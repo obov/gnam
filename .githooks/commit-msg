@@ -1,0 +1,13 @@
+#!/bin/sh
+# gnam commit-msg hook. gnam link 이 설치 (core.hooksPath=.githooks). --no-verify 로 우회 가능. 최종 gate = CI (gnam verify)
+root=$(git rev-parse --show-toplevel)
+bin="$root/node_modules/gnam/bin/gnam.js"
+# gnam 저장소 자신 (dogfooding)
+[ -f "$bin" ] || { grep -q '"name": "gnam"' "$root/package.json" 2>/dev/null && bin="$root/bin/gnam.js"; }
+if [ -f "$bin" ]; then
+  if command -v node >/dev/null 2>&1; then exec node "$bin" commit-msg "$1"; fi
+  if command -v bun >/dev/null 2>&1; then exec bun "$bin" commit-msg "$1"; fi
+fi
+if command -v gnam >/dev/null 2>&1; then exec gnam commit-msg "$1"; fi
+echo "gnam: 실행 파일 없음. npm install (또는 bun install) 후 다시 커밋한다" >&2
+exit 1
