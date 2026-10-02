@@ -246,7 +246,7 @@ export function preparePackage(project: string, report: Report): void {
     writeFileSync(path, text)
     report.push("package.json postinstall = gnam link")
   }
-  if (git(["rev-parse", "--git-dir"], project).ok && !git(["check-ignore", "-q", "node_modules"], project).ok) {
+  if (git(["rev-parse", "--git-dir"], project).ok && !git(["check-ignore", "-q", "--no-index", "node_modules/"], project).ok) {
     const ignore = join(project, ".gitignore")
     const before = existsSync(ignore) ? readFileSync(ignore, "utf8") : ""
     writeFileSync(ignore, `${before}${before === "" || before.endsWith("\n") ? "" : "\n"}node_modules/\n`)

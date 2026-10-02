@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { existsSync, mkdirSync, readFileSync, readlinkSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, readFileSync, readlinkSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { afterEach, test } from "node:test"
 import { type Repo, tempRepo } from "./helpers.ts"
@@ -30,6 +30,14 @@ test("init --no-install: gnam.json · hook · skill 링크 · AGENTS.md 블록 �
   assert.equal(pkg.scripts.postinstall, "gnam link")
   assert.equal(repo.git("check-ignore", "-q", "node_modules").status, 0)
   assert.equal(repo.gnam("doctor").status, 0)
+})
+
+test(".gitignore 에 node_modules/ 가 이미 있으면 (디렉터리 설치 전) 추가하지 않는다", () => {
+  repo = tempRepo(null)
+  writeFileSync(join(repo.root, ".gitignore"), "node_modules/\n.env\n")
+  rmSync(join(repo.root, "node_modules"), { recursive: true })
+  assert.equal(repo.gnam("init", "--no-install").status, 0)
+  assert.equal(readFileSync(join(repo.root, ".gitignore"), "utf8"), "node_modules/\n.env\n")
 })
 
 test("AGENTS.md 블록 밖 내용은 유지, 다시 sync 해도 같음", () => {
