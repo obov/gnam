@@ -2,17 +2,44 @@
   "name": "gnam",
   "version": "0.1.0",
   "description": "Git-Native Agent Memory: commit conventions (chore · refactor · spec plan/impl) enforced by a git hook, with opt-in plugins (lore, run, release, multi-agent).",
-  "keywords": ["git", "commit", "conventions", "agents", "claude-code", "codex", "hooks"],
+  "keywords": [
+    "git",
+    "commit",
+    "conventions",
+    "agents",
+    "claude-code",
+    "codex",
+    "hooks"
+  ],
   "license": "MIT",
   "author": "obov",
+  "homepage": "https://github.com/obov/gnam#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/obov/gnam.git"
+  },
+  "bugs": {
+    "url": "https://github.com/obov/gnam/issues"
+  },
   "type": "module",
-  "bin": { "gnam": "bin/gnam.js" },
+  "bin": {
+    "gnam": "bin/gnam.js"
+  },
   "exports": {
     "./plugin": "./dist/core/plugin.js",
     "./package.json": "./package.json"
   },
-  "files": ["bin", "dist", "skills", "plugins", "templates"],
-  "engines": { "node": ">=20", "bun": ">=1.2" },
+  "files": [
+    "bin",
+    "dist",
+    "skills",
+    "plugins",
+    "templates"
+  ],
+  "engines": {
+    "node": ">=20",
+    "bun": ">=1.2"
+  },
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
@@ -24,5 +51,8 @@
   "devDependencies": {
     "@types/node": "24.3.0",
     "typescript": "5.9.3"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

@@ -1,0 +1,26 @@
+name: publish
+# Tag vX.Y.Z (matching package.json version) → check → build → npm publish with provenance.
+# Uses npm trusted publishing (OIDC); no NPM_TOKEN secret needed once the
+# package's trusted publisher is set to this repository + workflow.
+on:
+  push:
+    tags: ["v*"]
+permissions:
+  contents: read
+  id-token: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - uses: oven-sh/setup-bun@v2
+      - run: npm install -g npm@latest
+      - run: npm ci
+      - name: Tag matches package version
+        run: test "v$(node -p 'require("./package.json").version')" = "$GITHUB_REF_NAME"
+      # prepublishOnly: check (typecheck · node test · bun test) + build
+      - run: npm publish --access public --provenance
