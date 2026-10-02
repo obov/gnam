@@ -1,5 +1,5 @@
 {
-  "name": "gnam",
+  "name": "@obov/gnam",
   "version": "0.1.0",
   "description": "Git-Native Agent Memory: commit conventions (chore · refactor · spec plan/impl) enforced by a git hook, with opt-in plugins (lore, run, release, multi-agent).",
   "keywords": [

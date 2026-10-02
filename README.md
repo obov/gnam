@@ -3,8 +3,8 @@
 파일에는 현재 상태, 커밋에는 상태가 변한 이유. 에이전트 (Claude Code · Codex) 와 사람이 같은 커밋 규약을 쓰도록 commit-msg hook 과 CI 검사로 강제한다.
 
 ```bash
-npx gnam init                      # 코어만: chore · refactor · spec.<topic>.plan|impl|chore
-npx gnam init --plugins lore,run   # plugin 함께
+npx @obov/gnam init                      # 코어만: chore · refactor · spec.<topic>.plan|impl|chore
+npx @obov/gnam init --plugins lore,run   # plugin 함께
 ```
 
 Node (>= 20) · Bun (>= 1.2) 모두 지원. 실행 파일은 hook 에서 node 우선, 없으면 bun.
@@ -14,9 +14,9 @@ Node (>= 20) · Bun (>= 1.2) 모두 지원. 실행 파일은 hook 에서 node �
 | 대상 | 내용 |
 |---|---|
 | `gnam.json` | `{ "format": 1, "plugins": [] }`. format 을 바꾼 커밋 = 검사 경계 |
-| `package.json` | devDependency `gnam`, `postinstall: gnam link` (clone 후 hook · 링크 복구) |
+| `package.json` | devDependency `@obov/gnam`, `postinstall: gnam link` (clone 후 hook · 링크 복구) |
 | `.githooks/commit-msg` | `git config core.hooksPath .githooks`. 다른 hooksPath 가 있으면 건드리지 않고 안내 |
-| `.agents/skills/gnam` · `.claude/skills/gnam` | `node_modules/gnam/skills/gnam` symlink (Codex · Claude Code) |
+| `.agents/skills/gnam` · `.claude/skills/gnam` | `node_modules/@obov/gnam/skills/gnam` symlink (Codex · Claude Code) |
 | `AGENTS.md` | `<!-- gnam:begin -->` 블록만 관리. 블록 밖은 유지. `CLAUDE.md` 없으면 `@AGENTS.md` |
 | `specs/README.md` | 없을 때만 |
 
@@ -59,7 +59,7 @@ npx gnam run <plugin> <command>        # plugin 명령
 
 ```js
 // gnam-plugins/docs/index.js
-import { definePlugin } from "gnam/plugin"
+import { definePlugin } from "@obov/gnam/plugin"
 export default definePlugin({
   id: "docs",
   version: "0.1.0",

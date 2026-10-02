@@ -18,7 +18,7 @@ test("init --no-install: gnam.json · hook · skill 링크 · AGENTS.md 블록 �
   assert.equal(repo.git("config", "core.hooksPath").out.trim(), ".githooks")
   assert.ok(existsSync(join(repo.root, ".githooks/commit-msg")))
   for (const dir of [".agents/skills", ".claude/skills"]) {
-    assert.match(readlinkSync(join(repo.root, dir, "gnam")), /node_modules\/gnam\/skills\/gnam$/)
+    assert.match(readlinkSync(join(repo.root, dir, "gnam")), /node_modules\/@obov\/gnam\/skills\/gnam$/)
     assert.ok(existsSync(join(repo.root, dir, "gnam-lore", "SKILL.md")))
   }
   const agents = readFileSync(join(repo.root, "AGENTS.md"), "utf8")

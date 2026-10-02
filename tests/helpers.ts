@@ -32,11 +32,11 @@ export interface Repo {
   cleanup: () => void
 }
 
-/** 임시 git 저장소. node_modules/gnam → 이 패키지. gnam 은 현재 런타임 (node · bun) 으로 실행 */
+/** 임시 git 저장소. node_modules/@obov/gnam → 이 패키지. gnam 은 현재 런타임 (node · bun) 으로 실행 */
 export function tempRepo(gnamJson: object | null = { format: 1, plugins: [] }): Repo {
   const root = mkdtempSync(join(tmpdir(), "gnam-"))
-  mkdirSync(join(root, "node_modules"))
-  symlinkSync(PACKAGE, join(root, "node_modules", "gnam"), "dir")
+  mkdirSync(join(root, "node_modules", "@obov"), { recursive: true })
+  symlinkSync(PACKAGE, join(root, "node_modules", "@obov", "gnam"), "dir")
   const run = (cmd: string, args: string[]) => {
     const r = spawnSync(cmd, args, { cwd: root, encoding: "utf8", env: { ...process.env, CI: "" } })
     return { status: r.status ?? 1, out: r.stdout, err: r.stderr }

@@ -1,7 +1,7 @@
 /**
  * plugin 계약. 내장 plugin (@gnam/<id>) · 로컬 plugin (./경로) · npm 패키지가 같은 형식을 쓴다.
  *
- *   import { definePlugin } from "gnam/plugin"
+ *   import { definePlugin } from "@obov/gnam/plugin"
  *   export default definePlugin({ id: "x", version: "0.1.0", kinds: [...] })
  */
 import type { GnamConfig } from "./config.ts"

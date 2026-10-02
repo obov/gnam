@@ -1,7 +1,7 @@
 /**
  * 저장소 설치 상태. 셋 다 gnam.json 에서 다시 만들 수 있다 (gnam sync):
  *   hook     .githooks/commit-msg + git config core.hooksPath .githooks (clone 마다 postinstall 의 gnam link 가 복구)
- *   skills   .agents/skills/<name> · .claude/skills/<name> → node_modules/gnam/… symlink (Codex · Claude Code 공통)
+ *   skills   .agents/skills/<name> · .claude/skills/<name> → node_modules/@obov/gnam/… symlink (Codex · Claude Code 공통)
  *   AGENTS   AGENTS.md 의 <!-- gnam:begin --> … <!-- gnam:end --> 블록 (코어 + plugin 조각). 블록 밖은 건드리지 않는다
  */
 import {
@@ -53,7 +53,7 @@ const isLink = (path: string) => {
 
 /** 프로젝트에 설치된 gnam 경로로 바꾼다. npx 캐시를 가리키는 링크는 캐시 정리 후 끊긴다 */
 function stable(project: string, path: string): string {
-  const installed = join(project, "node_modules", "gnam")
+  const installed = join(project, "node_modules", "@obov", "gnam")
   if (!path.startsWith(PACKAGE_ROOT) || !existsSync(join(installed, "package.json"))) return path
   return join(installed, relative(PACKAGE_ROOT, path))
 }
@@ -116,10 +116,10 @@ function skillDirs(project: string): string[] {
   return SKILL_DIRS
 }
 
-/** gnam 이 만든 링크인가: 패키지 · node_modules/gnam · 활성 plugin 자원을 가리킨다 */
+/** gnam 이 만든 링크인가: 패키지 · node_modules/@obov/gnam · 활성 plugin 자원을 가리킨다 */
 function managed(project: string, link: string, roots: string[]): boolean {
   const target = resolve(dirname(link), readlinkSync(link))
-  const owners = [PACKAGE_ROOT, join(project, "node_modules", "gnam"), ...roots]
+  const owners = [PACKAGE_ROOT, join(project, "node_modules", "@obov", "gnam"), ...roots]
   return owners.some((o) => target === o || target.startsWith(o.endsWith(sep) ? o : o + sep))
 }
 
@@ -290,7 +290,7 @@ export async function sync(project: string, removed: Loaded[] = []): Promise<Rep
 export interface InitOptions {
   plugins?: string[]
   install?: boolean
-  /** 설치할 gnam 표기. 기본 gnam@^<이 판> */
+  /** 설치할 gnam 표기. 기본 @obov/gnam@^<이 판> */
   source?: string
 }
 
@@ -308,7 +308,7 @@ export async function init(project: string, options: InitOptions = {}): Promise<
   preparePackage(project, report)
   if (options.install !== false) {
     const version = (JSON.parse(readFileSync(join(PACKAGE_ROOT, "package.json"), "utf8")) as { version: string }).version
-    install(project, options.source ?? `gnam@^${version}`, report)
+    install(project, options.source ?? `@obov/gnam@^${version}`, report)
   }
   report.push(...(await sync(project)))
   return report
