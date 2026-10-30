@@ -9,9 +9,9 @@ opt-in 내장 plugin `recall`. 단어가 기억나지 않는 결정 · 계획 ·
 gnam run recall search <query…> [--limit N]
 ```
 
-- 미구현: `--limit` 기본 10. N 은 양의 정수, 아니면 오류 (exit 1)
-- 미구현: query 가 비거나 토큰이 하나도 없으면 사용법 출력 · exit 1
-- 미구현: 결과 없음 = `결과 없음` 출력 · exit 0
+- `--limit` 기본 10. N 은 양의 정수, 아니면 오류 (exit 1)
+- query 가 비거나 토큰이 하나도 없으면 사용법 출력 · exit 1
+- 결과 없음 = `결과 없음` 출력 · exit 0
 
 ## 검색 대상
 

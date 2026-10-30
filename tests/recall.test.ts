@@ -87,3 +87,28 @@ test("순위: 동점은 수집 순서, 대체된 plan 에 superseded by 표시 (
   const tie = search([doc("c1", "재시도"), doc("c2", "재시도")], "재시도", 10)
   expect(tie.map((h) => h.doc.ref)).toEqual(["c1", "c2"])
 })
+
+test("search 명령: 출력 형식 · --limit · 빈 query exit 1 · 결과 없음 exit 0", () => {
+  const repo = tempRepo({ format: 1, plugins: ["@gnam/recall"] })
+  try {
+    const old = repo.commit("a.txt", "spec.auth.plan: 재시도 계획")
+    const next = repo.commit("b.txt", `spec.auth.plan: 재시도 간격 계획\n\nSupersedes: ${old}`)
+    writeRepoFile(repo.root, "lore/retry.md", "## 재시도 간격은 1초\n\nWhen: 토큰 갱신\n")
+    const out = repo.gnam("run", "recall", "search", "재시도를", "--limit", "5")
+    expect(out.status).toBe(0)
+    const lines = out.out.trim().split("\n")
+    expect(lines).toHaveLength(3)
+    expect(lines).toContain(`${old.slice(0, 7)}  commit  spec.auth.plan: 재시도 계획  superseded by ${next.slice(0, 7)}`)
+    expect(lines).toContain("lore/retry.md:1  lore  재시도 간격은 1초")
+    expect(repo.gnam("run", "recall", "search", "재시도", "--limit", "1").out.trim().split("\n")).toHaveLength(1)
+    for (const bad of [["--limit", "0", "재시도"], ["재시도", "--limit"], [":"], []]) {
+      const r = repo.gnam("run", "recall", "search", ...bad)
+      expect(r.status).toBe(1)
+      expect(r.err).toContain("사용: gnam run recall search")
+    }
+    const none = repo.gnam("run", "recall", "search", "배포")
+    expect([none.status, none.out.trim()]).toEqual([0, "결과 없음"])
+  } finally {
+    repo.cleanup()
+  }
+})
