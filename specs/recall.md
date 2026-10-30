@@ -41,12 +41,12 @@ handoff.md 경로는    →  handoff md 경로 로는
 plan커밋             →  plan 커밋
 ```
 
-- 미구현: 문서와 query 에 같은 토큰화를 쓴다
+- 문서와 query 에 같은 토큰화를 쓴다
 
 ## 순위
 
-- 미구현: BM25 (k1 = 1.2, b = 0.75). 점수 높은 순, 같으면 수집 순서 (커밋 새 것부터 → spec → lore, 파일은 경로 · 줄 순)
-- 미구현: 다른 커밋 본문의 `Supersedes: <hash>` 가 가리키는 plan 커밋은 `superseded by <hash>` 를 함께 표시
+- BM25 (k1 = 1.2, b = 0.75). 점수 높은 순, 같으면 수집 순서 (커밋 새 것부터 → spec → lore, 파일은 경로 · 줄 순)
+- 다른 커밋 본문의 `Supersedes: <hash>` 가 가리키는 plan 커밋은 `superseded by <hash>` 를 함께 표시
 
 ## 출력
 

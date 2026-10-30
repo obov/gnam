@@ -2,7 +2,8 @@ import { test } from "node:test"
 import { expect } from "./expect.ts"
 import { mkdirSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
-import { collect, sections } from "../src/plugins/recall/corpus.ts"
+import { collect, type Doc, sections } from "../src/plugins/recall/corpus.ts"
+import { search } from "../src/plugins/recall/rank.ts"
 import { tokenize } from "../src/plugins/recall/tokenize.ts"
 import { tempRepo } from "./helpers.ts"
 
@@ -54,4 +55,35 @@ test("문서 수집: spec 머리 절은 # 제목 외 내용이 있을 때만", (
   ])
   expect(sections("specs/x.md", "spec", "## A\n")).toHaveLength(1)
   expect(sections("lore/x.md", "lore", "# L\n\n설명\n## A\n").map((d) => d.title)).toEqual(["A"])
+})
+
+const doc = (ref: string, text: string, kind: Doc["kind"] = "commit"): Doc => ({ ref, kind, title: text.split("\n")[0] ?? "", text })
+
+test("순위: 조사가 붙은 '재시도를' 문서가 '재시도' query 1위, 무관 문서 제외", () => {
+  const docs = [
+    doc("c000001", "chore: 재시작 스크립트 정리"),
+    doc("c000002", "chore: 설정 시도 기록"),
+    doc("c000003", "spec.auth.impl: 토큰 갱신 실패 시 재시도를 추가\n\n간격 1초"),
+    doc("c000004", "chore: 배포 설정"),
+  ]
+  const hits = search(docs, "재시도", 10)
+  expect(hits[0]?.doc.ref).toBe("c000003")
+  expect(hits.map((h) => h.doc.ref)).not.toContain("c000004")
+  expect(search(docs, "— :", 10)).toEqual([])
+  expect(search(docs, "재시도 설정", 1)).toHaveLength(1)
+})
+
+test("순위: 동점은 수집 순서, 대체된 plan 에 superseded by 표시 (점수 유지)", () => {
+  const docs = [
+    doc("bbbbbbb", "spec.x.plan: 재시도 새 계획\n\nSupersedes: aaaaaaa1234"),
+    doc("aaaaaaa", "spec.x.plan: 재시도 옛 계획"),
+    doc("specs/x.md:3", "## 재시도\n", "spec"),
+  ]
+  const hits = search(docs, "계획", 10)
+  expect(hits.map((h) => [h.doc.ref, h.supersededBy])).toEqual([
+    ["aaaaaaa", "bbbbbbb"],
+    ["bbbbbbb", null],
+  ])
+  const tie = search([doc("c1", "재시도"), doc("c2", "재시도")], "재시도", 10)
+  expect(tie.map((h) => h.doc.ref)).toEqual(["c1", "c2"])
 })
