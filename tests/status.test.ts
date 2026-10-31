@@ -242,7 +242,13 @@ test("프로그래밍 API: status() 가 CLI --json 과 같은 트리", async () 
   const repo = tempRepo({ format: 1, plugins: ["@gnam/recall"] })
   try {
     repo.commit("a.txt", "chore: 첫 커밋")
-    const api = await status({ cwd: repo.root })
+    // CLI 하위 프로세스는 CI="" (tempRepo). 같은 조건으로 비교
+    const ci = process.env["CI"]
+    process.env["CI"] = ""
+    const api = await status({ cwd: repo.root }).finally(() => {
+      if (ci === undefined) delete process.env["CI"]
+      else process.env["CI"] = ci
+    })
     const cli = JSON.parse(repo.gnam("status", "--json").out) as Record<string, unknown>
     expect(JSON.parse(JSON.stringify(api))).toEqual(cli)
     expect(Object.keys(await status({ cwd: repo.root, paths: ["trace"] }))).toEqual(["trace"])
