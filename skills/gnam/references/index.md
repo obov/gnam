@@ -10,6 +10,7 @@ okf_version: "0.2"
 
 * [개요](overview.md) - 현재 상태 (spec · 코드 · 테스트) 와 과거 맥락 (git history) 의 구분. 미구현: · 미결: 고정 표기
 * [Agent 프로토콜](agent-protocol.md) - 세션 시작 · 작업 · 사용자 소통 (자율 진행) · 중단 · 재개 (인계 메모) 절차의 원본
+* [기록 분석](analysis.md) - gnam status trace + git 으로 요청 의도 · 반영 여부 분석, 개선안 · 후속 작업 제안
 * [ADR와의 관계](adr.md) - ADR · plan · impl · spec 의 결정 기록 범위 구분
 
 # 커밋

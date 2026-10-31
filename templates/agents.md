@@ -4,8 +4,7 @@
 
 ```sh
 git status
-cat "$(git rev-parse --git-path gnam/handoff.md)" 2>/dev/null   # 인계 메모 (.agents/skills/gnam/references/agent-protocol.md)
-git log --oneline --decorate -20 && cat specs/README.md
+npx gnam status    # 설치 · 문제 · 인계 메모 · 요청 · plan 진행 · Blocking · 미결 (경로 · --json 으로 데이터)
 ```
 
 ```text

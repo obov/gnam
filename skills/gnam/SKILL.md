@@ -7,7 +7,8 @@ description: Git 기반 작업 기록 규약 (Git-Native Agent Memory). spec · 
 
 파일에는 현재 상태, 커밋에는 상태가 변한 이유. 필수 규칙은 스킬 선택 여부와 무관하게 AGENTS.md 와 commit-msg hook · CI (`npx gnam verify`) 로 적용한다.
 
-- 시작 · 인계: [agent-protocol](references/agent-protocol.md)
+- 시작 · 인계: [agent-protocol](references/agent-protocol.md). 상태 요약 · 데이터: `npx gnam status` (경로 · `--json` · `--since <rev>`)
+- 기록 분석 · 제안: [analysis](references/analysis.md)
 - 규약 목록: [index](references/index.md), [commits](references/commits/index.md)
 - 추적 명령: [git-commands](references/reference/git-commands.md)
 - 검사: `npx gnam commit-msg <file>` (hook) · `npx gnam verify` (history + plugin 파일 검사)

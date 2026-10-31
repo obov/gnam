@@ -87,6 +87,21 @@ npx gnam plugin add ./gnam-plugins/docs
 
 `verify` 는 커밋 history (기본 HEAD, gnam 도입 이후) 와 plugin 파일 검사를 함께 돈다.
 
+## status
+
+```bash
+npx gnam status                                    # 세션 시작 요약 (git status 와 함께)
+npx gnam status gnam.version --format raw          # 경로 하나의 값
+npx gnam status trace.requests --where status=open # 미착수 요청
+npx gnam status trace --since <저장한 trace.head>   # 바뀐 부분만
+npx gnam status --keys install · --schema trace     # 구조 탐색
+npx gnam status problems --check                   # 문제 있으면 exit 3 (CI)
+npx gnam status gnam.version -C ../a -C ../b       # 여러 저장소
+```
+
+트리 = schema · gnam · project · config · plugins · builtins · kinds · rules · install · problems · handoff · env · trace.
+형식 json · compact · ndjson · raw · env · text + plugin 형식. 코드에서는 `import { status } from "@obov/gnam/status"`.
+
 ## 명령
 
 ```text
@@ -94,7 +109,8 @@ gnam init [DIR] [--plugins a,b] [--no-install] [--source SPEC]
 gnam commit-msg <file>
 gnam verify [--range A..B | --push BEFORE SHA]
 gnam plugin list | add <spec> | remove <spec> [--cascade]
-gnam run <plugin> <command> [args…]
+gnam run <plugin> <command> [args…] [--json | --format F]
+gnam status [<경로>…] [--json] [--format F] [--where k=v] [--fields a,b] [--keys] [--schema] [--since REV] [--deep] [--check] [-C DIR]…
 gnam sync      gnam.json 기준 hook · skill 링크 · AGENTS.md 블록 · scaffold 재생성
 gnam link      hook · skill 링크만 (postinstall)
 gnam doctor    설치 상태 점검

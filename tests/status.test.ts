@@ -236,3 +236,17 @@ test("--schema: 최상위 키 · trace 하위 키 · plugin 섹션이 schema 에
     repo.cleanup()
   }
 })
+
+test("프로그래밍 API: status() 가 CLI --json 과 같은 트리", async () => {
+  const { status } = await import("../src/status.ts")
+  const repo = tempRepo({ format: 1, plugins: ["@gnam/recall"] })
+  try {
+    repo.commit("a.txt", "chore: 첫 커밋")
+    const api = await status({ cwd: repo.root })
+    const cli = JSON.parse(repo.gnam("status", "--json").out) as Record<string, unknown>
+    expect(JSON.parse(JSON.stringify(api))).toEqual(cli)
+    expect(Object.keys(await status({ cwd: repo.root, paths: ["trace"] }))).toEqual(["trace"])
+  } finally {
+    repo.cleanup()
+  }
+})

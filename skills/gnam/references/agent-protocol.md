@@ -38,7 +38,14 @@ hook · CI는 검사 가능한 규칙의 준수를 확인한다. 통과했다고
 
 ```bash
 git status
-cat "$(git rev-parse --git-path gnam/handoff.md)" 2>/dev/null   # 인계 메모 (아래 '중단 · 재개'). 없으면 출력 없음
+npx gnam status                   # 요약: 설치 · 문제 · 인계 메모 Next · 요청 · 진행 중 plan · Blocking · 미결 · plugin 상태
+```
+
+요약에서 이어 갈 곳을 고른 뒤 필요한 것만 읽는다.
+
+```bash
+npx gnam status handoff.content --format raw   # 인계 메모 전체 (아래 '중단 · 재개')
+npx gnam status trace.topics.<topic> --format text   # topic 의 spec 표기 · plan 단계별 impl · 미해결
 git log --oneline --decorate -20
 cat lore/README.md 2>/dev/null    # 작업 노하우 인덱스 (lore plugin). 적용 조건이 맞는 파일만 읽는다
 git show -s $(git log -1 -E --grep '^spec\.[^:]+\.chore: [A-Z][0-9]+ 완료' --format=%h)   # 직전 마일스톤 종료 — 남은 일 전체
@@ -56,6 +63,7 @@ topic 관련 경로는 `ls apps packages` 로 구조를 보고, 그 topic impl �
 (`git log --stat --grep='^spec\.<topic>\.impl:'`) 로 정한다.
 
 더 깊은 추적 (줄 출처 · 개념 등장 시점 · 계획 → 실행) 은 [추적 명령](reference/git-commands.md).
+요청 의도 · 반영 여부 분석과 개선안 · 후속 작업 제안은 [기록 분석](analysis.md).
 
 ## 작업
 

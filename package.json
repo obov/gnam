@@ -27,6 +27,7 @@
   },
   "exports": {
     "./plugin": "./dist/core/plugin.js",
+    "./status": "./dist/status.js",
     "./package.json": "./package.json"
   },
   "files": [

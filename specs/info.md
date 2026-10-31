@@ -79,7 +79,7 @@ sections     plugin 이 더한 섹션 (아래 'plugin 확장')
 
 - gnam.json 이 없거나 깨져도 exit 0. config.raw = null, 원인은 problems
 - plugin 로드 실패 · requires 누락도 exit 0. 해당 plugin 객체의 error 와 problems
-- 미구현: deep 으로 표시한 plugin 섹션은 `--deep` 이거나 경로로 직접 고를 때만 계산
+- deep 으로 표시한 plugin 섹션은 `--deep` 이거나 경로로 직접 고를 때만 계산
 - 고른 경로에 필요한 섹션만 계산한다 (`gnam status gnam.version` 은 trace · plugin 섹션을 읽지 않는다)
 
 ## trace
@@ -132,7 +132,7 @@ HEAD 가 바뀔 때마다 바뀐 부분만 읽는 호출자용 (`trace.head` 를
 
 ## 세션 시작
 
-- 미구현: AGENTS.md 템플릿 · agent-protocol 시작 절차 = `git status` + `npx gnam status`. 인계 메모 · 최근 커밋 · specs 목록 개별 명령은 필요할 때만
+- AGENTS.md 템플릿 · agent-protocol 시작 절차 = `git status` + `npx gnam status`. 인계 메모 · 최근 커밋 · specs 목록 개별 명령은 필요할 때만
 
 ## 고르기
 
@@ -203,7 +203,7 @@ multi-agent   summary = 진행 중 run 수 · 판단 필요 노드 수. sections
 
 ## 프로그래밍 API
 
-- 미구현: `import { status } from "@obov/gnam/status"`. `status({ cwd, paths?, deep? })` → CLI 와 같은 트리 (형식 적용 전 값)
+- `import { status } from "@obov/gnam/status"`. `status({ cwd, paths?, deep? })` → CLI 와 같은 트리 (형식 적용 전 값)
 
 ## 범위 밖
 
