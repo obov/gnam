@@ -43,7 +43,7 @@ const LINK_SCRIPT = "gnam link"
 
 export type Report = string[]
 
-const isLink = (path: string) => {
+export const isLink = (path: string) => {
   try {
     return lstatSync(path).isSymbolicLink()
   } catch {
@@ -96,12 +96,12 @@ export function hookProblems(project: string): string[] {
 
 // ---------- skills ----------
 
-interface SkillSource {
+export interface SkillSource {
   name: string
   source: string
 }
 
-function skillSources(project: string, loaded: Loaded[]): SkillSource[] {
+export function skillSources(project: string, loaded: Loaded[]): SkillSource[] {
   const core = { name: "gnam", source: stable(project, join(PACKAGE_ROOT, "skills", "gnam")) }
   const fromPlugins = loaded.flatMap(({ root, plugin }) =>
     (plugin.skills ?? []).map((dir) => ({ name: basename(dir), source: stable(project, join(root, dir)) })),
@@ -110,7 +110,7 @@ function skillSources(project: string, loaded: Loaded[]): SkillSource[] {
 }
 
 /** .claude/skills 가 .agents/skills 를 가리키는 링크면 한쪽만 */
-function skillDirs(project: string): string[] {
+export function skillDirs(project: string): string[] {
   const claude = join(project, ".claude/skills")
   if (isLink(claude)) return [".agents/skills"]
   return SKILL_DIRS

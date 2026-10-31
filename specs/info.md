@@ -20,7 +20,7 @@ gnam run <plugin> <command> [args…] --json | --format <이름> [출력 옵션]
 - 미구현: `--check` 만 주면 요약 출력 + problems 가 있으면 exit 3
 - 미구현: gnam doctor 는 status 의 problems 수집을 쓴다. 출력 · exit code 는 지금과 같다
 - 미구현: stdout = 결과만. 진단 · 경고는 stderr
-- 미구현: 키 순서 고정 (이 문서 순서, plugin 은 gnam.json plugins 순서). 같은 저장소 상태면 같은 출력
+- 키 순서 고정 (이 문서 순서, plugin 은 gnam.json plugins 순서). 같은 저장소 상태면 같은 출력
 
 ## 요약
 
@@ -77,10 +77,10 @@ error        로드 실패 메시지. 실패하면 이 키와 spec · kind 만
 sections     plugin 이 더한 섹션 (아래 'plugin 확장')
 ```
 
-- 미구현: gnam.json 이 없거나 깨져도 exit 0. config.raw = null, 원인은 problems
-- 미구현: plugin 로드 실패 · requires 누락도 exit 0. 해당 plugin 객체의 error 와 problems
+- gnam.json 이 없거나 깨져도 exit 0. config.raw = null, 원인은 problems
+- plugin 로드 실패 · requires 누락도 exit 0. 해당 plugin 객체의 error 와 problems
 - 미구현: deep 으로 표시한 plugin 섹션은 `--deep` 이거나 경로로 직접 고를 때만 계산
-- 미구현: 고른 경로에 필요한 섹션만 계산한다 (`gnam status gnam.version` 은 trace · plugin 섹션을 읽지 않는다)
+- 고른 경로에 필요한 섹션만 계산한다 (`gnam status gnam.version` 은 trace · plugin 섹션을 읽지 않는다)
 
 ## trace
 

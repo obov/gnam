@@ -47,6 +47,37 @@ export interface CommitKind {
 export interface Command {
   describe: string
   run(args: string[], cwd: string, config: GnamConfig): number | Promise<number>
+  /** 구조화 결과. 있으면 gnam run … --json · --format 이 이 값을 출력 계층에 넘긴다 */
+  data?(args: string[], ctx: StatusContext): unknown | Promise<unknown>
+  /** data 결과의 JSON Schema */
+  schema?: object
+}
+
+/** status 섹션 · summary · data 가 받는 문맥 */
+export interface StatusContext {
+  cwd: string
+  config: GnamConfig
+  /** 활성 plugin id */
+  plugins: string[]
+}
+
+export interface StatusSection {
+  describe: string
+  /** true 면 --deep 이거나 경로로 고를 때만 계산 */
+  deep?: boolean
+  schema?: object
+  collect(ctx: StatusContext): unknown | Promise<unknown>
+}
+
+export interface OutputFormat {
+  describe: string
+  render(value: unknown, ctx: StatusContext): string
+}
+
+export interface RuleMeta {
+  /** 위반 rule 값 그대로. 예: commit/request-text · lore/index */
+  id: string
+  why: string
 }
 
 export interface GnamPlugin {
@@ -70,6 +101,17 @@ export interface GnamPlugin {
   agentsMd?: string
   /** 없을 때만 만드는 파일. 저장소 경로 → plugin 루트 기준 원본 */
   scaffold?: Record<string, string>
+  /** gnam status 에 더하는 섹션 (plugins.<id>.sections.<이름>) · 요약 줄 */
+  status?: {
+    sections?: Record<string, StatusSection>
+    summary?(ctx: StatusContext): string[] | Promise<string[]>
+  }
+  /** gnam status · gnam run --format <이름> 형식 */
+  formats?: Record<string, OutputFormat>
+  /** gnam.json 의 이 plugin 설정 기본값 (config.effective.<id>) */
+  configDefaults?: unknown
+  /** 이 plugin 이 내는 검사 규칙 (gnam status rules) */
+  rules?: RuleMeta[]
 }
 
 export function definePlugin(plugin: GnamPlugin): GnamPlugin {
