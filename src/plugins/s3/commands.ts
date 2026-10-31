@@ -3,7 +3,10 @@
  */
 import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs"
 import { basename, extname, join, resolve } from "node:path"
+import { fieldsOf } from "../../core/fields.ts"
+import { git } from "../../core/git.ts"
 import type { GnamConfig } from "../../core/plugin.ts"
+import { parseAttachment, REQUEST_SUBJECT } from "../request/model.ts"
 import { type S3Client, S3Error, s3Client } from "./client.ts"
 import { CREDENTIAL_HELP, credentialsFrom, s3ConfigOf, s3ConfigProblems, type S3Config } from "./config.ts"
 import { sha256Hex } from "./sigv4.ts"
@@ -168,4 +171,51 @@ export async function urlCommand(args: string[], _cwd: string, gnamConfig: GnamC
   }
   io.out(r.client.presign(target.key, expires, target.bucket))
   return 0
+}
+
+/** range 의 request 커밋에서 s3 첨부 줄 (commit sha · 이름 · bucket · key) */
+export function s3Attachments(cwd: string, range: string): { sha: string; name: string; bucket: string; key: string }[] {
+  const result = git(["log", "-z", "--format=%H%x00%s%x00%b", range], cwd)
+  if (!result.ok) throw new Error(`git log ${range} 실패: ${result.err.trim()}`)
+  const fields = result.out.split("\0")
+  const out: { sha: string; name: string; bucket: string; key: string }[] = []
+  for (let i = 0; i + 2 < fields.length; i += 3) {
+    const [sha = "", subject = "", body = ""] = fields.slice(i, i + 3)
+    if (!REQUEST_SUBJECT.test(subject)) continue
+    for (const line of fieldsOf(body).get("Attachments") ?? []) {
+      const parsed = line.trim() === "" ? null : parseAttachment(line.trim())
+      if (parsed === null || typeof parsed === "string" || parsed.location.kind !== "s3") continue
+      const m = /^s3:\/\/([^/]+)\/(.+)$/.exec(parsed.location.value)
+      if (m !== null) out.push({ sha: sha.trim(), name: parsed.name, bucket: m[1] ?? "", key: m[2] ?? "" })
+    }
+  }
+  return out.reverse()
+}
+
+export async function checkCommand(args: string[], cwd: string, gnamConfig: GnamConfig, io: Io = processIo()): Promise<number> {
+  const r = ready(gnamConfig, io)
+  if (typeof r === "number") return r
+  let attachments: ReturnType<typeof s3Attachments>
+  try {
+    attachments = s3Attachments(cwd, args[0] ?? "HEAD")
+  } catch (error) {
+    io.err((error as Error).message)
+    return 1
+  }
+  return guarded(io, async () => {
+    let failed = 0
+    for (const a of attachments) {
+      const info = await r.client.head(a.key, a.bucket)
+      const expected = a.key.split("/").at(-1) ?? ""
+      const meta = info?.metadata["sha256"]
+      const problem = info === null ? "객체 없음" : meta !== undefined && HEX64.test(expected) && meta !== expected ? `sha256 메타데이터 불일치 (${meta})` : null
+      if (problem !== null) {
+        io.out(`${a.sha.slice(0, 7)}  ${attachmentName(a.name)}  ${problem}`)
+        failed++
+      }
+    }
+    if (failed > 0) return 1
+    io.out(`s3 check: 첨부 ${attachments.length}개 확인`)
+    return 0
+  })
 }

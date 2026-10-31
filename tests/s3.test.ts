@@ -199,3 +199,33 @@ test("url: presigned URL · 만료 범위 검사", async () => {
     await t.server.close()
   }
 })
+
+test("check: request 커밋의 s3 첨부 존재 · 없는 객체 출력 exit 1 · 모두 있으면 exit 0", async () => {
+  const { checkCommand, putCommand } = await import("../src/plugins/s3/commands.ts")
+  const { tempRepo } = await import("./helpers.ts")
+  const t = await commandSetup()
+  const repo = tempRepo({ format: 1, plugins: [] })
+  try {
+    t.write("a.png", "aaa")
+    await putCommand(["a.png"], t.dir, t.config, t.io)
+    const line = t.out[0] ?? ""
+    const missing = `gone.png  sha256:${"b".repeat(64)}  s3://gnam/gnam/${"b".repeat(64)}`
+    const empty = (message: string) => repo.git("commit", "-q", "--no-verify", "--allow-empty", "-m", message)
+    empty(`request: 첫\n\nText:\n> a\n\nAttachments:\n${line}\n문서  https://x.dev/doc`)
+    const first = repo.git("rev-parse", "HEAD").out.trim()
+    t.out.length = 0
+    expect(await checkCommand([], repo.root, t.config, t.io)).toBe(0)
+    expect(t.out).toEqual(["s3 check: 첨부 1개 확인"])
+    empty(`request: 둘\n\nText:\n> b\n\nAttachments:\n${missing}`)
+    const second = repo.git("rev-parse", "HEAD").out.trim()
+    t.out.length = 0
+    expect(await checkCommand([], repo.root, t.config, t.io)).toBe(1)
+    expect(t.out).toEqual([`${second.slice(0, 7)}  gone.png  객체 없음`])
+    t.out.length = 0
+    expect(await checkCommand([`${first}~0`], repo.root, t.config, t.io)).toBe(0)
+    expect(await checkCommand(["nope..HEAD"], repo.root, t.config, t.io)).toBe(1)
+  } finally {
+    repo.cleanup()
+    await t.server.close()
+  }
+})
