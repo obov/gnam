@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.0
+
+- `gnam status`: 인자 없이 세션 시작 요약 (설치 · 문제 · 인계 메모 · 요청 · plan 진행 · Blocking · 미결 · plugin 상태). 경로 · `--json` 이면 JSON 트리 (schema · gnam · config · plugins · kinds · rules · install · problems · handoff · env · trace)
+- 출력 계층: 경로 선택 · `--where` · `--fields` · `--keys` · `--schema` · 형식 json · compact · ndjson · raw · env · text · `-C` 여러 저장소 · `--check` (exit 3)
+- trace: 요청 → plan → 단계별 impl → spec 연결, plan 상태, 미해결 후보, 결정 필요 (Blocking · 미결: 도입 커밋), `--since <rev>` 바뀐 부분만
+- plugin 확장점: status 섹션 · 요약 줄 · 출력 형식 · 명령 구조화 결과 (`gnam run … --json`) · 설정 기본값 · 규칙 메타
+- 내장 plugin `request`: 사용자 요청 원문 · 첨부를 `request:` 빈 커밋으로, 작업 커밋 `Request:` 검사, `open` · `show`
+- 내장 plugin `s3`: 첨부를 S3 호환 저장소에 sha256 key 로 보관 (`put` · `get` · `url` · `check`), 런타임 의존성 없는 SigV4
+- 프로그래밍 API `@obov/gnam/status`. 시작 절차 = `git status` + `npx gnam status`. 기록 분석 절차 문서 (analysis.md)
+- doctor: plugin 로드 실패를 오류 종료 대신 문제 줄로
+
 ## 0.2.1
 
 - 에이전트 자율 진행: 커밋 · 다음 plan 착수는 사용자 확인 없이 진행. 질문은 요구사항 판단 · git 예외만 (AGENTS.md 블록 · agent-protocol '사용자 소통')
