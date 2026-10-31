@@ -16,10 +16,10 @@ gnam doctor                                         설치 문제 점검 (기존
 gnam run <plugin> <command> [args…] --json | --format <이름> [출력 옵션]
 ```
 
-- 미구현: 인자 · 옵션 없으면 요약 (아래 '요약'). `--json` 이면 트리 전체 (deep 섹션 제외), 경로를 주면 그 값 (형식 기본 json)
-- 미구현: `--check` 만 주면 요약 출력 + problems 가 있으면 exit 3
-- 미구현: gnam doctor 는 status 의 problems 수집을 쓴다. 출력 · exit code 는 지금과 같다
-- 미구현: stdout = 결과만. 진단 · 경고는 stderr
+- 인자 · 옵션 없으면 요약 (아래 '요약'). `--json` 이면 트리 전체 (deep 섹션 제외), 경로를 주면 그 값 (형식 기본 json)
+- `--check` 만 주면 요약 출력 + problems 가 있으면 exit 3
+- gnam doctor 는 status 의 problems 수집을 쓴다. 출력 · exit code 는 지금과 같다
+- stdout = 결과만. 진단 · 경고는 stderr
 - 키 순서 고정 (이 문서 순서, plugin 은 gnam.json plugins 순서). 같은 저장소 상태면 같은 출력
 
 ## 요약
@@ -162,7 +162,7 @@ text      사람용 들여쓰기 트리 (key: value)
 
 - `--keys` = 고른 값 아래 모든 잎 경로 목록 (배열 형식 출력)
 - 미구현: `--schema` = 고른 값의 JSON Schema (core + plugin 이 낸 schema 합성)
-- 미구현: `--check` = problems 가 비어 있지 않으면 exit 3 (출력은 그대로)
+- `--check` = problems 가 비어 있지 않으면 exit 3 (출력은 그대로)
 
 ## exit code
 

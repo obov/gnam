@@ -6,7 +6,10 @@ import { git, gitOrThrow, lines, nulList } from "./core/git.ts"
 import { boundaryOf, cleanMessage, commitInput, gitLookup, historyArgs, pushRange } from "./core/history.ts"
 import { builtinIds, loadPlugins, PACKAGE_ROOT } from "./core/loader.ts"
 import type { GnamPlugin } from "./core/plugin.ts"
-import { addPlugin, doctor, init, link, realProject, removePlugin, sync } from "./core/project.ts"
+import { OutputError, output, type OutputOptions } from "./core/output.ts"
+import { addPlugin, init, link, realProject, removePlugin, sync } from "./core/project.ts"
+import { collectStatus, Context, problemsOf, summaryOf } from "./core/status.ts"
+import { TraceError } from "./core/trace.ts"
 import { format, type Violation } from "./core/violation.ts"
 
 const USAGE = `gnam — Git-Native Agent Memory
@@ -18,6 +21,8 @@ const USAGE = `gnam — Git-Native Agent Memory
   gnam run <plugin> <command> [args…]                       plugin 명령
   gnam sync                                                 gnam.json 기준 hook · skill · AGENTS.md 블록 재생성
   gnam link                                                 hook · skill 링크 복구 (postinstall)
+  gnam status [<경로>…] [--json] [--format F] [--where k=v] [--fields a,b] [--keys]
+              [--since REV] [--deep] [--check] [-C DIR]…   작업 기록 상태. 인자 없으면 요약, 경로 · --json 이면 JSON 트리
   gnam doctor                                               설치 상태 점검
 `
 
@@ -106,6 +111,97 @@ async function run(project: string, args: string[]): Promise<number> {
   return await command.run(rest, project, config)
 }
 
+interface StatusArgs extends OutputOptions {
+  dirs: string[]
+  json: boolean
+  deep: boolean
+  check: boolean
+  since: string | undefined
+  schema: boolean
+}
+
+const STATUS_VALUE_OPTIONS = new Set(["-C", "--format", "--where", "--fields", "--since"])
+const STATUS_FLAGS = new Set(["--json", "--deep", "--check", "--keys", "--schema"])
+
+export function parseStatusArgs(args: string[]): StatusArgs {
+  const parsed: StatusArgs = {
+    paths: [],
+    where: [],
+    fields: [],
+    format: "json",
+    keys: false,
+    dirs: [],
+    json: false,
+    deep: false,
+    check: false,
+    since: undefined,
+    schema: false,
+  }
+  let format: string | undefined
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i] ?? ""
+    if (STATUS_VALUE_OPTIONS.has(arg)) {
+      const value = args[++i]
+      if (value === undefined) throw new OutputError(`${arg} 값 없음`, 1)
+      if (arg === "-C") parsed.dirs.push(value)
+      else if (arg === "--format") format = value
+      else if (arg === "--where") parsed.where.push(value)
+      else if (arg === "--fields") parsed.fields.push(...value.split(",").filter(Boolean))
+      else parsed.since = value
+    } else if (STATUS_FLAGS.has(arg)) {
+      if (arg === "--json") parsed.json = true
+      else if (arg === "--deep") parsed.deep = true
+      else if (arg === "--check") parsed.check = true
+      else if (arg === "--keys") parsed.keys = true
+      else parsed.schema = true
+    } else if (arg.startsWith("-") && arg !== "-") throw new OutputError(`모르는 옵션: ${arg}`, 1)
+    else parsed.paths.push(arg)
+  }
+  if (format !== undefined) parsed.format = format
+  return parsed
+}
+
+/** 요약 모드: 경로 · 데이터 옵션이 하나도 없을 때 */
+const summaryMode = (a: StatusArgs, raw: string[]) =>
+  a.paths.length === 0 && !a.json && !a.keys && !a.schema && a.where.length === 0 && a.fields.length === 0 && !raw.includes("--format")
+
+async function status(args: string[]): Promise<number> {
+  try {
+    const a = parseStatusArgs(args)
+    const roots = (a.dirs.length === 0 ? ["."] : a.dirs).map((d) => realProject(d))
+    let problems = 0
+    if (summaryMode(a, args)) {
+      for (const [i, root] of roots.entries()) {
+        if (roots.length > 1) process.stdout.write(`${i === 0 ? "" : "\n"}== ${root}\n`)
+        process.stdout.write(await summaryOf(root))
+        if (a.check) problems += (await problemsOf(new Context({ cwd: root }))).length
+      }
+      return a.check && problems > 0 ? 3 : 0
+    }
+    const results: Record<string, string> = {}
+    const values: Record<string, unknown> = {}
+    for (const root of roots) {
+      const tree = await collectStatus({ cwd: root, paths: a.paths, deep: a.deep, since: a.since })
+      if (a.check) problems += (await problemsOf(new Context({ cwd: root }))).length
+      if (roots.length === 1) results[root] = output(tree, a)
+      else values[root] = JSON.parse(output(tree, { ...a, format: "compact" })) as unknown
+    }
+    if (roots.length === 1) process.stdout.write(Object.values(results)[0] ?? "")
+    else process.stdout.write(output(values, { paths: [], where: [], fields: [], keys: false, format: a.format }))
+    return a.check && problems > 0 ? 3 : 0
+  } catch (error) {
+    if (error instanceof OutputError) {
+      console.error(`gnam status: ${error.message}`)
+      return error.code
+    }
+    if (error instanceof TraceError) {
+      console.error(`gnam status: ${error.message}`)
+      return 1
+    }
+    throw error
+  }
+}
+
 function print(report: string[]): number {
   for (const line of report) console.log(line)
   return 0
@@ -145,8 +241,10 @@ export async function main(argv: string[]): Promise<number> {
         return print(await sync(realProject(".")))
       case "link":
         return print(await link(realProject(".")))
+      case "status":
+        return await status(args)
       case "doctor": {
-        const problems = await doctor(realProject("."))
+        const problems = (await problemsOf(new Context({ cwd: realProject(".") }))).map((p) => p.message)
         for (const p of problems) console.error(`- ${p}`)
         if (problems.length === 0) console.log("gnam doctor: 문제 없음")
         return problems.length === 0 ? 0 : 1

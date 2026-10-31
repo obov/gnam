@@ -371,13 +371,6 @@ export async function removePlugin(project: string, input: string, cascade = fal
   return [`plugin 제거 ${removed.map((l) => l.plugin.id).join(", ")}`, ...(await sync(project, removed))]
 }
 
-export async function doctor(project: string): Promise<string[]> {
-  const config = readConfig(project)
-  if (config === null) return ["gnam.json 없음 (npx gnam init)"]
-  const loaded = await loadPlugins(project, config)
-  return [...hookProblems(project), ...skillProblems(project, loaded), ...agentsProblems(project, loaded)]
-}
-
 export const realProject = (cwd: string) => {
   const top = git(["rev-parse", "--show-toplevel"], cwd)
   return top.ok ? realpathSync(top.out.trim()) : realpathSync(cwd)

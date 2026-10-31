@@ -157,3 +157,40 @@ test("로컬 plugin: 커밋 종류 추가", () => {
   assert.notEqual(r.status, 0)
   assert.match(r.err, /'docs: …'/)
 })
+
+test("status: 인자 없음 = 요약, --json = JSON 트리, 경로 · 형식, -C 여럿 = 루트 키 객체", () => {
+  const a = tempRepo()
+  const b = tempRepo({ format: 1, plugins: ["@gnam/recall"] })
+  try {
+    assert.equal(a.gnam("init", "--no-install").status, 0)
+    const summary = a.gnam("status")
+    assert.equal(summary.status, 0)
+    assert.match(summary.out, /^gnam \S+ · plugins 없음 · 문제 없음\n인계 메모  없음\n$/)
+    const tree = JSON.parse(a.gnam("status", "--json").out) as Record<string, unknown>
+    assert.deepEqual(Object.keys(tree).slice(0, 3), ["schema", "gnam", "project"])
+    assert.equal(a.gnam("status", "schema", "--format", "raw").out, "1\n")
+    const both = JSON.parse(a.gnam("status", "gnam.format", "-C", a.root, "-C", b.root).out) as Record<string, unknown>
+    assert.deepEqual(Object.values(both), [1, 1])
+    assert.equal(Object.keys(both).length, 2)
+  } finally {
+    a.cleanup()
+    b.cleanup()
+  }
+})
+
+test("status: --check 는 problems 가 있으면 exit 3, 모르는 옵션 · 잘못된 --since exit 1, 없는 경로 exit 2", () => {
+  const repo = tempRepo()
+  try {
+    assert.equal(repo.gnam("status", "--check").status, 3)
+    assert.equal(repo.gnam("status", "problems", "--check").status, 3)
+    assert.equal(repo.gnam("status", "--nope").status, 1)
+    assert.equal(repo.gnam("status", "trace", "--since", "deadbeef").status, 1)
+    const missing = repo.gnam("status", "gnam.nope")
+    assert.equal(missing.status, 2)
+    assert.match(missing.err, /없는 경로: gnam.nope/)
+    assert.equal(repo.gnam("init", "--no-install").status, 0)
+    assert.equal(repo.gnam("status", "--check").status, 0)
+  } finally {
+    repo.cleanup()
+  }
+})
