@@ -7,8 +7,9 @@ import { basename, isAbsolute, join, resolve } from "node:path"
 import { CONFIG_FILE, configPath, configProblems, FORMAT, type GnamConfig } from "./config.ts"
 import { exec, git } from "./git.ts"
 import { BUILTIN_PREFIX, builtinIds, isLocalSpec, type Loaded, loadPlugin, PACKAGE_ROOT, pluginProblems } from "./loader.ts"
-import { parsePath } from "./output.ts"
-import { summary } from "./summary.ts"
+import { CORE_FORMATS, parsePath, type Renderer } from "./output.ts"
+import type { StatusContext } from "./plugin.ts"
+import { pluginLine, summary } from "./summary.ts"
 import { CORE_RULES } from "./rules.ts"
 import { collectTrace } from "./trace.ts"
 import { agentsProblems, HOOKS_DIR, hookProblems, isLink, skillDirs, skillProblems, skillSources } from "./project.ts"
@@ -41,6 +42,8 @@ export class Context {
   readonly cwd: string
   readonly options: StatusOptions
   private memo = new Map<string, unknown>()
+  /** 섹션 · 요약 · 형식 계산 중 생긴 문제 */
+  readonly late: Problem[] = []
   constructor(options: StatusOptions) {
     this.cwd = options.cwd
     this.options = options
@@ -88,11 +91,81 @@ export class Context {
       }
       if (config !== null)
         for (const message of pluginProblems(loaded, config)) problems.push({ source: `plugin:${message.split(/[ :]/)[0]}`, message })
+      const owners = new Map<string, string>(CORE_FORMATS.map((f) => [f, "core"]))
+      for (const { plugin } of loaded)
+        for (const name of Object.keys(plugin.formats ?? {})) {
+          const owner = owners.get(name)
+          if (owner !== undefined) problems.push({ source: `plugin:${plugin.id}`, message: `${plugin.id}: 형식 이름 ${name} 이 ${owner} 와 겹침` })
+          else owners.set(name, plugin.id)
+        }
       return { loaded, failed, problems }
     })()
     this.memo.set("plugins", promise)
     return promise
   }
+
+  /** plugin 에 넘기는 문맥 */
+  async statusContext(): Promise<StatusContext> {
+    const { config } = this.config()
+    const { loaded } = await this.plugins()
+    return { cwd: this.cwd, config: config ?? { format: FORMAT, plugins: [] }, plugins: loaded.map((l) => l.plugin.id) }
+  }
+
+  /** plugin 형식 이름 → renderer. 이름이 겹친 형식은 뺀다 */
+  async formats(): Promise<Record<string, Renderer>> {
+    const { loaded } = await this.plugins()
+    const sctx = await this.statusContext()
+    const out: Record<string, Renderer> = {}
+    for (const { plugin } of loaded)
+      for (const [name, format] of Object.entries(plugin.formats ?? {}))
+        if (!(CORE_FORMATS as readonly string[]).includes(name) && !(name in out)) out[name] = (value) => format.render(value, sctx)
+    return out
+  }
+}
+
+/** plugin 섹션을 계산할지: 경로가 없으면 deep 아닌 것 (--deep 이면 전부), 경로가 그 섹션 (또는 상위) 을 가리키면 */
+function wantSection(options: StatusOptions, id: string, name: string, deep: boolean): boolean {
+  const paths = (options.paths ?? []).map(parsePath)
+  if (paths.length === 0) return !deep || options.deep === true
+  return paths.some((p) => {
+    const want = ["plugins", id, "sections", name]
+    const prefix = want.slice(0, Math.min(p.length, 4))
+    if (!prefix.every((seg, i) => p[i] === seg)) return false
+    return p.length >= 4 || !deep || options.deep === true
+  })
+}
+
+async function sectionsOf(ctx: Context, l: Loaded): Promise<Record<string, unknown> | null> {
+  const sections = l.plugin.status?.sections
+  if (sections === undefined) return null
+  const sctx = await ctx.statusContext()
+  const out: Record<string, unknown> = {}
+  for (const [name, section] of Object.entries(sections)) {
+    if (!wantSection(ctx.options, l.plugin.id, name, section.deep === true)) continue
+    try {
+      out[name] = await section.collect(sctx)
+    } catch (error) {
+      out[name] = null
+      ctx.late.push({ source: `plugin:${l.plugin.id}`, message: `${l.plugin.id}: 섹션 ${name} 실패: ${(error as Error).message}` })
+    }
+  }
+  return out
+}
+
+/** plugin 요약 줄 */
+export async function pluginSummaryLines(ctx: Context): Promise<string[]> {
+  const { loaded } = await ctx.plugins()
+  const sctx = await ctx.statusContext()
+  const out: string[] = []
+  for (const { plugin } of loaded) {
+    if (plugin.status?.summary === undefined) continue
+    try {
+      for (const line of await plugin.status.summary(sctx)) out.push(pluginLine(plugin.id, line))
+    } catch (error) {
+      ctx.late.push({ source: `plugin:${plugin.id}`, message: `${plugin.id}: 요약 실패: ${(error as Error).message}` })
+    }
+  }
+  return out
 }
 
 const idOf = (spec: string) => (spec.startsWith(BUILTIN_PREFIX) ? spec.slice(BUILTIN_PREFIX.length) : spec)
@@ -138,6 +211,7 @@ export async function problemsOf(ctx: Context): Promise<Problem[]> {
   problems.push(...pluginIssues)
   for (const message of [...hookProblems(ctx.cwd), ...skillProblems(ctx.cwd, loaded), ...agentsProblems(ctx.cwd, loaded)])
     problems.push({ source: "install", message })
+  problems.push(...ctx.late)
   return problems
 }
 
@@ -223,7 +297,12 @@ export const SECTIONS: [string, Section][] = [
       const order = config?.plugins ?? []
       for (const spec of order) {
         const l = loaded.find((x) => x.spec === spec)
-        if (l !== undefined) out[l.plugin.id] = pluginObject(l, config)
+        if (l !== undefined) {
+          const object: Record<string, unknown> = pluginObject(l, config)
+          const sections = await sectionsOf(ctx, l)
+          if (sections !== null) object["sections"] = sections
+          out[l.plugin.id] = object
+        }
         const f = failed.find((x) => x.spec === spec)
         if (f !== undefined) out[idOf(spec)] = f
       }
@@ -298,8 +377,7 @@ export function neededKeys(paths: string[]): Set<string> | null {
 }
 
 /** 트리. 고른 경로의 최상위 키만 계산 (경로 없음 = 전부) */
-export async function collectStatus(options: StatusOptions): Promise<Record<string, unknown>> {
-  const ctx = new Context(options)
+export async function collectStatus(options: StatusOptions, ctx = new Context(options)): Promise<Record<string, unknown>> {
   const needed = neededKeys(options.paths ?? [])
   const tree: Record<string, unknown> = {}
   for (const [key, compute] of SECTIONS) if (needed === null || needed.has(key)) tree[key] = await compute(ctx)
@@ -310,6 +388,7 @@ export async function collectStatus(options: StatusOptions): Promise<Record<stri
 export async function summaryOf(cwd: string): Promise<string> {
   const ctx = new Context({ cwd })
   const { loaded } = await ctx.plugins()
+  const pluginLines = await pluginSummaryLines(ctx)
   return summary({
     cwd,
     version: packageVersion(),
@@ -317,6 +396,6 @@ export async function summaryOf(cwd: string): Promise<string> {
     problems: await problemsOf(ctx),
     handoff: handoffOf(cwd),
     trace: ctx.once("trace", () => collectTrace(cwd)),
-    pluginLines: [],
+    pluginLines,
   })
 }

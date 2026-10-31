@@ -148,3 +148,73 @@ test("rules: 소스의 모든 rule id 가 core · 내장 plugin rules 에 있다
     repo.cleanup()
   }
 })
+
+const DEMO = `export default {
+  id: "demo",
+  version: "0.0.1",
+  status: {
+    sections: {
+      info: { describe: "가벼운 정보", collect: (ctx) => ({ plugins: ctx.plugins }) },
+      heavy: { describe: "무거운 정보", deep: true, collect: () => 42 },
+      broken: { describe: "실패", collect: () => { throw new Error("깨짐") } },
+    },
+    summary: (ctx) => ["hello " + ctx.plugins.length],
+  },
+  formats: {
+    "demo-lines": { describe: "줄마다", render: (value) => value.map((v) => v.label).join("\\n") },
+    json: { describe: "충돌", render: () => "x" },
+  },
+  configDefaults: { level: 1, color: "red" },
+  commands: {
+    list: { describe: "목록", run: () => 0, data: (args) => [{ name: "a", n: 1 }, { name: args[0] ?? "b", n: 2 }] },
+    plain: { describe: "텍스트만", run: () => 0 },
+  },
+}
+`
+
+function demoRepo() {
+  const repo = tempRepo({ format: 1, plugins: ["./demo"], demo: { color: "blue" } })
+  mkdirSync(join(repo.root, "demo"), { recursive: true })
+  writeFileSync(join(repo.root, "demo", "index.js"), DEMO)
+  return repo
+}
+
+test("plugin 확장: 섹션 (deep · 경로 지정 · 실패) · 형식 충돌 · configDefaults", async () => {
+  const repo = demoRepo()
+  try {
+    const tree = await collectStatus({ cwd: repo.root })
+    const demo = (tree["plugins"] as Record<string, { sections: Record<string, unknown>; formats: string[] }>)["demo"]
+    expect(demo?.sections).toEqual({ info: { plugins: ["demo"] }, broken: null })
+    expect(demo?.formats).toEqual(["demo-lines", "json"])
+    const messages = (tree["problems"] as { source: string; message: string }[]).filter((p) => p.source === "plugin:demo").map((p) => p.message)
+    expect(messages.some((m) => m.includes("형식 이름 json"))).toBe(true)
+    expect(messages.some((m) => m.includes("섹션 broken 실패: 깨짐"))).toBe(true)
+    expect((tree["config"] as { effective: Record<string, unknown> }).effective["demo"]).toEqual({ level: 1, color: "blue" })
+    const deep = await collectStatus({ cwd: repo.root, deep: true, paths: ["plugins"] })
+    expect((deep["plugins"] as Record<string, { sections: Record<string, unknown> }>)["demo"]?.sections["heavy"]).toBe(42)
+    const one = await collectStatus({ cwd: repo.root, paths: ["plugins.demo.sections.heavy"] })
+    expect((one["plugins"] as Record<string, { sections: Record<string, unknown> }>)["demo"]?.sections).toEqual({ heavy: 42 })
+  } finally {
+    repo.cleanup()
+  }
+})
+
+test("plugin 확장: 요약 줄 · --format plugin 형식 · gnam run --json · data 없는 명령 exit 1", () => {
+  const repo = demoRepo()
+  try {
+    expect(repo.gnam("status").out).toContain("demo       hello 1\n")
+    expect(repo.gnam("status", "kinds", "--format", "demo-lines").out).toBe("chore: …\nrefactor: …\nspec.<topic>.plan: …\nspec.<topic>.impl: …\nspec.<topic>.chore: …\n")
+    expect(repo.gnam("status", "gnam.format", "--format", "json").out).toBe("1\n")
+    expect(JSON.parse(repo.gnam("run", "demo", "list", "c", "--json").out)).toEqual([
+      { name: "a", n: 1 },
+      { name: "c", n: 2 },
+    ])
+    expect(repo.gnam("run", "demo", "list", "--format", "ndjson", "--where", "n=2", "--fields", "name").out).toBe('{"name":"b"}\n')
+    const plain = repo.gnam("run", "demo", "plain", "--json")
+    expect(plain.status).toBe(1)
+    expect(plain.err).toContain("구조화 결과가 없음")
+    expect(repo.gnam("run", "demo", "plain").status).toBe(0)
+  } finally {
+    repo.cleanup()
+  }
+})

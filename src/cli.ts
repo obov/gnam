@@ -6,7 +6,7 @@ import { git, gitOrThrow, lines, nulList } from "./core/git.ts"
 import { boundaryOf, cleanMessage, commitInput, gitLookup, historyArgs, pushRange } from "./core/history.ts"
 import { builtinIds, loadPlugins, PACKAGE_ROOT } from "./core/loader.ts"
 import type { GnamPlugin } from "./core/plugin.ts"
-import { OutputError, output, type OutputOptions } from "./core/output.ts"
+import { OutputError, output, type OutputOptions, type Renderer } from "./core/output.ts"
 import { addPlugin, init, link, realProject, removePlugin, sync } from "./core/project.ts"
 import { collectStatus, Context, problemsOf, summaryOf } from "./core/status.ts"
 import { TraceError } from "./core/trace.ts"
@@ -96,19 +96,53 @@ async function plugin(project: string, args: string[]): Promise<number> {
   throw new Error("사용: gnam plugin list | add <spec> | remove <spec> [--cascade]")
 }
 
+/** gnam run 의 출력 옵션 (--json · --format 이 있을 때만). 나머지는 명령 인자 */
+export function splitRunArgs(args: string[]): { rest: string[]; out: OutputOptions | null } {
+  if (!args.includes("--json") && !args.includes("--format")) return { rest: args, out: null }
+  const out: OutputOptions = { paths: [], where: [], fields: [], format: "json", keys: false }
+  const rest: string[] = []
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i] ?? ""
+    if (arg === "--json") continue
+    if (arg === "--keys") out.keys = true
+    else if (arg === "--format" || arg === "--where" || arg === "--fields") {
+      const value = args[++i]
+      if (value === undefined) throw new OutputError(`${arg} 값 없음`, 1)
+      if (arg === "--format") out.format = value
+      else if (arg === "--where") out.where.push(value)
+      else out.fields.push(...value.split(",").filter(Boolean))
+    } else rest.push(arg)
+  }
+  return { rest, out }
+}
+
 async function run(project: string, args: string[]): Promise<number> {
-  const [id, name, ...rest] = args
+  const [id, name, ...raw] = args
   const config = requireConfig(project)
   const loaded = await loadPlugins(project, config)
   const target = loaded.find((l) => l.plugin.id === id)
   if (target === undefined) throw new Error(`활성 plugin 아님: ${id ?? "(없음)"}`)
   const command = name === undefined ? undefined : target.plugin.commands?.[name]
   if (command === undefined) {
-    const list = Object.entries(target.plugin.commands ?? {}).map(([n, c]) => `  ${n}  ${c.describe}`)
+    const list = Object.entries(target.plugin.commands ?? {}).map(([n, c]) => `  ${n}  ${c.describe}${c.data ? "  (--json)" : ""}`)
     console.error(`gnam run ${target.plugin.id} <command>\n${list.join("\n") || "  (명령 없음)"}`)
     return 1
   }
-  return await command.run(rest, project, config)
+  try {
+    const { rest, out } = splitRunArgs(raw)
+    if (out === null) return await command.run(rest, project, config)
+    if (command.data === undefined) throw new OutputError(`${target.plugin.id} ${name} 는 구조화 결과가 없음 (--json · --format 불가)`, 1)
+    const ctx = new Context({ cwd: project })
+    const value = await command.data(rest, await ctx.statusContext())
+    process.stdout.write(output(value, out, await ctx.formats()))
+    return 0
+  } catch (error) {
+    if (error instanceof OutputError) {
+      console.error(`gnam run: ${error.message}`)
+      return error.code
+    }
+    throw error
+  }
 }
 
 interface StatusArgs extends OutputOptions {
@@ -180,14 +214,17 @@ async function status(args: string[]): Promise<number> {
     }
     const results: Record<string, string> = {}
     const values: Record<string, unknown> = {}
+    let extra: Record<string, Renderer> = {}
     for (const root of roots) {
-      const tree = await collectStatus({ cwd: root, paths: a.paths, deep: a.deep, since: a.since })
-      if (a.check) problems += (await problemsOf(new Context({ cwd: root }))).length
-      if (roots.length === 1) results[root] = output(tree, a)
+      const ctx = new Context({ cwd: root, paths: a.paths, deep: a.deep, since: a.since })
+      const tree = await collectStatus(ctx.options, ctx)
+      if (root === roots[0]) extra = await ctx.formats()
+      if (a.check) problems += (await problemsOf(ctx)).length
+      if (roots.length === 1) results[root] = output(tree, a, extra)
       else values[root] = JSON.parse(output(tree, { ...a, format: "compact" })) as unknown
     }
     if (roots.length === 1) process.stdout.write(Object.values(results)[0] ?? "")
-    else process.stdout.write(output(values, { paths: [], where: [], fields: [], keys: false, format: a.format }))
+    else process.stdout.write(output(values, { paths: [], where: [], fields: [], keys: false, format: a.format }, extra))
     return a.check && problems > 0 ? 3 : 0
   } catch (error) {
     if (error instanceof OutputError) {

@@ -40,7 +40,7 @@ release    다음 release minor (release plugin)
 - plan 줄 = 대체되지 않은 plan 중 status partial · not-started. `<topic> <sha> <impl 있는 단계>/<단계 수>`, 최근 plan 부터 최대 5개 (넘으면 `외 N`)
 - Blocking 줄 = Blocking 이 남은 최신 plan 마다 항목 번호 · 내용 첫 줄
 - 미결 줄 = specs/ 의 `미결:` 위치 (최대 5개, 넘으면 `외 N`)
-- 미구현: plugin 줄 = plugin 이 낸 summary 줄 (아래 'plugin 확장'). 그 plugin 순서대로
+- plugin 줄 = plugin 이 낸 summary 줄 (아래 'plugin 확장'). 그 plugin 순서대로
 - 해당 내용이 없는 줄은 생략 (첫 줄 · 인계 메모 줄 제외)
 
 ## 트리
@@ -187,10 +187,10 @@ configDefaults gnam.json 의 이 plugin 설정 기본값 → config.effective.<i
 rules          이 plugin 의 검사 규칙 id · why → rules
 ```
 
-- 미구현: ctx = cwd · config · 활성 plugin 목록
-- 미구현: 형식 이름이 core 형식 · 다른 plugin 형식과 겹치면 plugin 로드 오류 (problems)
-- 미구현: collect · summary · data 가 던진 오류는 그 섹션 값 null + problems (트리 전체는 계속)
-- 미구현: data 없는 명령에 --json · --format = 사용 오류 (exit 1)
+- ctx = cwd · config · 활성 plugin 목록
+- 형식 이름이 core 형식 · 다른 plugin 형식과 겹치면 plugin 로드 오류 (problems)
+- collect · summary · data 가 던진 오류는 그 섹션 값 null + problems (트리 전체는 계속)
+- data 없는 명령에 --json · --format = 사용 오류 (exit 1)
 
 내장 plugin:
 
