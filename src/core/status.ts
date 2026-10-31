@@ -9,6 +9,7 @@ import { exec, git } from "./git.ts"
 import { BUILTIN_PREFIX, builtinIds, isLocalSpec, type Loaded, loadPlugin, PACKAGE_ROOT, pluginProblems } from "./loader.ts"
 import { parsePath } from "./output.ts"
 import { summary } from "./summary.ts"
+import { CORE_RULES } from "./rules.ts"
 import { collectTrace } from "./trace.ts"
 import { agentsProblems, HOOKS_DIR, hookProblems, isLink, skillDirs, skillProblems, skillSources } from "./project.ts"
 
@@ -254,6 +255,16 @@ export const SECTIONS: [string, Section][] = [
       return [
         ...CORE_KINDS.map((k) => ({ ...k, owner: "core" })),
         ...loaded.flatMap(({ plugin }) => (plugin.kinds ?? []).map((k) => ({ label: k.label, subject: k.subject.source, owner: plugin.id }))),
+      ]
+    },
+  ],
+  [
+    "rules",
+    async (ctx) => {
+      const { loaded } = await ctx.plugins()
+      return [
+        ...CORE_RULES.map((r) => ({ id: r.id, owner: "core", why: r.why })),
+        ...loaded.flatMap(({ plugin }) => (plugin.rules ?? []).map((r) => ({ id: r.id, owner: plugin.id, why: r.why }))),
       ]
     },
   ],

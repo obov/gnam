@@ -3,14 +3,14 @@ import { expect } from "./expect.ts"
 import { mkdirSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { collectStatus, summaryOf } from "../src/core/status.ts"
-import { tempRepo } from "./helpers.ts"
+import { PACKAGE, tempRepo } from "./helpers.ts"
 import { commit, fixture } from "./trace-fixture.ts"
 
 test("status 트리: 키 순서 · plugin · 종류 · config · install", async () => {
   const repo = tempRepo({ format: 1, plugins: ["@gnam/recall"] })
   try {
     const tree = await collectStatus({ cwd: repo.root })
-    expect(Object.keys(tree)).toEqual(["schema", "gnam", "project", "config", "plugins", "builtins", "kinds", "install", "problems", "handoff", "env", "trace"])
+    expect(Object.keys(tree)).toEqual(["schema", "gnam", "project", "config", "plugins", "builtins", "kinds", "rules", "install", "problems", "handoff", "env", "trace"])
     expect(tree["schema"]).toBe(1)
     expect(tree["gnam"]).toMatchObject({ format: 1, source: "checkout" })
     expect(tree["config"]).toMatchObject({ raw: { format: 1, plugins: ["@gnam/recall"] }, effective: { format: 1 } })
@@ -109,6 +109,41 @@ test("요약: 빈 저장소는 첫 줄 · 인계 메모 줄만", async () => {
   try {
     const lines = (await summaryOf(repo.root)).trimEnd().split("\n").filter((l) => !l.startsWith("- "))
     expect(lines.slice(1)).toEqual(["인계 메모  없음"])
+  } finally {
+    repo.cleanup()
+  }
+})
+
+test("rules: 소스의 모든 rule id 가 core · 내장 plugin rules 에 있다", async () => {
+  const { readdirSync, readFileSync, statSync } = await import("node:fs")
+  const files: string[] = []
+  const walk = (dir: string) => {
+    for (const name of readdirSync(dir)) {
+      const path = join(dir, name)
+      if (statSync(path).isDirectory()) walk(path)
+      else if (path.endsWith(".ts")) files.push(path)
+    }
+  }
+  walk(join(PACKAGE, "src"))
+  const used = new Set<string>()
+  for (const file of files) {
+    const text = readFileSync(file, "utf8")
+    for (const m of text.matchAll(/rule: "([a-z]+\/[a-z0-9-]+)"/g)) used.add(m[1] ?? "")
+    for (const m of text.matchAll(/rule: "([a-z0-9-]+)"/g)) used.add(`commit/${m[1] ?? ""}`)
+    for (const m of text.matchAll(/(?:add|problem)\(\s*"([a-z0-9-]+)"/g)) used.add(`commit/${m[1] ?? ""}`)
+  }
+  const { CORE_RULES } = await import("../src/core/rules.ts")
+  const { builtinIds, loadPlugin } = await import("../src/core/loader.ts")
+  const known = new Set(CORE_RULES.map((r) => r.id))
+  for (const id of builtinIds()) for (const r of (await loadPlugin(`@gnam/${id}`, PACKAGE)).plugin.rules ?? []) known.add(r.id)
+  expect([...used].filter((id) => !known.has(id))).toEqual([])
+  expect(used.size).toBeGreaterThan(25)
+  const repo = tempRepo({ format: 1, plugins: ["@gnam/request"] })
+  try {
+    const tree = await collectStatus({ cwd: repo.root, paths: ["rules"] })
+    const rules = tree["rules"] as { id: string; owner: string }[]
+    expect(rules.some((r) => r.id === "commit/request-link" && r.owner === "request")).toBe(true)
+    expect(rules.some((r) => r.id === "commit/impl-ready" && r.owner === "core")).toBe(true)
   } finally {
     repo.cleanup()
   }

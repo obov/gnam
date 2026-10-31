@@ -37,6 +37,14 @@ export default definePlugin({
     if (owner !== "core" || ctx.merge || !LINKED_SUBJECT.test(ctx.subject) || !activeAt(ctx)) return []
     return linkProblems(ctx)
   },
+  rules: [
+    { id: "commit/request-text", why: "Text 는 사용자 원문 인용 (모든 줄 '> ')" },
+    { id: "commit/request-files", why: "request 는 빈 커밋" },
+    { id: "commit/request-attachment", why: "첨부 줄 = 이름 · sha256 · 위치 · 원래 경로" },
+    { id: "commit/request-refines", why: "Refines 는 먼저 커밋된 request" },
+    { id: "commit/request-link", why: "plan · spec chore · chore · refactor 의 Request 필드" },
+    { id: "commit/merge-kind", why: "request 를 merge 로 만들지 않는다" },
+  ],
   commands: {
     open: { describe: "어느 커밋도 가리키지 않은 request (미착수 요청)", run: (_args, cwd) => openCommand(cwd) },
     show: { describe: "<hash>  요청 · Refines 체인 · 가리키는 커밋", run: (args, cwd) => showCommand(args, cwd) },

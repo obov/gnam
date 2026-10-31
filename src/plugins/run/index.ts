@@ -130,6 +130,13 @@ export default definePlugin({
       run: (args, cwd) => statsCli(args, cwd),
     },
   },
+  rules: [
+    { id: "commit/run-ref", why: "run 본문의 plan · 커밋 참조가 먼저 커밋된 커밋" },
+    { id: "commit/run-empty", why: "run 커밋은 빈 커밋" },
+    { id: "commit/run-agents", why: "에이전트마다 한 줄 형식" },
+    { id: "commit/run-body", why: "run 본문 필드 (조회 · 집계 기준)" },
+    { id: "commit/merge-kind", why: "run 커밋을 merge 로 만들지 않는다" },
+  ],
   skills: ["skills/gnam-run"],
   agentsMd: "agents.md",
 })

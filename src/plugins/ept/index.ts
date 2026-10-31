@@ -25,6 +25,9 @@ export default definePlugin({
       },
     },
   },
+  rules: [
+    { id: "experiment/record", why: "experiments/agent-workflows/*/record.json 형식" },
+  ],
   skills: ["skills/gnam-ept"],
   agentsMd: "agents.md",
 })

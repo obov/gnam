@@ -50,6 +50,14 @@ export default definePlugin({
     const release = stateOf(ctx)
     return release === null ? [] : outsideProblems(release.states).map(toViolation)
   },
+  rules: [
+    { id: "commit/release-subject", why: "release 제목 형식" },
+    { id: "commit/release-target", why: "release 는 gnam.json release 를 켠 저장소에서만" },
+    { id: "commit/release-version", why: "대상 package version 이 계산 수준과 맞음" },
+    { id: "commit/release-section", why: "Package: 절 = GitHub Release 본문" },
+    { id: "commit/release-files", why: "release 커밋은 대상 package.json · lock 만" },
+    { id: "commit/version-outside", why: "release 밖 커밋은 대상 version 을 바꾸지 않는다" },
+  ],
   configProblems: releaseConfigProblems,
   commands: Object.fromEntries(
     (
