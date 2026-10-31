@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.2
+
+- multi-agent: claude 시작 인자를 파일로 변경. 프로젝트 `.gnam/claude-args` > 전역 `~/.config/gnam/claude-args` > 기본값. 평소 쓰는 `claude …` 명령을 붙여넣을 수 있음. `harness-execute/claude-args.sh init|source|--json`. 파일이 없으면 동작 동일
+
 ## 0.3.1
 
 - 0.3.0 과 같은 기능. 0.3.0 태그는 CI 환경에서 테스트 하나가 실패해 배포되지 않음 (테스트만 수정)
