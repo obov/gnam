@@ -1,7 +1,10 @@
 # info — 설정 · 상태 조회 (JSON stdout)
 
-gnam 이 저장소에 세팅한 정보 (설치 · gnam.json · plugin · 커밋 종류 · 검사 규칙 · 설치 상태 · history · spec) 를 하나의 JSON 트리로 stdout 에 낸다.
+gnam 이 저장소에 세팅한 정보 (설치 · gnam.json · plugin · 커밋 종류 · 검사 규칙 · 설치 상태) 와 기록의 연결 (요청 → plan → impl → spec) 을 하나의 JSON 트리로 stdout 에 낸다.
 사람 · 에이전트 · 스크립트가 같은 트리를 경로로 골라 원하는 형식으로 꺼낸다. plugin 은 자기 데이터 · 검색 결과 · 출력 형식을 같은 트리와 출력 계층에 더한다.
+
+git 과 나눠 쓴다. info 는 git 한 번으로 안 되는 것 (커밋 간 연결 · 본문 필드 추출 · 상태 계산) 만 맡고 커밋은 hash 로 가리킨다.
+원문 · diff · 줄 출처는 git (`git show <sha>` · `git log -p -- <경로>` · `git blame`) 으로 읽는다.
 
 ## 명령
 
@@ -30,8 +33,7 @@ install    hooks (hooksPath · expected · commitMsg 파일 유무) · skills (d
 problems   source (config | install | plugin:<id>) · message. doctor 와 같은 내용을 구조화
 handoff    path · exists · content (없으면 null)
 env        node · bun · git 버전 (없으면 null) · ci · gitDir · commonDir · worktree · branch
-history    (deep) head · boundary (gnam 검사 경계 커밋 sha · subject, 없으면 null) · counts (종류 label → 커밋 수) · recent (최근 20개 sha · subject)
-specs      (deep) topic 마다 path · unimplemented · open (각 line · text) · latestPlan (sha · subject · blocking)
+trace      (deep) 기록의 연결. 아래 'trace'
 ```
 
 plugin 객체:
@@ -51,8 +53,38 @@ info         plugin 이 더한 섹션 (아래 'plugin 확장')
 
 - 미구현: gnam.json 이 없거나 깨져도 exit 0. config.raw = null, 원인은 problems
 - 미구현: plugin 로드 실패 · requires 누락도 exit 0. 해당 plugin 객체의 error 와 problems
-- 미구현: deep 섹션 (history · specs · deep 으로 표시한 plugin 섹션) 은 `--deep` 이거나 경로로 직접 고를 때만 계산
-- 미구현: 고른 경로에 필요한 섹션만 계산한다 (`gnam info gnam.version` 은 history · specs · plugin 섹션을 읽지 않는다)
+- 미구현: deep 섹션 (trace · deep 으로 표시한 plugin 섹션) 은 `--deep` 이거나 경로로 직접 고를 때만 계산
+- 미구현: 고른 경로에 필요한 섹션만 계산한다 (`gnam info gnam.version` 은 trace · plugin 섹션을 읽지 않는다)
+
+## trace
+
+에이전트가 요청 의도 · 반영 여부를 분석하고 개선안 · 후속 작업을 제안할 때 쓰는 입력. gnam.json 검사 경계 이후 HEAD 에서 도달 가능한 커밋 기준.
+
+```text
+trace.boundary    검사 경계 커밋 sha · subject (없으면 null)
+trace.requests    request: 커밋. sha · subject · refines · refinedBy · by (Request: 로 가리킨 커밋 sha) · status (open | started | refined)
+trace.topics      topic → { path · exists · unimplemented · open (각 line · text) · plans · chores }
+trace.agent       Request: 없음 (<근거>) 커밋. sha · subject · reason
+trace.items       미해결 후보. kind (remaining | deferred | open | risk | blocking) · text · sha (출처 커밋)
+```
+
+plan 객체 (trace.topics.<topic>.plans, 오래된 것부터):
+
+```text
+sha · subject · requests (Request: hash 목록, 없음이면 [])
+supersedes · supersededBy · dropped (Dropped: 줄)
+blocking    Blocking 항목 (없음이면 [])
+decisionsExpected · risks · open   본문 필드의 항목 (D · R 번호 유지)
+steps       n · title · done (완료: 줄) · impls (그 단계를 Plan: 으로 가리킨 impl sha 목록)
+status      superseded | done (모든 단계에 impl) | partial | not-started
+impls       sha · subject · step · deviation · decisions · remaining · deferred (본문 필드 원문, 없으면 null)
+```
+
+- 미구현: chores = 그 topic 의 spec.<topic>.chore 커밋 sha · subject · requests. topic 없는 chore · refactor 는 trace.topics."" 아래
+- 미구현: Topics: 로 여러 topic 을 묶은 수집 plan 은 각 topic 의 plans 에 모두 나타난다
+- 미구현: 본문 필드 = 줄 머리 `<이름>:` 부터 다음 필드 머리 전까지. 값은 앞뒤 공백을 뺀 원문
+- 미구현: items 의 해결 여부는 판정하지 않는다 (연결 필드가 없음). 출처 sha 만 준다
+- 미구현: request plugin 이 꺼져 있어도 request: 커밋 · Request: 필드가 있으면 읽는다
 
 ## 고르기
 
@@ -127,3 +159,5 @@ lore     info.entries = lore/README.md 인덱스의 [{ file · summary }]
 - Deferred: jq 수준 식 (계산 · 변환 · 정렬). 필요하면 `| jq`
 - Deferred: 원격 조회 (npm 최신 버전 비교). 네트워크 없이 같은 출력 유지
 - Deferred: 기존 명령 (`plugin list` · `doctor` · `verify`) 의 --json. 같은 데이터는 info 경로로 꺼낸다
+- Deferred: 미해결 항목 번호 · Resolves 연결과 해결 여부 판정
+- Deferred: 커밋 diff · 전체 본문 포함. git 으로 읽는다
