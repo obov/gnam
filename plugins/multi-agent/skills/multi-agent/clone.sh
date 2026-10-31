@@ -17,7 +17,7 @@ set -euo pipefail
 
 main_root="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"
 registry_dir="$(git rev-parse --path-format=absolute --git-common-dir)/clone"
-system_prompt="$(cd "$(dirname "$0")/../harness-execute" && pwd)/system-prompt.md"
+claude_args="$(cd "$(dirname "$0")/../harness-execute" && pwd)/claude-args.sh"
 
 die() { printf 'clone.sh: %s\n' "$*" >&2; exit 1; }
 need() { [ "$#" -ge "$1" ] || die "인자 부족. 파일 머리 주석의 사용법 참고"; }
@@ -35,7 +35,9 @@ record() { # <run> <name> <역할> <pane> <session> <worktree>
 }
 pane_id() { jq -r '.result.pane.pane_id // .result.pane_id // .result.root_pane.pane_id // empty'; }
 start_agent() { # <pane> <name> <model> <effort> <session>
-  local args=(--dangerously-skip-permissions --system-prompt-file "$system_prompt" --session-id "$5" --model "$3")
+  local args=() a # 기본 인자: 프로젝트 · 전역 · 기본값 순 (harness-execute/claude-args.sh)
+  while IFS= read -r a; do args+=("$a"); done < <(bash "$claude_args")
+  args+=(--session-id "$5" --model "$3")
   [ -n "$4" ] && args+=(--effort "$4")
   herdr agent start "$2" --kind claude --pane "$1" -- "${args[@]}" > /dev/null
 }

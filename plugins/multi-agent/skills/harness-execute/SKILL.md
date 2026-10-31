@@ -10,6 +10,7 @@ description: 이 세션이 다른 에이전트 세션 (Claude Code · Codex CLI)
 ```text
 adapters/        도구 조합별 원시 동작 6개의 실제 명령     도구 교체 → 파일 하나 추가
 system-prompt.md 모든 세션에 붙이는 커뮤니케이션 규칙 (start)
+claude-args.sh   claude 시작 기본 인자 해석 (프로젝트 > 전역 > 기본값)
 ```
 
 사용처: multi-agent (runner · reviewer · 위임자). 그 스킬이 이 위에 더하는 것은 multi-agent/harness.md.
@@ -45,6 +46,28 @@ session id    호출자가 정해 (uuidgen) start 에 넘긴다. transcript 측�
 순서          close → worktree 삭제 (자리의 cwd 가 worktree)
 닫는 주체     그 자리를 만든 세션
 ```
+
+## 시작 인자 (claude)
+
+claude 세션의 기본 인자는 `claude-args.sh` 가 정한다. 첫 번째로 존재하는 파일이 적용된다.
+
+```text
+프로젝트   <main 저장소>/.gnam/claude-args
+전역       ${XDG_CONFIG_HOME:-~/.config}/gnam/claude-args
+기본값     --dangerously-skip-permissions --system-prompt-file <repo>/.agents/skills/harness-execute/system-prompt.md
+```
+
+```sh
+bash .agents/skills/harness-execute/claude-args.sh init            # 프로젝트 파일 생성 (기본값으로 채움). --global 이면 전역
+bash .agents/skills/harness-execute/claude-args.sh source          # 적용 중인 출처
+bash .agents/skills/harness-execute/claude-args.sh                 # 최종 인자
+```
+
+- 형식: 평소 쓰는 `claude \ --tools … --settings … --system-prompt-file …` 를 그대로 붙여 넣는다. 셸 단어 규칙 · 줄 끝 `\` · `#` 주석. 맨 앞 `claude` 는 무시. 값 확장 · eval 없음. 경로는 절대 경로 또는 `~/`
+- `--session-id` · `--model` · `--effort` 는 파일에 있어도 버린다. 세션마다 호출자가 붙인다 (agent-routing 배정 · 측정 키)
+- 적용 범위: herdr-claude · atcher-claude · multi-agent clone.sh. claude-print (단발) 와 herdr-codex 는 제외. 각 adapter 가 인자를 따로 정한다
+- 파일을 저장소에 커밋하면 팀이 공유하고, `.gitignore` 에 넣으면 개인 설정. 실행 중인 세션은 바뀌지 않는다. 새로 띄우는 세션부터 적용
+- 파일이 있으면 기본값은 쓰이지 않는다. `--dangerously-skip-permissions` 를 빼면 세션이 권한 확인에서 blocked
 
 ## adapter 선택
 

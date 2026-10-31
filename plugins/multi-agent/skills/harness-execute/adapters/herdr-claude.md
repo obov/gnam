@@ -32,12 +32,13 @@ herdr pane wait-output <pane> --match "<worktree 이름>" --timeout 10000
 ## start
 
 ```sh
-herdr agent start <name> --kind claude --pane <pane> --timeout 60000 -- \
-  --dangerously-skip-permissions \
-  --system-prompt-file <repo>/.agents/skills/harness-execute/system-prompt.md \
+args=(); while IFS= read -r a; do args+=("$a"); done < <(bash <repo>/.agents/skills/harness-execute/claude-args.sh)
+herdr agent start <name> --kind claude --pane <pane> --timeout 60000 -- "${args[@]}" \
   --session-id <session id> \
   --model <모델 ID> --effort <effort>   # 지정이 없으면 --model · --effort 생략 (사용자 설정)
 ```
+
+기본 인자 (`args`) 는 claude-args.sh 가 정한다. 프로젝트 `.gnam/claude-args` > 전역 `~/.config/gnam/claude-args` > 기본값 (`--dangerously-skip-permissions --system-prompt-file system-prompt.md`). 형식 · 변경법은 SKILL.md '시작 인자'.
 
 측정: `npx gnam run run usage <session> …` 가 transcript (`${CLAUDE_CONFIG_DIR:-~/.claude}/projects/*/<session>.jsonl` + subagents) 를 읽는다.
 Claude Code 설정 디렉터리가 다르면 `--root <projects 경로>`.

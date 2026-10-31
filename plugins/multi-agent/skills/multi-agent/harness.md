@@ -7,6 +7,7 @@
 ```text
 session id   run.start Agent 줄의 session (SKILL.md 'run 기록' 2단계). 같은 값을 adapter start 에
 모델         run 기록의 배정 모델 ID · effort. 배정이 없으면 agent-routing 을 읽고 결정한 뒤 start. 역할별 모델 고정값 없음
+기본 인자    claude-args.sh (프로젝트 `.gnam/claude-args` > 전역 `~/.config/gnam/claude-args` > 기본값). harness-execute SKILL.md '시작 인자'
 adapter      대화형 (herdr-claude · herdr-codex · atcher-claude). 단발 (claude-print) 은 쓰지 않는다 (blocked 를 사용자가 봐야 하고 후속 지시가 잦음)
 ```
 

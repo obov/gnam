@@ -38,14 +38,15 @@ layout 파일을 쓰고 up. 여러 세션을 한 파일에 넣으면 한 번에 
 cat > /tmp/<run>-layout.json <<'JSON'
 { "agents": [
   { "name": "<name>", "kind": "claude", "cwd": ".worktrees/<name>", "model": "<모델 ID>",
-    "args": ["--dangerously-skip-permissions",
-             "--system-prompt-file", "<repo>/.agents/skills/harness-execute/system-prompt.md",
+    "args": [<claude-args.sh --json 의 원소>,
              "--session-id", "<session id>",
              "--effort", "<effort>"] }
 ]}
 JSON
 atcher up /tmp/<run>-layout.json
 ```
+
+기본 인자: `bash <repo>/.agents/skills/harness-execute/claude-args.sh --json` (프로젝트 > 전역 > 기본값. SKILL.md '시작 인자'). 그 배열 뒤에 `--session-id` · `--effort` 를 이어 붙인다.
 
 ```text
 cwd        호출 위치 기준 상대 경로 또는 절대 경로. 없는 경로면 invalid_layout (아무것도 만들지 않음)
