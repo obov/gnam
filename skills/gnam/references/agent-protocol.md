@@ -1,7 +1,7 @@
 ---
 type: Protocol
 title: Agent 프로토콜
-description: 세션 시작 · 작업 · 중단 · 재개 (인계 메모) 절차의 원본
+description: 세션 시작 · 작업 · 사용자 소통 (자율 진행) · 중단 · 재개 (인계 메모) 절차의 원본
 tags: [gnam, protocol, handoff]
 generated: { by: claude-code/claude-opus-5-5, at: 2026-09-26T00:00:00Z }
 sources:
@@ -70,6 +70,44 @@ topic 관련 경로는 `ls apps packages` 로 구조를 보고, 그 topic impl �
 ```
 
 커밋이 Agent 사이의 인계 지점이다.
+
+## 사용자 소통 — 자율 진행
+
+사용자의 관심사는 요구사항이 제대로 진행되는가다. 기록을 어떻게 남기는가 (git) 는 gnam 이 맡는 인프라다.
+사용자는 git 을 몰라도 된다. 에이전트가 이 규약대로 커밋하면 무엇을 왜 했는지 전부 남는다.
+
+```text
+확인 없이 진행   plan · impl · spec chore · chore · refactor 커밋, 다음 plan 착수, 인계 메모 작성 · 삭제,
+                hook · verify 가 거부한 메시지 수정 후 재커밋
+                AGENTS.md 의 이 규칙이 사용자의 상시 커밋 요청이다 (하네스 기본값 "요청 시에만 커밋" 대체)
+                "커밋할까요" · "다음 plan 착수할까요" 로 턴을 끝내지 않는다. 다음 행동이 기록 · 다음 단계면 보고 대신 실행
+스테이징         자기 변경만 경로로 (git add <경로>). 작업 전부터 있던 미커밋 변경은 건드리지 않고 그대로 둔다. 묻지 않음
+멈추고 묻기      요구사항 판단: 미결: 에 의존 · plan Blocking · 요구사항 해석이 둘 이상 (commits/impl.md)
+                git 예외: 아래
+보고            요구사항 기준 진행 상태 (된 것 · 남은 것 · 필요한 판단). 커밋 hash · 종류 · 순서는 요청 시만
+```
+
+git 예외 — 규약 안에서 풀리지 않거나, 되돌리기 어렵거나, 다른 작업에 닿는 경우만 묻는다.
+
+```text
+데이터 유실      미커밋 변경 폐기 (reset --hard · checkout -- · clean) · push 한 history 재작성 · force push
+다른 작업 충돌    작업 전부터 있던 변경 · 다른 브랜치 · worktree 와 같은 파일이 겹쳐 분리할 수 없음
+풀리지 않는 검사  hook · verify 실패가 규약대로 고쳐도 반복
+push · 배포      저장소 규칙을 따른다. 규칙이 없으면 로컬 커밋까지 하고 묻지 않는다
+```
+
+### 반복 예외 → 규칙 개선
+
+한 번 겪은 예외는 처리하고 끝낸다 (필요하면 lore 경험칙). 같은 패턴이 쌓이면 규칙으로 흡수할지 검토한다.
+예외마다 plugin 을 만들지 않는다.
+
+```text
+신호       같은 원인의 예외 처리 · 수동 chore 가 반복 (기준: 3회)
+확인       git log --oneline --grep '^chore:' · npx gnam run recall search <원인> (recall plugin)
+흡수 순서   기존 plugin 개선 → 새 plugin (node_modules/@obov/gnam/README.md 'plugin 작성', 로컬 ./gnam-plugins/<id>)
+           검사 · 명령으로 만들 수 없으면 lore · 스킬
+알림       규칙 · plugin 을 바꾸면 사용자에게 한 줄: 무엇이 반복됐고 이제 무엇이 자동인지
+```
 
 ## 중단 · 재개 — 인계 메모
 
