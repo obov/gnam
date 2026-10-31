@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.1
+
+- 0.3.0 과 같은 기능. 0.3.0 태그는 CI 환경에서 테스트 하나가 실패해 배포되지 않음 (테스트만 수정)
+
 ## 0.3.0
 
 - `gnam status`: 인자 없이 세션 시작 요약 (설치 · 문제 · 인계 메모 · 요청 · plan 진행 · Blocking · 미결 · plugin 상태). 경로 · `--json` 이면 JSON 트리 (schema · gnam · config · plugins · kinds · rules · install · problems · handoff · env · trace)
