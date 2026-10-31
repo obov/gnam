@@ -2,8 +2,9 @@ import { test } from "node:test"
 import { expect } from "./expect.ts"
 import { mkdirSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
-import { collectStatus } from "../src/core/status.ts"
+import { collectStatus, summaryOf } from "../src/core/status.ts"
 import { tempRepo } from "./helpers.ts"
+import { commit, fixture } from "./trace-fixture.ts"
 
 test("status 트리: 키 순서 · plugin · 종류 · config · install", async () => {
   const repo = tempRepo({ format: 1, plugins: ["@gnam/recall"] })
@@ -72,6 +73,42 @@ test("status 트리: 고른 경로의 최상위 키만 계산", async () => {
   try {
     const tree = await collectStatus({ cwd: repo.root, paths: ["gnam.version"] })
     expect(Object.keys(tree)).toEqual(["gnam"])
+  } finally {
+    repo.cleanup()
+  }
+})
+
+test("요약: 문제 · 인계 메모 · 요청 · plan (최근부터 · 외 N) · Blocking · 미결 · 내용 없는 줄 생략", async () => {
+  const repo = tempRepo(null)
+  try {
+    const f = fixture(repo)
+    writeFileSync(join(repo.root, "gnam.json"), JSON.stringify({ format: 1, plugins: [] }))
+    for (let i = 0; i < 5; i++) commit(repo, `spec.c.plan: 추가 ${i}\n\nGoal:\ng\n\nPlan:\n1. x\n\nBlocking: 없음`)
+    mkdirSync(join(repo.root, ".git", "gnam"), { recursive: true })
+    writeFileSync(join(repo.root, ".git", "gnam", "handoff.md"), "State:\n진행 중\n\nNext:\nrequest 2단계\n")
+    const text = await summaryOf(repo.root)
+    const lines = text.trimEnd().split("\n")
+    expect(lines[0]).toMatch(/^gnam \d+\.\d+\.\d+\S* · plugins 없음 · 문제 \d+$/)
+    expect(lines.filter((l) => l.startsWith("- ")).length).toBeGreaterThan(0)
+    const rest = lines.filter((l) => !l.startsWith("- ")).slice(1)
+    const s = (sha: string) => sha.slice(0, 7)
+    expect(rest[0]).toBe("인계 메모  있음 · Next: request 2단계")
+    expect(rest[1]).toBe("요청       미착수 1 · 진행 1")
+    expect(rest[2]).toMatch(/^plan       c [0-9a-f]{7} 0\/1 · c [0-9a-f]{7} 0\/1 · c [0-9a-f]{7} 0\/1 · c [0-9a-f]{7} 0\/1 · c [0-9a-f]{7} 0\/1 · 외 2$/)
+    expect(rest[3]).toBe(`Blocking   a ${s(f.p4)} B1 새 결정`)
+    expect(rest[4]).toBe(`           a ${s(f.p4)} B2 둘째`)
+    expect(rest[5]).toBe("미결       specs/a.md:4 · specs/a.md:7")
+    expect(rest).toHaveLength(6)
+  } finally {
+    repo.cleanup()
+  }
+})
+
+test("요약: 빈 저장소는 첫 줄 · 인계 메모 줄만", async () => {
+  const repo = tempRepo()
+  try {
+    const lines = (await summaryOf(repo.root)).trimEnd().split("\n").filter((l) => !l.startsWith("- "))
+    expect(lines.slice(1)).toEqual(["인계 메모  없음"])
   } finally {
     repo.cleanup()
   }

@@ -34,14 +34,14 @@ Blocking   request 9f1c2ab B1 첨부 보관 정책
 release    다음 release minor (release plugin)
 ```
 
-- 미구현: 첫 줄 = gnam 버전 · 활성 plugin id · `문제 없음` 또는 `문제 N` (아래에 문제 줄 `- <message>`)
-- 미구현: 인계 메모 줄 = 있음이면 Next: 필드 값, 없으면 `없음`
-- 미구현: 요청 줄 = request: 커밋이 하나라도 있을 때만. open · started 개수
-- 미구현: plan 줄 = 대체되지 않은 plan 중 status partial · not-started. `<topic> <sha> <impl 있는 단계>/<단계 수>`, 최근 plan 부터 최대 5개 (넘으면 `외 N`)
-- 미구현: Blocking 줄 = Blocking 이 남은 최신 plan 마다 항목 번호 · 내용 첫 줄
-- 미구현: 미결 줄 = specs/ 의 `미결:` 위치 (최대 5개, 넘으면 `외 N`)
+- 첫 줄 = gnam 버전 · 활성 plugin id · `문제 없음` 또는 `문제 N` (아래에 문제 줄 `- <message>`)
+- 인계 메모 줄 = 있음이면 Next: 필드 값, 없으면 `없음`
+- 요청 줄 = request: 커밋이 하나라도 있을 때만. open · started 개수
+- plan 줄 = 대체되지 않은 plan 중 status partial · not-started. `<topic> <sha> <impl 있는 단계>/<단계 수>`, 최근 plan 부터 최대 5개 (넘으면 `외 N`)
+- Blocking 줄 = Blocking 이 남은 최신 plan 마다 항목 번호 · 내용 첫 줄
+- 미결 줄 = specs/ 의 `미결:` 위치 (최대 5개, 넘으면 `외 N`)
 - 미구현: plugin 줄 = plugin 이 낸 summary 줄 (아래 'plugin 확장'). 그 plugin 순서대로
-- 미구현: 해당 내용이 없는 줄은 생략 (첫 줄 · 인계 메모 줄 제외)
+- 해당 내용이 없는 줄은 생략 (첫 줄 · 인계 메모 줄 제외)
 
 ## 트리
 

@@ -8,6 +8,7 @@ import { CONFIG_FILE, configPath, configProblems, FORMAT, type GnamConfig } from
 import { exec, git } from "./git.ts"
 import { BUILTIN_PREFIX, builtinIds, isLocalSpec, type Loaded, loadPlugin, PACKAGE_ROOT, pluginProblems } from "./loader.ts"
 import { parsePath } from "./output.ts"
+import { summary } from "./summary.ts"
 import { collectTrace } from "./trace.ts"
 import { agentsProblems, HOOKS_DIR, hookProblems, isLink, skillDirs, skillProblems, skillSources } from "./project.ts"
 
@@ -292,4 +293,19 @@ export async function collectStatus(options: StatusOptions): Promise<Record<stri
   const tree: Record<string, unknown> = {}
   for (const [key, compute] of SECTIONS) if (needed === null || needed.has(key)) tree[key] = await compute(ctx)
   return tree
+}
+
+/** 요약 텍스트 (인자 없는 gnam status) */
+export async function summaryOf(cwd: string): Promise<string> {
+  const ctx = new Context({ cwd })
+  const { loaded } = await ctx.plugins()
+  return summary({
+    cwd,
+    version: packageVersion(),
+    plugins: loaded.map((l) => l.plugin.id),
+    problems: await problemsOf(ctx),
+    handoff: handoffOf(cwd),
+    trace: ctx.once("trace", () => collectTrace(cwd)),
+    pluginLines: [],
+  })
 }
