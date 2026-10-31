@@ -138,6 +138,7 @@ HEAD 가 바뀔 때마다 바뀐 부분만 읽는 호출자용 (`trace.head` 를
 
 ```text
 경로         점 구분. 배열은 숫자 인덱스. 예: gnam.version · plugins.recall.commands · kinds.0.label
+             점 · 따옴표가 든 키는 큰따옴표로 감싼다. 예: trace.topics."".chores · plugins."./demo".version
 경로 하나     그 값
 경로 여럿     { "<경로>": 값, … }
 --where      배열 원소 · 객체 값 거르기. key=value · key!=value. 여러 개 = AND. key 는 점 경로. 값은 JSON 스칼라의 문자열 표현과 비교
