@@ -62,9 +62,9 @@ s3://<bucket>/<key>     저장소 밖 파일. s3 plugin 으로 올린 결과 (sp
          Request: 없음 (<발의 근거>)          에이전트 발의 (반복 예외 → 규칙 개선 등)
 ```
 
-- 미구현: 대상 커밋에 Request 필드 필수
-- 미구현: hash 는 이 커밋보다 먼저 있는 request 커밋. 아니면 위반
-- 미구현: request plugin 을 켠 커밋 (gnam.json plugins 에 추가한 커밋) 이후만 검사
+- 대상 커밋에 Request 필드 필수
+- hash 는 이 커밋보다 먼저 있는 request 커밋. 아니면 위반
+- 그 커밋 시점 gnam.json plugins 에 request 가 있을 때만 검사 (켠 커밋부터)
 
 ## 명령
 

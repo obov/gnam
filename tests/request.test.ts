@@ -2,7 +2,9 @@ import { test } from "node:test"
 import { expect } from "./expect.ts"
 import request from "../src/plugins/request/index.ts"
 import { parseAttachment } from "../src/plugins/request/model.ts"
-import { fakeLookup, ruleRunner } from "./helpers.ts"
+import { writeFileSync } from "node:fs"
+import { join } from "node:path"
+import { fakeLookup, ruleRunner, tempRepo } from "./helpers.ts"
 
 const SHA = `sha256:${"a".repeat(64)}`
 const R1 = "1111111"
@@ -68,4 +70,41 @@ test("첨부 줄 해석: 큰따옴표 이름 · 원래 경로 · 저장소 위�
     location: { kind: "repo", path: "src/cli.ts", commit: "abcdef1" },
     origin: null,
   })
+})
+
+test("Request 필드: plan · spec chore · chore · refactor 에 필수, impl 은 제외", () => {
+  const plan = "spec.x.plan: p\n\nGoal:\ng\n\nPlan:\n1. a\n   완료: b\n\nBlocking: 없음"
+  expect(rules(plan, [])).toEqual(["commit/request-link"])
+  expect(rules(`${plan}\n\nRequest: ${R1}`, [])).toEqual([])
+  expect(rules("chore: c\n\nRequest: 없음 (반복 chore 3회 → 규칙 개선)", [])).toEqual([])
+  expect(rules("chore: c\n\nRequest: 없음", [])).toEqual(["commit/request-link"])
+  expect(rules("chore: c\n\nRequest: 2222222", [])).toEqual(["commit/request-link"])
+  expect(rules("chore: c\n\nRequest: 3333333", [])).toEqual(["commit/request-link"])
+  expect(rules(`chore: c\n\nRequest: ${R1}, 2222222`, [])).toEqual(["commit/request-link"])
+  expect(rules("spec.x.impl: i\n\nPlan: 2222222 1", [])).not.toContain("commit/request-link")
+  expect(rules("request: r\n\nText:\n> 원문", [])).toEqual([])
+})
+
+test("Request 필드: verify 는 request plugin 을 켠 커밋부터 검사", () => {
+  const repo = tempRepo({ format: 1, plugins: [] })
+  try {
+    repo.git("add", "gnam.json")
+    repo.git("commit", "-q", "--no-verify", "-m", "chore: gnam 도입\n\nGoal:\nx")
+    repo.commit("a.txt", "chore: 켜기 전")
+    writeFileSync(join(repo.root, "gnam.json"), JSON.stringify({ format: 1, plugins: ["@gnam/request"] }))
+    repo.git("add", "gnam.json")
+    repo.git("commit", "-q", "--no-verify", "-m", "chore: request 켜기\n\nRequest: 없음 (도입)")
+    expect(repo.gnam("verify").status).toBe(0)
+    repo.git("commit", "-q", "--no-verify", "--allow-empty", "-m", "request: 요청\n\nText:\n> 원문")
+    const req = repo.git("rev-parse", "--short=7", "HEAD").out.trim()
+    repo.commit("b.txt", `chore: 연결됨\n\nRequest: ${req}`)
+    expect(repo.gnam("verify").status).toBe(0)
+    repo.commit("c.txt", "chore: 연결 없음")
+    const failed = repo.gnam("verify")
+    expect(failed.status).toBe(1)
+    expect(failed.err).toContain("commit/request-link")
+    expect(failed.err).toContain("chore: 연결 없음")
+  } finally {
+    repo.cleanup()
+  }
 })
