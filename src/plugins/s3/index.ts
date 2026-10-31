@@ -16,4 +16,6 @@ export default definePlugin({
     url: { describe: "<ref> [--expires <초>]  presigned GET URL", run: (args, cwd, config) => urlCommand(args, cwd, config) },
     check: { describe: "[<rev 범위>]  request 커밋의 s3 첨부가 저장소에 있는지 (기본 HEAD 전체)", run: (args, cwd, config) => checkCommand(args, cwd, config) },
   },
+  skills: ["skills/gnam-s3"],
+  agentsMd: "agents.md",
 })

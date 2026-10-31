@@ -229,3 +229,21 @@ test("check: request 커밋의 s3 첨부 존재 · 없는 객체 출력 exit 1 �
     await t.server.close()
   }
 })
+
+test("plugin add s3: AGENTS.md 조각 · 스킬 링크 · 설정 문제는 problems", async () => {
+  const { tempRepo } = await import("./helpers.ts")
+  const { readFileSync, existsSync, writeFileSync } = await import("node:fs")
+  const { join } = await import("node:path")
+  const repo = tempRepo({ format: 1, plugins: [] })
+  try {
+    expect(repo.gnam("plugin", "add", "s3").status).toBe(0)
+    expect(readFileSync(join(repo.root, "AGENTS.md"), "utf8")).toContain("### s3 (첨부 보관)")
+    expect(existsSync(join(repo.root, ".agents/skills/gnam-s3/SKILL.md"))).toBe(true)
+    const config = JSON.parse(readFileSync(join(repo.root, "gnam.json"), "utf8")) as Record<string, unknown>
+    writeFileSync(join(repo.root, "gnam.json"), JSON.stringify({ ...config, s3: { bucket: "b", secretAccessKey: "x" } }))
+    const problems = JSON.parse(repo.gnam("status", "problems").out) as { source: string; message: string }[]
+    expect(problems.some((p) => p.message.includes("자격은 gnam.json 에 두지 않는다"))).toBe(true)
+  } finally {
+    repo.cleanup()
+  }
+})
