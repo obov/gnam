@@ -6,7 +6,8 @@ import { git, gitOrThrow, lines, nulList } from "./core/git.ts"
 import { boundaryOf, cleanMessage, commitInput, gitLookup, historyArgs, pushRange } from "./core/history.ts"
 import { builtinIds, loadPlugins, PACKAGE_ROOT } from "./core/loader.ts"
 import type { GnamPlugin } from "./core/plugin.ts"
-import { OutputError, output, type OutputOptions, type Renderer } from "./core/output.ts"
+import { OutputError, output, type OutputOptions, render, type Renderer } from "./core/output.ts"
+import { schemaAt, statusSchema } from "./core/schema.ts"
 import { addPlugin, init, link, realProject, removePlugin, sync } from "./core/project.ts"
 import { collectStatus, Context, problemsOf, summaryOf } from "./core/status.ts"
 import { TraceError } from "./core/trace.ts"
@@ -211,6 +212,13 @@ async function status(args: string[]): Promise<number> {
         if (a.check) problems += (await problemsOf(new Context({ cwd: root }))).length
       }
       return a.check && problems > 0 ? 3 : 0
+    }
+    if (a.schema) {
+      const ctx = new Context({ cwd: roots[0] ?? "." })
+      const schema = statusSchema((await ctx.plugins()).loaded)
+      const value = a.paths.length <= 1 ? schemaAt(schema, a.paths[0] ?? "") : Object.fromEntries(a.paths.map((p) => [p, schemaAt(schema, p)]))
+      process.stdout.write(render(value, a.format, await ctx.formats()))
+      return 0
     }
     const results: Record<string, string> = {}
     const values: Record<string, unknown> = {}

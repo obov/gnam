@@ -218,3 +218,21 @@ test("plugin 확장: 요약 줄 · --format plugin 형식 · gnam run --json · 
     repo.cleanup()
   }
 })
+
+test("--schema: 최상위 키 · trace 하위 키 · plugin 섹션이 schema 에 있다", async () => {
+  const repo = demoRepo()
+  try {
+    const schema = JSON.parse(repo.gnam("status", "--schema").out) as { properties: Record<string, { properties?: Record<string, unknown> }> }
+    const tree = await collectStatus({ cwd: repo.root })
+    expect(Object.keys(schema.properties)).toEqual(Object.keys(tree))
+    expect(Object.keys(schema.properties["trace"]?.properties ?? {})).toEqual(Object.keys(tree["trace"] as object))
+    const section = JSON.parse(repo.gnam("status", "plugins.demo.sections.info", "--schema").out) as { description: string }
+    expect(section.description).toBe("가벼운 정보")
+    const plan = JSON.parse(repo.gnam("status", "trace.topics.a.plans.0.status", "--schema").out) as { enum: string[] }
+    expect(plan.enum).toEqual(["superseded", "done", "partial", "not-started"])
+    const handoffKeys = Object.keys((JSON.parse(repo.gnam("status", "handoff", "--schema").out) as { properties: object }).properties)
+    expect(handoffKeys).toEqual(Object.keys(tree["handoff"] as object))
+  } finally {
+    repo.cleanup()
+  }
+})

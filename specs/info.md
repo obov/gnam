@@ -161,7 +161,7 @@ text      사람용 들여쓰기 트리 (key: value)
 ```
 
 - `--keys` = 고른 값 아래 모든 잎 경로 목록 (배열 형식 출력)
-- 미구현: `--schema` = 고른 값의 JSON Schema (core + plugin 이 낸 schema 합성)
+- `--schema` = 고른 값의 JSON Schema (core + plugin 이 낸 schema 합성)
 - `--check` = problems 가 비어 있지 않으면 exit 3 (출력은 그대로)
 
 ## exit code
