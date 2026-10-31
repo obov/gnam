@@ -136,3 +136,15 @@ test("실행: atcher status 시간 초과 → 기존 출력", { timeout: 15_000 
   expect(out.stdout.trimEnd()).toBe(BASE)
   expect(out.ms).toBeLessThan(8000)
 })
+
+test("status 데이터: runsData = 같은 트리, runsSummary = 진행 중 run · 판단 필요 노드", async () => {
+  const { runsData, runsSummary } = await import("../src/plugins/multi-agent/status.ts")
+  const runs = runsData(dir)
+  expect(runs.map((r) => r.id)).toEqual(["0924-1402"])
+  expect(runs[0]?.root.fields["budget"]).toEqual(["6"])
+  expect(runs[0]?.root.children.map((c) => c.id)).toEqual(["d1"])
+  expect(runs[0]?.root.children[0]?.children.map((c) => c.id)).toEqual(["d1.1", "r2"])
+  expect(runs[0]?.root.children[0]?.children[0]?.fields["question"]).toEqual(["Q1 위치"])
+  expect(runsSummary(dir)).toEqual(["진행 중 run 1 · 판단 필요 1"])
+  expect(runsSummary(join(dir, "없음"))).toEqual([])
+})

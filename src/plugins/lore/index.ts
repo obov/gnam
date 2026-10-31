@@ -1,5 +1,5 @@
 import { definePlugin } from "../../core/plugin.ts"
-import { loreViolations } from "./lore.ts"
+import { loreEntries, loreViolations } from "./lore.ts"
 
 export default definePlugin({
   id: "lore",
@@ -13,4 +13,13 @@ export default definePlugin({
   skills: ["skills/gnam-lore"],
   agentsMd: "agents.md",
   scaffold: { "lore/README.md": "files/README.md" },
+  status: {
+    sections: {
+      entries: {
+        describe: "lore/README.md 인덱스 (파일 · 적용 조건 요약)",
+        schema: { type: "array", items: { type: "object", properties: { file: { type: "string" }, summary: { type: "string" } } } },
+        collect: (ctx) => loreEntries(ctx.cwd),
+      },
+    },
+  },
 })

@@ -135,3 +135,20 @@ test("openapi: 새 v<N>.yaml = 새 버전, 설정 없이 release 제목은 실�
     ).map((v) => v.rule),
   ).toEqual(["commit/release-target"])
 })
+
+test("status 요약: releaseSummary 가 release status 와 같은 계산", async () => {
+  const { releaseSummary } = await import("../../src/plugins/release/release.ts")
+  root = mkdtempSync(join(tmpdir(), "release-summary-"))
+  git("init", "-q", "-b", "main")
+  git("config", "user.name", "t")
+  git("config", "user.email", "t@t")
+  write("packages/a/package.json", pkg("a", "1.0.0"))
+  commit("chore: a", "packages/a/package.json")
+  write("packages/a/x.txt", "x")
+  commit("chore: x", "packages/a/x.txt")
+  const one: ReleaseConfig = { targets: { "packages/a": "semver" } }
+  const input = releaseStates(root, one, { kind: "worktree" })
+  const state = input?.states[0]
+  if (input === null || state === undefined) throw new Error("state 없음")
+  expect(releaseSummary(root, one)).toEqual([`a 없음 → ${allowedVersions(state, input.date)[0] ?? "변경 없음"}`])
+})

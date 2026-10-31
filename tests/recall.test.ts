@@ -112,3 +112,21 @@ test("search 명령: 출력 형식 · --limit · 빈 query exit 1 · 결과 없�
     repo.cleanup()
   }
 })
+
+test("search --json: ref · kind · title · score · supersededBy", () => {
+  const repo = tempRepo({ format: 1, plugins: ["@gnam/recall"] })
+  try {
+    repo.commit("a.txt", "chore: 재시도 간격 조정\n\n본문")
+    repo.commit("b.txt", "chore: 다른 일")
+    const out = repo.gnam("run", "recall", "search", "재시도", "--json")
+    expect(out.status).toBe(0)
+    const hits = JSON.parse(out.out) as { ref: string; kind: string; title: string; score: number; supersededBy: string | null }[]
+    expect(hits).toHaveLength(1)
+    expect(hits[0]).toMatchObject({ kind: "commit", title: "chore: 재시도 간격 조정", supersededBy: null })
+    expect(hits[0]?.score).toBeGreaterThan(0)
+    expect(repo.gnam("run", "recall", "search", "재시도", "--format", "raw", "--fields", "title").out).toBe('[{"title":"chore: 재시도 간격 조정"}]\n')
+    expect(repo.gnam("run", "recall", "search", "--json").status).toBe(1)
+  } finally {
+    repo.cleanup()
+  }
+})

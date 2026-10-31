@@ -6,7 +6,7 @@ import { type CommitContext, definePlugin, type GnamConfig } from "../../core/pl
 import type { Violation } from "../../core/violation.ts"
 import { releaseConfigOf, releaseConfigProblems } from "./config.ts"
 import { outsideProblems, RELEASE_SUBJECT, releaseProblems } from "./model.ts"
-import { releaseCli } from "./release.ts"
+import { releaseCli, releaseSummary } from "./release.ts"
 import { releaseStates } from "./repo.ts"
 
 const stateOf = (ctx: CommitContext) => {
@@ -58,6 +58,12 @@ export default definePlugin({
     { id: "commit/release-files", why: "release 커밋은 대상 package.json · lock 만" },
     { id: "commit/version-outside", why: "release 밖 커밋은 대상 version 을 바꾸지 않는다" },
   ],
+  status: {
+    summary(ctx) {
+      const config = releaseConfigOf(ctx.config["release"])
+      return config === null ? [] : releaseSummary(ctx.cwd, config)
+    },
+  },
   configProblems: releaseConfigProblems,
   commands: Object.fromEntries(
     (

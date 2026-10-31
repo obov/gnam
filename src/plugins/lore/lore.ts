@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs"
+import { existsSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import type { Violation } from "../../core/violation.ts"
 const readText = (path: string) => readFileSync(path, "utf8")
@@ -74,4 +74,11 @@ export function loreViolations(cwd: string, files: string[]): Violation[] {
     }
   }
   return violations
+}
+
+/** lore/README.md 인덱스 줄 '<파일>.md  <요약>' */
+export function loreEntries(cwd: string): { file: string; summary: string }[] {
+  const path = join(cwd, LORE_INDEX)
+  if (!existsSync(path)) return []
+  return [...readFileSync(path, "utf8").matchAll(/^([a-z0-9-]+\.md)\s{2,}(.+?)\s*$/gm)].map((m) => ({ file: m[1] ?? "", summary: m[2] ?? "" }))
 }

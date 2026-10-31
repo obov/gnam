@@ -36,3 +36,21 @@ test("lore/location · lore/entry-fields · lore/index", () => {
     "lore/index lore/README.md: gone.md 파일 없음",
   ])
 })
+
+test("status 섹션 plugins.lore.sections.entries = README 인덱스", async () => {
+  const { tempRepo } = await import("./helpers.ts")
+  const { collectStatus } = await import("../src/core/status.ts")
+  const repo = tempRepo({ format: 1, plugins: ["@gnam/lore"] })
+  try {
+    mkdirSync(join(repo.root, "lore"), { recursive: true })
+    writeFileSync(join(repo.root, "lore", "README.md"), "# lore\n\n```text\nstory.md  데이터 스토리 도입부\nretry-policy.md  외부 API 재시도\n```\n")
+    const tree = await collectStatus({ cwd: repo.root, paths: ["plugins.lore.sections.entries"] })
+    const lore = (tree["plugins"] as Record<string, { sections: { entries: unknown } }>)["lore"]
+    expect(lore?.sections.entries).toEqual([
+      { file: "story.md", summary: "데이터 스토리 도입부" },
+      { file: "retry-policy.md", summary: "외부 API 재시도" },
+    ])
+  } finally {
+    repo.cleanup()
+  }
+})

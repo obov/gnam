@@ -3,7 +3,7 @@
  * 스킬 3개 (multi-agent · harness-execute · agent-routing) 를 링크한다. 배정 · 실측 기록은 run, 통합 커밋은 merge plugin.
  */
 import { definePlugin } from "../../core/plugin.ts"
-import { agentsFrom, atcherStatus, runsDir, show } from "./status.ts"
+import { agentsFrom, atcherStatus, runsData, runsDir, runsSummary, show } from "./status.ts"
 
 export default definePlugin({
   id: "multi-agent",
@@ -17,6 +17,12 @@ export default definePlugin({
         return 0
       },
     },
+  },
+  status: {
+    sections: {
+      runs: { describe: "위임 상태 트리 (<git common dir>/gnam/runs, multi-agent status 와 같은 데이터)", collect: (ctx) => runsData(runsDir(ctx.cwd)) },
+    },
+    summary: (ctx) => runsSummary(runsDir(ctx.cwd)),
   },
   skills: ["skills/multi-agent", "skills/harness-execute", "skills/agent-routing"],
   agentsMd: "agents.md",

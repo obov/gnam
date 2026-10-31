@@ -51,6 +51,16 @@ export function withVersion(text: string, version: string): string {
   return text.replace(/("version"\s*:\s*")[^"]*(")/, `$1${version}$2`)
 }
 
+/** status 요약 줄: 대상마다 '<이름> <직전> → <다음>' (release status 와 같은 계산) */
+export function releaseSummary(cwd: string, config: ReleaseConfig): string[] {
+  const input = releaseStates(cwd, config, { kind: "worktree" })
+  if (input === null) return []
+  return input.states.map((state) => {
+    const allowed = allowedVersions(state, input.date)
+    return `${state.name} ${state.last?.version ?? "없음"} → ${allowed[0] ?? "변경 없음"}`
+  })
+}
+
 function status(cwd: string, config: ReleaseConfig) {
   const input = releaseStates(cwd, config, { kind: "worktree" })
   if (input === null) return console.log("커밋 없음")

@@ -143,3 +143,30 @@ export function show(dir: string, only?: string, now = Date.now(), agents?: Agen
     .join("\n\n")
 }
 
+
+export interface RunNode {
+  id: string
+  fields: Record<string, string[]>
+  children: RunNode[]
+}
+
+const toJson = (n: Node): RunNode => ({ id: n.id, fields: Object.fromEntries(n.fields), children: n.children.map(toJson) })
+
+/** 위임 상태 트리 데이터 (status 명령과 같은 node 파일). run id 순 */
+export function runsData(dir: string): { id: string; root: RunNode }[] {
+  if (!existsSync(dir)) return []
+  return readdirSync(dir)
+    .filter((id) => statSync(join(dir, id)).isDirectory())
+    .sort()
+    .map((id) => ({ id, root: toJson(load(join(dir, id), "root")) }))
+}
+
+/** 요약 줄: 진행 중 run 수 · 판단 필요 노드 수. run 없으면 빈 목록 */
+export function runsSummary(dir: string): string[] {
+  const runs = runsData(dir)
+  if (runs.length === 0) return []
+  const walk = (n: RunNode): RunNode[] => [n, ...n.children.flatMap(walk)]
+  const activeRuns = runs.filter((r) => ACTIVE.has(r.root.fields["status"]?.[0] ?? "")).length
+  const waiting = runs.flatMap((r) => walk(r.root)).filter((n) => n.fields["status"]?.[0] === "판단 필요" || (n.fields["question"]?.length ?? 0) > 0).length
+  return [`진행 중 run ${activeRuns} · 판단 필요 ${waiting}`]
+}
