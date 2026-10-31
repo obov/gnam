@@ -4,6 +4,7 @@
  */
 import { git } from "../../core/git.ts"
 import { type CommitContext, definePlugin } from "../../core/plugin.ts"
+import { openCommand, showCommand } from "./history.ts"
 import { linkProblems, REQUEST_SUBJECT, requestProblems } from "./model.ts"
 
 /** Request 필드가 필요한 제목: plan · spec chore · chore · refactor (impl 은 Plan 으로 이어짐) */
@@ -35,5 +36,9 @@ export default definePlugin({
   everyCommit(ctx, owner) {
     if (owner !== "core" || ctx.merge || !LINKED_SUBJECT.test(ctx.subject) || !activeAt(ctx)) return []
     return linkProblems(ctx)
+  },
+  commands: {
+    open: { describe: "어느 커밋도 가리키지 않은 request (미착수 요청)", run: (_args, cwd) => openCommand(cwd) },
+    show: { describe: "<hash>  요청 · Refines 체인 · 가리키는 커밋", run: (args, cwd) => showCommand(args, cwd) },
   },
 })

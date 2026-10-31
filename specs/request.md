@@ -73,8 +73,8 @@ gnam run request open     어느 커밋의 Request 도 가리키지 않는 reque
 gnam run request show <hash>   요청 · Refines 체인 · 가리키는 커밋 목록
 ```
 
-- 미구현: open 출력 한 줄 = `<hash>  <요약>`. 없으면 `미착수 요청 없음` · exit 0
-- 미구현: show 출력 = 요청 제목 · Refines 체인 (오래된 것부터) · 가리키는 커밋 `<hash>  <제목>`
+- open 출력 한 줄 = `<hash>  <요약>`. 없으면 `미착수 요청 없음` · exit 0
+- show 출력 = 요청 제목 · Refines 체인 (오래된 것부터) · 가리키는 커밋 `<hash>  <제목>`
 
 ## 범위 밖
 

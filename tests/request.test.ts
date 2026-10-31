@@ -108,3 +108,38 @@ test("Request 필드: verify 는 request plugin 을 켠 커밋부터 검사", ()
     repo.cleanup()
   }
 })
+
+test("명령 open · show: 미착수 요청 · Refines 체인 · 가리키는 커밋", () => {
+  const repo = tempRepo({ format: 1, plugins: ["@gnam/request"] })
+  try {
+    const empty = (message: string) => {
+      repo.git("commit", "-q", "--no-verify", "--allow-empty", "-m", message)
+      return repo.git("rev-parse", "HEAD").out.trim()
+    }
+    expect(repo.gnam("run", "request", "open").out.trim()).toBe("미착수 요청 없음")
+    const a = empty("request: 첫 요청\n\nText:\n> a")
+    const b = empty("request: 다른 요청\n\nText:\n> b")
+    const c = empty(`request: 첫 요청 보충\n\nText:\n> c\n\nRefines: ${a.slice(0, 7)}`)
+    const work = repo.commit("x.txt", `chore: 작업\n\nRequest: ${a.slice(0, 7)}`)
+    expect(repo.gnam("run", "request", "open").out.trim().split("\n")).toEqual([
+      `${c.slice(0, 7)}  첫 요청 보충`,
+      `${b.slice(0, 7)}  다른 요청`,
+    ])
+    const later = repo.commit("y.txt", `chore: 보충 반영\n\nRequest: ${c.slice(0, 9)}`)
+    expect(repo.gnam("run", "request", "open").out.trim()).toBe(`${b.slice(0, 7)}  다른 요청`)
+    expect(repo.gnam("run", "request", "show", c.slice(0, 7)).out.trim().split("\n")).toEqual([
+      `${c.slice(0, 7)}  request: 첫 요청 보충`,
+      "",
+      "Refines 체인",
+      `${a.slice(0, 7)}  첫 요청`,
+      `${c.slice(0, 7)}  첫 요청 보충  ← 이 요청`,
+      "",
+      "가리키는 커밋",
+      `${work.slice(0, 7)}  chore: 작업  → ${a.slice(0, 7)}`,
+      `${later.slice(0, 7)}  chore: 보충 반영  → ${c.slice(0, 7)}`,
+    ])
+    expect(repo.gnam("run", "request", "show", work.slice(0, 7)).status).toBe(1)
+  } finally {
+    repo.cleanup()
+  }
+})
