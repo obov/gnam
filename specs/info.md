@@ -145,8 +145,8 @@ HEAD 가 바뀔 때마다 바뀐 부분만 읽는 호출자용 (`trace.head` 를
 -C <dir>     그 저장소를 조회. 여러 번 = { "<루트 절대 경로>": 결과, … }
 ```
 
-- 미구현: 처리 순서 = 수집 → 경로 → --where → --fields → 형식
-- 미구현: 없는 경로 = stderr 에 경로 · exit 2
+- 처리 순서 = 수집 → 경로 → --where → --fields → 형식
+- 없는 경로 = stderr 에 경로 · exit 2
 
 ## 형식
 
@@ -160,7 +160,7 @@ text      사람용 들여쓰기 트리 (key: value)
 <plugin>  plugin 이 더한 형식
 ```
 
-- 미구현: `--keys` = 고른 값 아래 모든 잎 경로 목록 (배열 형식 출력)
+- `--keys` = 고른 값 아래 모든 잎 경로 목록 (배열 형식 출력)
 - 미구현: `--schema` = 고른 값의 JSON Schema (core + plugin 이 낸 schema 합성)
 - 미구현: `--check` = problems 가 비어 있지 않으면 exit 3 (출력은 그대로)
 
