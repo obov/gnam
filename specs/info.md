@@ -11,7 +11,7 @@ git 과 나눠 쓴다. status 는 git 한 번으로 안 되는 것 (커밋 간 �
 
 ```text
 gnam status                                         요약 (사람 · 에이전트용 텍스트)
-gnam status [<경로>…] [-C <dir>]… [--json] [--deep] [--check] [--where <조건>]… [--fields <a,b>] [--format <이름>] [--keys] [--schema]
+gnam status [<경로>…] [-C <dir>]… [--json] [--deep] [--check] [--since <rev>] [--where <조건>]… [--fields <a,b>] [--format <이름>] [--keys] [--schema]
 gnam doctor                                         설치 문제 점검 (기존 출력 · exit code 유지)
 gnam run <plugin> <command> [args…] --json | --format <이름> [출력 옵션]
 ```
@@ -57,7 +57,7 @@ rules      검사 규칙. id · owner · why
 install    hooks (hooksPath · expected · commitMsg 파일 유무) · skills (dir · name · target · ok)
            · agentsMd (exists · inSync) · claudeMd (exists · importsAgents)
 problems   source (config | install | plugin:<id>) · message. doctor 와 같은 내용을 구조화
-handoff    path · exists · content (없으면 null)
+handoff    path · exists · content (없으면 null) · modifiedAt (파일 변경 시각 ISO 8601, 없으면 null)
 env        node · bun · git 버전 (없으면 null) · ci · gitDir · commonDir · worktree · branch
 trace      기록의 연결. 아래 'trace'
 ```
@@ -87,11 +87,16 @@ sections     plugin 이 더한 섹션 (아래 'plugin 확장')
 에이전트가 요청 의도 · 반영 여부를 분석하고 개선안 · 후속 작업을 제안할 때 쓰는 입력. gnam.json 검사 경계 이후 HEAD 에서 도달 가능한 커밋 기준.
 
 ```text
+trace.head        HEAD sha (없으면 null). 다음 --since 에 넘길 값
+trace.since       --since 로 준 rev 의 sha (없으면 null)
 trace.boundary    검사 경계 커밋 sha · subject (없으면 null)
 trace.requests    request: 커밋. sha · subject · refines · refinedBy · by (Request: 로 가리킨 커밋 sha) · status (open | started | refined)
 trace.topics      topic → { path · exists · unimplemented · open (각 line · text) · plans · chores }
 trace.agent       Request: 없음 (<근거>) 커밋. sha · subject · reason
 trace.items       미해결 후보. kind (remaining | deferred | open | risk | blocking) · text · sha (출처 커밋)
+trace.decisions   사람 결정이 필요한 것. 근거별로 나눈다
+  blocking        대체되지 않은 plan 의 Blocking 항목. topic · plan (sha) · id (B1 …, 번호 없으면 null) · text
+  open            specs/ 의 미결:. path · line · text · introducedBy (그 줄을 넣은 커밋 sha, 미커밋이면 null)
 ```
 
 plan 객체 (trace.topics.<topic>.plans, 오래된 것부터):
@@ -111,6 +116,19 @@ impls       sha · subject · step · deviation · decisions · remaining · def
 - 미구현: 본문 필드 = 줄 머리 `<이름>:` 부터 다음 필드 머리 전까지. 값은 앞뒤 공백을 뺀 원문
 - 미구현: items 의 해결 여부는 판정하지 않는다 (연결 필드가 없음). 출처 sha 만 준다
 - 미구현: request plugin 이 꺼져 있어도 request: 커밋 · Request: 필드가 있으면 읽는다
+- 미구현: items 는 모든 plan · impl 본문의 출처 기록, decisions 는 지금 결정이 필요한 것만 (대체된 plan 의 Blocking 제외 · spec 의 미결: 포함)
+- 미구현: decisions.open 의 introducedBy = 그 줄의 git blame 커밋
+
+### --since
+
+HEAD 가 바뀔 때마다 바뀐 부분만 읽는 호출자용 (`trace.head` 를 저장했다가 다음 호출에 넘긴다).
+
+- 미구현: `--since <rev>` = rev..HEAD 에 생긴 것만 trace 에 남긴다. requests · plans · impls · chores · agent · items 는 sha 가 범위 안인 것, 범위 안 impl 이 가리키는 plan 은 함께
+- 미구현: plan status · steps · supersededBy 는 범위와 무관하게 전체 history 로 계산
+- 미구현: decisions.blocking 은 범위 안 plan, decisions.open 은 introducedBy 가 범위 안이거나 null (미커밋)
+- 미구현: topics 는 범위 안 항목이 있는 topic 만. unimplemented · open 은 그대로 (현재 상태)
+- 미구현: rev 가 없거나 HEAD 의 조상이 아니면 (history 재작성) stderr 에 이유 · exit 1. 호출자는 --since 없이 다시 읽는다
+- 미구현: --since 는 trace 를 고를 때만 의미. 요약 · 다른 섹션에는 영향 없음
 
 ## 세션 시작
 
