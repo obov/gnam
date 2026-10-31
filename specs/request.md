@@ -20,9 +20,9 @@ Attachments:
 Refines: <이전 request hash>
 ```
 
-- 미구현: Text 필수. 모든 줄이 `> ` 또는 `>` 로 시작
-- 미구현: Described · Attachments · Refines 선택. Refines 는 같은 요청을 바꾸거나 보충할 때 이전 request 커밋을 가리킨다
-- 미구현: 파일 변경 없음 (빈 커밋)
+- Text 필수. 모든 줄이 `> ` 또는 `>` 로 시작
+- Described · Attachments · Refines 선택. Refines 는 같은 요청을 바꾸거나 보충할 때 이전 request 커밋을 가리킨다
+- 파일 변경 없음 (빈 커밋)
 - 원문은 요약 · 수정하지 않는다. 비밀값 (토큰 · 비밀번호 · 키) 만 `[REDACTED]`
 
 기록 대상:
@@ -47,8 +47,8 @@ s3://<bucket>/<key>     저장소 밖 파일. s3 plugin 으로 올린 결과 (sp
 없음                    보관 실패 (s3 plugin 비활성 · 업로드 실패 · 경로 없음)
 ```
 
-- 미구현: URL 외의 줄은 sha256 (64자리 소문자 hex) 필수. 위치 `없음` 이면 `← <원래 경로>` 필수
-- 미구현: 이름에 공백이 있으면 큰따옴표로 감싼다
+- URL 외의 줄은 sha256 (64자리 소문자 hex) 필수. 위치 `없음` 이면 `← <원래 경로>` 필수
+- 이름에 공백이 있으면 큰따옴표로 감싼다
 - 경로 없는 첨부 (붙여넣은 이미지에 파일이 없음) 는 첨부 줄 대신 Described 에 내용을 적는다
 - 보관 실패는 사용자에게 한 줄 알린다 (agent-protocol 의 git 예외)
 
