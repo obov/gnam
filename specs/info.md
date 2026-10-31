@@ -111,24 +111,24 @@ status      superseded | done (모든 단계에 impl) | partial | not-started
 impls       sha · subject · step · deviation · decisions · remaining · deferred (본문 필드 원문, 없으면 null)
 ```
 
-- 미구현: chores = 그 topic 의 spec.<topic>.chore 커밋 sha · subject · requests. topic 없는 chore · refactor 는 trace.topics."" 아래
-- 미구현: Topics: 로 여러 topic 을 묶은 수집 plan 은 각 topic 의 plans 에 모두 나타난다
-- 미구현: 본문 필드 = 줄 머리 `<이름>:` 부터 다음 필드 머리 전까지. 값은 앞뒤 공백을 뺀 원문
-- 미구현: items 의 해결 여부는 판정하지 않는다 (연결 필드가 없음). 출처 sha 만 준다
-- 미구현: request plugin 이 꺼져 있어도 request: 커밋 · Request: 필드가 있으면 읽는다
-- 미구현: items 는 모든 plan · impl 본문의 출처 기록, decisions 는 지금 결정이 필요한 것만 (대체된 plan 의 Blocking 제외 · spec 의 미결: 포함)
-- 미구현: decisions.open 의 introducedBy = 그 줄의 git blame 커밋
+- chores = 그 topic 의 spec.<topic>.chore 커밋 sha · subject · requests. topic 없는 chore · refactor 는 trace.topics."" 아래
+- Topics: 로 여러 topic 을 묶은 수집 plan 은 각 topic 의 plans 에 모두 나타난다
+- 본문 필드 = 줄 머리 `<이름>:` 부터 다음 필드 머리 전까지. 값은 앞뒤 공백을 뺀 원문
+- items 의 해결 여부는 판정하지 않는다 (연결 필드가 없음). 출처 sha 만 준다
+- request plugin 이 꺼져 있어도 request: 커밋 · Request: 필드가 있으면 읽는다
+- items 는 모든 plan · impl 본문의 출처 기록, decisions 는 지금 결정이 필요한 것만 (대체된 plan 의 Blocking 제외 · spec 의 미결: 포함)
+- decisions.open 의 introducedBy = 그 줄의 git blame 커밋
 
 ### --since
 
 HEAD 가 바뀔 때마다 바뀐 부분만 읽는 호출자용 (`trace.head` 를 저장했다가 다음 호출에 넘긴다).
 
-- 미구현: `--since <rev>` = rev..HEAD 에 생긴 것만 trace 에 남긴다. requests · plans · impls · chores · agent · items 는 sha 가 범위 안인 것, 범위 안 impl 이 가리키는 plan 은 함께
-- 미구현: plan status · steps · supersededBy 는 범위와 무관하게 전체 history 로 계산
-- 미구현: decisions.blocking 은 범위 안 plan, decisions.open 은 introducedBy 가 범위 안이거나 null (미커밋)
-- 미구현: topics 는 범위 안 항목이 있는 topic 만. unimplemented · open 은 그대로 (현재 상태)
-- 미구현: rev 가 없거나 HEAD 의 조상이 아니면 (history 재작성) stderr 에 이유 · exit 1. 호출자는 --since 없이 다시 읽는다
-- 미구현: --since 는 trace 를 고를 때만 의미. 요약 · 다른 섹션에는 영향 없음
+- `--since <rev>` = rev..HEAD 에 생긴 것만 trace 에 남긴다. requests · plans · impls · chores · agent · items 는 sha 가 범위 안인 것, 범위 안 impl 이 가리키는 plan 은 함께
+- plan status · steps · supersededBy 는 범위와 무관하게 전체 history 로 계산
+- decisions.blocking 은 범위 안 plan, decisions.open 은 introducedBy 가 범위 안이거나 null (미커밋)
+- topics 는 범위 안 항목이 있는 topic 만. unimplemented · open 은 그대로 (현재 상태)
+- rev 가 없거나 HEAD 의 조상이 아니면 (history 재작성) stderr 에 이유 · exit 1. 호출자는 --since 없이 다시 읽는다
+- --since 는 trace 를 고를 때만 의미. 요약 · 다른 섹션에는 영향 없음
 
 ## 세션 시작
 

@@ -2,32 +2,18 @@
  * request 커밋 · 첨부 줄 · Request 필드 형식 (specs/request.md).
  * 순수 함수만. git 조회는 CommitContext 의 subjectOf · isAncestor 로 받는다.
  */
+import { fieldsOf, requestRefOf } from "../../core/fields.ts"
+
+export { fieldsOf, requestRefOf }
 export const REQUEST_SUBJECT = /^request: \S/
 export const SHA256 = /^sha256:[0-9a-f]{64}$/
 const HASH = /^[0-9a-f]{7,40}$/
-const FIELD = /^([A-Z][A-Za-z ]*):[ \t]*(.*)$/
 
 export interface Problem {
   rule: string
   why: string
   current: string
   fix: string
-}
-
-/** 본문 필드. 필드 = 줄 머리 '<이름>:' 부터 다음 필드 머리 전까지. 값 = 머리 줄 나머지 + 다음 줄들 (끝 빈 줄 제외) */
-export function fieldsOf(body: string): Map<string, string[]> {
-  const fields = new Map<string, string[]>()
-  let current: string[] | null = null
-  for (const line of body.split("\n")) {
-    const match = FIELD.exec(line)
-    if (match !== null) {
-      current = []
-      fields.set(match[1] ?? "", current)
-      if ((match[2] ?? "").trim() !== "") current.push(match[2] ?? "")
-    } else current?.push(line)
-  }
-  for (const value of fields.values()) while (value.length > 0 && (value.at(-1) ?? "").trim() === "") value.pop()
-  return fields
 }
 
 export type Location =
@@ -173,22 +159,6 @@ export function requestProblems({ body, files, merge, subjectOf, isAncestor }: R
     }
   }
   return problems
-}
-
-/** Request 필드 값. 없으면 null, '없음 (근거)' 면 { agent }, 아니면 hash 목록 */
-export function requestRefOf(body: string): { agent: string } | { hashes: string[] } | null {
-  const match = /^Request:[ \t]*(.*)$/m.exec(body)
-  if (match === null) return null
-  const value = (match[1] ?? "").trim()
-  const agent = /^없음\s*\((.*)\)$/.exec(value)
-  if (agent !== null) return { agent: (agent[1] ?? "").trim() }
-  if (value.startsWith("없음")) return { agent: "" }
-  return {
-    hashes: value
-      .split(",")
-      .map((h) => h.trim())
-      .filter((h) => h !== ""),
-  }
 }
 
 export interface LinkInput {

@@ -8,6 +8,7 @@ import { CONFIG_FILE, configPath, configProblems, FORMAT, type GnamConfig } from
 import { exec, git } from "./git.ts"
 import { BUILTIN_PREFIX, builtinIds, isLocalSpec, type Loaded, loadPlugin, PACKAGE_ROOT, pluginProblems } from "./loader.ts"
 import { parsePath } from "./output.ts"
+import { collectTrace } from "./trace.ts"
 import { agentsProblems, HOOKS_DIR, hookProblems, isLink, skillDirs, skillProblems, skillSources } from "./project.ts"
 
 export const SCHEMA = 1
@@ -259,6 +260,7 @@ export const SECTIONS: [string, Section][] = [
   ["problems", problemsOf],
   ["handoff", (ctx) => handoffOf(ctx.cwd)],
   ["env", (ctx) => envOf(ctx.cwd)],
+  ["trace", (ctx) => ctx.once("trace", () => collectTrace(ctx.cwd, ctx.options.since))],
 ]
 
 /** 코어 커밋 종류 (commit.ts CORE_SUBJECT 를 종류별로 나눈 것) */
