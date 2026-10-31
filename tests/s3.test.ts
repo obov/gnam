@@ -114,3 +114,88 @@ test("클라이언트: virtual-host style URL · presign", async () => {
   expect(url.searchParams.get("X-Amz-Date")).toBe("20261031T000000Z")
   expect(s3Client({ ...config, pathStyle: true }, { accessKeyId: "a", secretAccessKey: "b" }).objectUrl("k").href).toBe("https://s3.example.com/gnam/k")
 })
+
+async function commandSetup(maxBytes = 1000) {
+  const { mkdtempSync, writeFileSync } = await import("node:fs")
+  const { tmpdir } = await import("node:os")
+  const { join } = await import("node:path")
+  const { fakeS3, CREDS } = await import("./s3-server.ts")
+  const server = await fakeS3()
+  const dir = mkdtempSync(join(tmpdir(), "s3-cmd-"))
+  const out: string[] = []
+  const err: string[] = []
+  const io = { env: { GNAM_S3_ACCESS_KEY_ID: CREDS.accessKeyId, GNAM_S3_SECRET_ACCESS_KEY: CREDS.secretAccessKey }, out: (l: string) => out.push(l), err: (l: string) => err.push(l) }
+  const config = { format: 1, plugins: ["@gnam/s3"], s3: { endpoint: server.endpoint, bucket: "gnam", maxBytes } }
+  return { server, dir, out, err, io, config, write: (name: string, body: string) => writeFileSync(join(dir, name), body), join }
+}
+
+test("put: 첨부 줄 출력 · 같은 내용 재업로드 생략 · maxBytes 초과 exit 1 · 자격 없음 exit 1", async () => {
+  const { putCommand } = await import("../src/plugins/s3/commands.ts")
+  const { createHash } = await import("node:crypto")
+  const t = await commandSetup(10)
+  try {
+    t.write("a b.png", "png-bytes")
+    t.write("big.txt", "x".repeat(11))
+    const hex = createHash("sha256").update("png-bytes").digest("hex")
+    expect(await putCommand(["a b.png"], t.dir, t.config, t.io)).toBe(0)
+    expect(t.out).toEqual([`"a b.png"  sha256:${hex}  s3://gnam/gnam/${hex}  ← ${t.join(t.dir, "a b.png")}`])
+    expect(t.server.objects.get(`/gnam/gnam/${hex}`)).toMatchObject({ contentType: "image/png", metadata: { name: "a%20b.png", sha256: hex } })
+    expect(await putCommand(["a b.png"], t.dir, t.config, t.io)).toBe(0)
+    expect(t.server.requests.filter((r) => r.method === "PUT")).toHaveLength(1)
+    expect(await putCommand(["big.txt", "a b.png"], t.dir, t.config, t.io)).toBe(1)
+    expect(t.err[0]).toContain("big.txt: 11 바이트 > maxBytes 10")
+    expect(t.out).toHaveLength(3)
+    expect(await putCommand(["a b.png"], t.dir, t.config, { ...t.io, env: {} })).toBe(1)
+    expect(t.err.at(-1)).toContain("GNAM_S3_ACCESS_KEY_ID")
+    // 서버가 받은 첨부 줄은 request 첨부 형식 그대로
+    const { parseAttachment } = await import("../src/plugins/request/model.ts")
+    expect(parseAttachment(t.out[0] ?? "")).toMatchObject({ name: "a b.png", location: { kind: "s3" } })
+  } finally {
+    await t.server.close()
+  }
+})
+
+test("get: sha256 ref · s3:// ref · -o · 해시 불일치면 파일 없음 exit 1", async () => {
+  const { getCommand, putCommand } = await import("../src/plugins/s3/commands.ts")
+  const { existsSync, readFileSync } = await import("node:fs")
+  const t = await commandSetup()
+  try {
+    t.write("note.md", "hello")
+    await putCommand(["note.md"], t.dir, t.config, t.io)
+    const hex = /sha256:([0-9a-f]{64})/.exec(t.out[0] ?? "")?.[1] ?? ""
+    const sub = t.join(t.dir, "out")
+    const { mkdirSync } = await import("node:fs")
+    mkdirSync(sub)
+    expect(await getCommand([`sha256:${hex}`], sub, t.config, t.io)).toBe(0)
+    expect(readFileSync(t.join(sub, "note.md"), "utf8")).toBe("hello")
+    expect(await getCommand([`s3://gnam/gnam/${hex}`, "-o", "copy.md"], sub, t.config, t.io)).toBe(0)
+    expect(readFileSync(t.join(sub, "copy.md"), "utf8")).toBe("hello")
+    const stored = t.server.objects.get(`/gnam/gnam/${hex}`)
+    if (stored !== undefined) stored.body = Buffer.from("tampered")
+    expect(await getCommand([`sha256:${hex}`, "-o", "bad.md"], sub, t.config, t.io)).toBe(1)
+    expect(existsSync(t.join(sub, "bad.md"))).toBe(false)
+    expect(t.err.at(-1)).toContain("sha256 불일치")
+    expect(await getCommand(["nope"], sub, t.config, t.io)).toBe(1)
+    expect(await getCommand([`sha256:${"0".repeat(64)}`], sub, t.config, t.io)).toBe(1)
+    expect(t.err.at(-1)).toContain("HTTP 404 NoSuchKey")
+  } finally {
+    await t.server.close()
+  }
+})
+
+test("url: presigned URL · 만료 범위 검사", async () => {
+  const { urlCommand } = await import("../src/plugins/s3/commands.ts")
+  const t = await commandSetup()
+  try {
+    const hex = "a".repeat(64)
+    expect(await urlCommand([`sha256:${hex}`, "--expires", "600"], t.dir, t.config, t.io)).toBe(0)
+    const url = new URL(t.out[0] ?? "")
+    expect(url.pathname).toBe(`/gnam/gnam/${hex}`)
+    expect(url.searchParams.get("X-Amz-Expires")).toBe("600")
+    expect(await urlCommand([`sha256:${hex}`, "--expires", "604801"], t.dir, t.config, t.io)).toBe(1)
+    expect(await urlCommand([`sha256:${hex}`, "--expires", "0"], t.dir, t.config, t.io)).toBe(1)
+    expect(await urlCommand([], t.dir, t.config, t.io)).toBe(1)
+  } finally {
+    await t.server.close()
+  }
+})
