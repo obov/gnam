@@ -33,3 +33,43 @@ test("자격: GNAM_S3_* 가 AWS_* 보다 우선, 둘 다 없으면 null", () => 
   expect(credentialsFrom({ GNAM_S3_ACCESS_KEY_ID: "g" })).toBeNull()
   expect(credentialsFrom({})).toBeNull()
 })
+
+// AWS 문서 예시 (Signature Version 4: GET object · presigned URL). 키 · 날짜 · 기대 서명은 문서 값 그대로
+const AWS_DOC = { accessKeyId: "AKIAIOSFODNN7EXAMPLE", secretAccessKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" }
+const DOC_DATE = new Date("2013-05-24T00:00:00Z")
+
+test("SigV4: AWS 문서 GET object 예시와 같은 서명", async () => {
+  const { signRequest, EMPTY_SHA256 } = await import("../src/plugins/s3/sigv4.ts")
+  const signed = signRequest({
+    method: "GET",
+    url: new URL("https://examplebucket.s3.amazonaws.com/test.txt"),
+    headers: { Range: "bytes=0-9" },
+    payloadHash: EMPTY_SHA256,
+    region: "us-east-1",
+    credentials: AWS_DOC,
+    date: DOC_DATE,
+  })
+  expect(signed.signature).toBe("f0e8bdb87c964420e857bd35b5d6ed310bd44f0170aba48dd91039c6036bdb41")
+  expect(signed.headers["authorization"]).toBe(
+    "AWS4-HMAC-SHA256 Credential=AKIAIOSFODNN7EXAMPLE/20130524/us-east-1/s3/aws4_request, SignedHeaders=host;range;x-amz-content-sha256;x-amz-date, Signature=f0e8bdb87c964420e857bd35b5d6ed310bd44f0170aba48dd91039c6036bdb41",
+  )
+})
+
+test("SigV4: AWS 문서 presigned URL 예시와 같은 서명", async () => {
+  const { presignUrl } = await import("../src/plugins/s3/sigv4.ts")
+  const url = presignUrl({
+    method: "GET",
+    url: new URL("https://examplebucket.s3.amazonaws.com/test.txt"),
+    region: "us-east-1",
+    credentials: AWS_DOC,
+    date: DOC_DATE,
+    expires: 86400,
+  })
+  expect(new URL(url).searchParams.get("X-Amz-Signature")).toBe("aeeed9bbccd4d02ee5c0109b86d86835f995330da4c265957d157751f604d404")
+})
+
+test("SigV4: 경로 인코딩 (공백 · 한글 · '/')", async () => {
+  const { uriEncode } = await import("../src/plugins/s3/sigv4.ts")
+  expect(uriEncode("a b/한.png", true)).toBe("a%20b/%ED%95%9C.png")
+  expect(uriEncode("a/b")).toBe("a%2Fb")
+})
