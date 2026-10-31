@@ -52,6 +52,7 @@ npx gnam run <plugin> <command>        # plugin 명령
 | `release` | `release:` 커밋 · 버전 밖 변경 검사 · `status` · `bump` · `publish` | - |
 | `ept` | `experiments/agent-workflows/*/record.json` 검사 | - |
 | `recall` | 커밋 · `specs/` 절 · `lore/` 항목 BM25 검색 (한글 bigram) · `search` | - |
+| `request` | `request:` 요청 원문 · 첨부 커밋 · 작업 커밋 `Request:` 검사 · `open` · `show` | - |
 | `multi-agent` | multi-agent · harness-execute · agent-routing 스킬 · `status` | run, merge |
 
 표기: `@gnam/<id>` (내장) · `./경로` (로컬) · npm 패키지명 (외부).

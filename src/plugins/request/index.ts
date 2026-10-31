@@ -41,4 +41,6 @@ export default definePlugin({
     open: { describe: "어느 커밋도 가리키지 않은 request (미착수 요청)", run: (_args, cwd) => openCommand(cwd) },
     show: { describe: "<hash>  요청 · Refines 체인 · 가리키는 커밋", run: (args, cwd) => showCommand(args, cwd) },
   },
+  skills: ["skills/gnam-request"],
+  agentsMd: "agents.md",
 })

@@ -2,7 +2,7 @@ import { test } from "node:test"
 import { expect } from "./expect.ts"
 import request from "../src/plugins/request/index.ts"
 import { parseAttachment } from "../src/plugins/request/model.ts"
-import { writeFileSync } from "node:fs"
+import { existsSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { fakeLookup, ruleRunner, tempRepo } from "./helpers.ts"
 
@@ -139,6 +139,19 @@ test("명령 open · show: 미착수 요청 · Refines 체인 · 가리키는 �
       `${later.slice(0, 7)}  chore: 보충 반영  → ${c.slice(0, 7)}`,
     ])
     expect(repo.gnam("run", "request", "show", work.slice(0, 7)).status).toBe(1)
+  } finally {
+    repo.cleanup()
+  }
+})
+
+test("plugin add request: AGENTS.md 블록에 조각 · 스킬 링크", () => {
+  const repo = tempRepo({ format: 1, plugins: [] })
+  try {
+    expect(repo.gnam("plugin", "add", "request").status).toBe(0)
+    const agents = readFileSync(join(repo.root, "AGENTS.md"), "utf8")
+    expect(agents).toContain("### request (사용자 요청 기록)")
+    expect(existsSync(join(repo.root, ".agents/skills/gnam-request/SKILL.md"))).toBe(true)
+    expect(repo.gnam("doctor").status).toBe(0)
   } finally {
     repo.cleanup()
   }
