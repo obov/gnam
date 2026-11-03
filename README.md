@@ -70,6 +70,9 @@ export default definePlugin({
   verify: (cwd, files, config) => [],        // gnam verify 의 파일 검사
   commands: { hello: { describe: "예시", run: () => 0 } },
   skills: ["skills/docs"],                   // plugin 루트 기준. SKILL.md 디렉터리
+  skillDeps: [                               // GitHub 스킬 의존. add 때 commit 으로 잠가 .gnam/skills/<name>/ 에 받는다
+    { name: "skill-creator", source: "github:anthropics/skills/skills/skill-creator", ref: "main" },
+  ],
   agentsMd: "agents.md",                     // AGENTS.md gnam 블록에 들어갈 조각
   scaffold: { "docs/README.md": "files/README.md" },
 })
@@ -78,6 +81,26 @@ export default definePlugin({
 ```bash
 npx gnam plugin add ./gnam-plugins/docs
 ```
+
+### 스킬 의존 (skillDeps)
+
+`plugin add` 가 선언된 GitHub 스킬을 받아 프로젝트에 둔다. 전역 스킬 디렉터리는 건드리지 않는다.
+
+| 대상 | 내용 |
+|---|---|
+| `.gnam/skills/<name>/` | 받은 스킬 (`.git` · symlink 제외). 커밋 대상 |
+| `.claude/skills/<name>` · `.agents/skills/<name>` | `../../.gnam/skills/<name>` 상대 링크. 커밋 대상 |
+| `gnam.json` `skills` | name → source · ref · commit · sha256 · by (선언한 plugin) |
+
+clone 만으로 복원되고 `link` · `sync` · `verify` 는 네트워크를 쓰지 않는다. 마지막 plugin 을 제거하면 스킬도 지운다.
+
+```bash
+npx gnam skill list                    # 잠긴 스킬
+npx gnam skill update [<name>…]        # ref 재해석 · diff --stat. --yes 로 적용
+npx gnam skill verify                  # 내용 해시 · 선언 대조 (gnam status problems 에도)
+```
+
+받은 스킬은 에이전트가 따르는 지시문 · 스크립트다. 처음 받은 내용과 update 의 diff 를 읽고 커밋한다.
 
 ## CI
 
@@ -111,6 +134,7 @@ gnam commit-msg <file>
 gnam verify [--range A..B | --push BEFORE SHA]
 gnam plugin list | add <spec> | remove <spec> [--cascade]
 gnam run <plugin> <command> [args…] [--json | --format F]
+gnam skill list | update [<name>…] [--yes] | verify
 gnam status [<경로>…] [--json] [--format F] [--where k=v] [--fields a,b] [--keys] [--schema] [--since REV] [--deep] [--check] [-C DIR]…
 gnam sync      gnam.json 기준 hook · skill 링크 · AGENTS.md 블록 · scaffold 재생성
 gnam link      hook · skill 링크만 (postinstall)

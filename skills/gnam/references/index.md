@@ -21,3 +21,4 @@ okf_version: "0.2"
 # 참조
 
 * [추적 명령](reference/git-commands.md) - 질문 → git 명령, 양방향 추적, 추적이 끊기는 지점
+* [스킬 의존](reference/skill-deps.md) - plugin 이 선언한 GitHub 스킬 (.gnam/skills) 의 확인 · 갱신 · 커밋
