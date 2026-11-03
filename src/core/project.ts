@@ -22,6 +22,7 @@ import { basename, dirname, join, relative, resolve, sep } from "node:path"
 import { defaultConfig, readConfig, requireConfig, writeConfig, type GnamConfig } from "./config.ts"
 import { exec, git } from "./git.ts"
 import { reconcileSkills, SKILLS_DIR, vendoredSources } from "./skills.ts"
+import { upgradeNotice } from "./upgrade.ts"
 import {
   BUILTIN_PREFIX,
   builtinIds,
@@ -273,6 +274,7 @@ export async function link(project: string): Promise<Report> {
   const loaded = await loadPlugins(project, config)
   installHook(project, report)
   linkSkills(project, loaded, report)
+  upgradeNotice(project, report)
   return report
 }
 

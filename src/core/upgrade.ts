@@ -4,6 +4,10 @@
  *   outdated    npm registry dist-tags.latest + 그 버전 tarball 의 CHANGELOG.md
  *   link        <git common dir>/gnam/version 과 설치 버전 비교
  */
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
+import { dirname, join } from "node:path"
+import { git } from "./git.ts"
+import { PACKAGE_ROOT } from "./loader.ts"
 
 export interface Migration {
   version: string
@@ -62,4 +66,44 @@ export function migrationsBetween(text: string, from: string, to: string): Migra
     .map((m, i) => ({ m, i }))
     .sort((p, q) => compareVersions(p.m.version, q.m.version) || p.i - q.i)
     .map(({ m }) => m)
+}
+
+// ---------- link 의 이전 안내 ----------
+
+export const installedVersion = (): string =>
+  (JSON.parse(readFileSync(join(PACKAGE_ROOT, "package.json"), "utf8")) as { version: string }).version
+
+const installedChangelog = (): string => {
+  const path = join(PACKAGE_ROOT, "CHANGELOG.md")
+  return existsSync(path) ? readFileSync(path, "utf8") : ""
+}
+
+/** <git common dir>/gnam/version. git 밖이면 null */
+export function versionRecordPath(project: string): string | null {
+  const r = git(["rev-parse", "--path-format=absolute", "--git-common-dir"], project)
+  return r.ok ? join(r.out.trim(), "gnam", "version") : null
+}
+
+export const formatMigrations = (migrations: Migration[]): string[] => migrations.map((m) => `  ${m.version}  ${m.text}`)
+
+/**
+ * 기록한 버전보다 설치 버전이 높으면 그 사이 이전 항목을 report 에. 기록은 항상 설치 버전으로.
+ * 기록 없음 (첫 link · 새 clone) · 다운그레이드 = 안내 없이 기록만. 네트워크 없음
+ */
+export function upgradeNotice(
+  project: string,
+  report: string[],
+  installed: string = installedVersion(),
+  changelog: () => string = installedChangelog,
+): void {
+  const path = versionRecordPath(project)
+  if (path === null) return
+  const recorded = existsSync(path) ? readFileSync(path, "utf8").trim() : ""
+  if (recorded === installed) return
+  if (recorded !== "" && compareVersions(installed, recorded) > 0) {
+    const migrations = migrationsBetween(changelog(), recorded, installed)
+    if (migrations.length > 0) report.push(`gnam ${recorded} → ${installed} 이전 항목:`, ...formatMigrations(migrations))
+  }
+  mkdirSync(dirname(path), { recursive: true })
+  writeFileSync(path, `${installed}\n`)
 }
