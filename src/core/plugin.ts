@@ -5,10 +5,12 @@
  *   export default definePlugin({ id: "x", version: "0.1.0", kinds: [...] })
  */
 import type { GnamConfig } from "./config.ts"
+import type { SkillDep } from "./skills.ts"
 import type { Violation } from "./violation.ts"
 
 export type { Violation } from "./violation.ts"
 export type { GnamConfig } from "./config.ts"
+export type { SkillDep } from "./skills.ts"
 
 /** 검사 시점. index = commit-msg hook (staged), commit = 이미 있는 커밋 (verify · CI) */
 export type View = { kind: "index" } | { kind: "commit"; sha: string }
@@ -97,6 +99,8 @@ export interface GnamPlugin {
   commands?: Record<string, Command>
   /** plugin 루트 기준 스킬 디렉터리. .agents/skills · .claude/skills 에 symlink */
   skills?: string[]
+  /** GitHub 스킬 의존. plugin add 가 commit 으로 잠가 .gnam/skills/<name>/ 에 받는다 (specs/skills.md) */
+  skillDeps?: SkillDep[]
   /** plugin 루트 기준 AGENTS.md 조각 */
   agentsMd?: string
   /** 없을 때만 만드는 파일. 저장소 경로 → plugin 루트 기준 원본 */

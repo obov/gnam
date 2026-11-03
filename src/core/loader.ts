@@ -10,6 +10,7 @@ import { isAbsolute, join, resolve } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import type { GnamConfig } from "./config.ts"
 import type { GnamPlugin } from "./plugin.ts"
+import { SKILLS_KEY, skillDepConflicts, skillDepProblems } from "./skills.ts"
 
 export const BUILTIN_PREFIX = "@gnam/"
 /** 이 패키지 루트 (src/core · dist/core 의 두 단계 위) */
@@ -84,12 +85,15 @@ export function pluginProblems(loaded: Loaded[], config: GnamConfig): string[] {
   const problems: string[] = []
   const ids = loaded.map((l) => l.plugin.id)
   for (const [i, id] of ids.entries()) if (ids.indexOf(id) !== i) problems.push(`${id} 중복`)
+  if (ids.includes(SKILLS_KEY)) problems.push(`${SKILLS_KEY}: plugin id 로 쓸 수 없음 (gnam.json 스킬 잠금 키)`)
   for (const { plugin } of loaded) {
+    problems.push(...skillDepProblems(plugin))
     for (const need of plugin.requires ?? [])
       if (!ids.includes(need)) problems.push(`${plugin.id} 가 ${need} 필요 (gnam plugin add ${need})`)
     if (plugin.configProblems !== undefined)
       for (const p of plugin.configProblems(config[plugin.id])) problems.push(`${plugin.id}: ${p}`)
   }
+  problems.push(...skillDepConflicts(loaded.map((l) => l.plugin)))
   return problems
 }
 

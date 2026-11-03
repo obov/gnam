@@ -197,6 +197,7 @@ function pluginObject(l: Loaded, config: GnamConfig | null) {
     commands: Object.entries(p.commands ?? {}).map(([name, c]) => ({ name, describe: c.describe, json: c.data !== undefined })),
     formats: Object.keys(p.formats ?? {}),
     skills: (p.skills ?? []).map((dir) => basename(dir)),
+    skillDeps: (p.skillDeps ?? []).map(({ name, source, ref }) => ({ name, source, ref })),
     agentsMd: p.agentsMd !== undefined,
     scaffold: Object.keys(p.scaffold ?? {}),
     configProblems: p.configProblems?.(config?.[p.id]) ?? [],

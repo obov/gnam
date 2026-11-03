@@ -18,8 +18,10 @@ source   github:<owner>/<repo>[/<경로>]. 경로 = 그 저장소 안의 SKILL.m
 ref      tag · branch · commit sha. 어느 쪽이든 받은 시점의 commit 으로 잠근다
 ```
 
-- 미구현: `skillDeps` 형식 문제 (name 형식 · source 접두 · ref 빈 값) = plugin 문제 (pluginProblems)
-- 미구현: 같은 name 을 plugin 둘이 다른 source 로 선언 = add 거부 · exit 1. 같은 source 다른 ref = 먼저 잠긴 것 유지 · 경고
+- `skillDeps` 형식 문제 (name 형식 · source 접두 · ref 빈 값) = plugin 문제 (pluginProblems)
+- 같은 name 을 plugin 둘이 다른 source 로 선언 = plugin 문제 (add 거부)
+- 미구현: 같은 source 다른 ref = 먼저 잠긴 것 유지 · 경고
+- gnam status 트리 plugin 객체에 `skillDeps` (name · source · ref)
 
 ## 잠금 (gnam.json)
 
@@ -43,8 +45,8 @@ sha256   받은 디렉터리의 내용 해시. 파일마다 '<sha256(내용)>  <
 by       이 스킬을 선언한 활성 plugin id
 ```
 
-- 미구현: `skills` 형식 문제 (키 누락 · commit 40자 hex · sha256 64자 hex · by 빈 배열) = configProblems
-- `skills` 는 plugin id 로 쓸 수 없다 (gnam.json 설정 키 충돌)
+- `skills` 형식 문제 (키 누락 · commit 40자 hex · sha256 64자 hex · by 빈 배열) = configProblems
+- `skills` 는 plugin id 로 쓸 수 없다 (gnam.json 설정 키 충돌). plugin 문제
 
 ## 저장 · 링크
 

@@ -1,10 +1,12 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
+import { SKILLS_KEY, skillsLockProblems } from "./skills.ts"
 
 /**
  * gnam.json. 저장소 루트에 하나.
  *   format   규약 판. 바꾼 커밋 = 검사 경계 (그 이전 커밋은 그 시점 규약으로 작성됨)
  *   plugins  활성 plugin 표기 (@gnam/<id> · ./로컬경로 · npm 패키지)
+ *   skills   외부 스킬 잠금 (specs/skills.md)
  *   <id>     plugin 설정 (예: release)
  */
 export const CONFIG_FILE = "gnam.json"
@@ -45,6 +47,7 @@ export function configProblems(value: unknown): string[] {
   else if (format > FORMAT) problems.push(`format ${format} > 설치된 gnam 이 아는 판 ${FORMAT}. gnam 을 갱신한다`)
   if (!Array.isArray(plugins) || !plugins.every((p) => typeof p === "string" && p !== ""))
     problems.push("plugins = 문자열 배열")
+  problems.push(...skillsLockProblems((value as Record<string, unknown>)[SKILLS_KEY]))
   return problems
 }
 

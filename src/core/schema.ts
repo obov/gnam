@@ -97,6 +97,7 @@ const PLUGIN: Record<string, Schema> = {
   commands: arr(obj({ name: str(), describe: str(), json: bool })),
   formats: arr(str()),
   skills: arr(str()),
+  skillDeps: arr(obj({ name: str(), source: str("github:<owner>/<repo>[/<경로>]"), ref: str() }), "GitHub 스킬 의존 (specs/skills.md)"),
   agentsMd: bool,
   scaffold: arr(str()),
   configProblems: arr(str()),
