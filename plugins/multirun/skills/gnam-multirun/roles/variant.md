@@ -35,7 +35,7 @@ clone 하나에서 plan 전체를 끝까지 구현한다. 작업 방식은 스�
    Remaining: <남은 일 또는 없음>
 3. 미커밋 · untracked · stash 를 남기지 않는다 (close 가 거부한다)
 4. 화면에 한 줄 요약 후 대기. merge 하지 않는다
-{awake} 5. awake MCP execute 도구로 command=report, args={status:"done", summary:"<variant 커밋 hash> <한 줄 요약>"} 한 번. 막혀서 멈출 때도 status=blocked (진행 불가) · needs_input (판단 필요) 로 보고
+{완료 보고}
 ```
 
-`{awake}` 줄: 조정자가 awake 완료 알림을 쓸 때만 (SKILL.md '완료 알림'). 아니면 줄째 뺀다.
+`{완료 보고}` 줄: 완료 알림 plugin 스킬이 주는 한 줄 (번호 5). 그 plugin 이 없으면 줄째 뺀다 (SKILL.md '완료 알림').

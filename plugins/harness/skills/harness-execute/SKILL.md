@@ -66,7 +66,7 @@ bash .agents/skills/harness-execute/claude-args.sh --file <경로>   # 세션별
 
 - 형식: 평소 쓰는 `claude \ --tools … --settings … --system-prompt-file …` 를 그대로 붙여 넣는다. 셸 단어 규칙 · 줄 끝 `\` · `#` 주석. 맨 앞 `claude` 는 무시. 값 확장 · eval 없음. 경로는 절대 경로 또는 `~/`
 - `--session-id` · `--model` · `--effort` 는 파일에 있어도 버린다. 세션마다 호출자가 붙인다 (agent-routing 배정 · 측정 키)
-- 적용 범위: herdr-claude · herdr-awake-claude · atcher-claude · multi-agent clone.sh. claude-print (단발) 와 herdr-codex 는 제외. 각 adapter 가 인자를 따로 정한다
+- 적용 범위: herdr-claude · atcher-claude · multi-agent clone.sh. claude-print (단발) 와 herdr-codex 는 제외. 각 adapter 가 인자를 따로 정한다
 - 파일을 저장소에 커밋하면 팀이 공유하고, `.gitignore` 에 넣으면 개인 설정. 실행 중인 세션은 바뀌지 않는다. 새로 띄우는 세션부터 적용
 - 세션별 파일: 세션마다 다른 인자가 필요하면 호출자가 `--file <경로>` 를 adapter start 에 넘긴다. 형식 · 제거 규칙 같음. 없는 경로 = exit 1
 - 파일이 있으면 기본값은 쓰이지 않는다. `--dangerously-skip-permissions` 를 빼면 세션이 권한 확인에서 blocked
@@ -77,7 +77,6 @@ bash .agents/skills/harness-execute/claude-args.sh --file <경로>   # 세션별
 adapters/claude-print.md    Claude Code 단발 (-p). pane 없음. 결과 JSON · structured output (--json-schema). 사용자 확인 불필요한 일회성
 adapters/herdr-claude.md    Herdr + Claude Code. 대화형 기본
 adapters/herdr-codex.md     Herdr + Codex CLI. herdr-claude 와 다른 부분 (start · hook trust)
-adapters/herdr-awake-claude.md  Herdr + awake + Claude Code. 자식 report 가 호출한 세션을 깨움 (wait 대신). 호출한 세션이 awake claude 로 실행됐을 때
 adapters/atcher-claude.md   atcher 명령만 (런타임 직접 호출 없음, 자식만 조작). atcher 설치 시
 ```
 
@@ -85,5 +84,7 @@ adapters/atcher-claude.md   atcher 명령만 (런타임 직접 호출 없음, �
 단발 (claude-print)   지시 한 번 → 결과 한 번. 결과를 코드로 분기 (판정 · 분류 · 추출). 중간 확인 없음
 대화형 (herdr · atcher) 후속 지시 · 반영이 잦음. blocked 를 사용자가 봐야 함. 화면을 같이 봄
 ```
+
+외부 adapter: 다른 plugin 의 스킬이 같은 6 절 형식으로 adapter 를 더할 수 있다 (AGENTS.md 의 그 plugin 조각이 가리킴). 쓰기 전에 그 파일 머리의 전제를 확인한다.
 
 호출자 · 사용자 지정이 없으면 현재 하네스에 맞춰 Claude Code 는 herdr-claude, Codex 는 herdr-codex. 전제 (각 파일 머리) 를 못 맞추면 사용자에게 알린다.
