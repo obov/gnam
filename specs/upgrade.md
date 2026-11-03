@@ -42,6 +42,7 @@ gnam 0.3.2 → 0.4.0 (latest)
 - 네트워크 · registry 오류 = stderr 에 원인 · exit 1. 다른 출력 없음
 - `--json` = `{ installed · latest · upgrade · migrations: [{ version · text }] }`. 최신이면 upgrade = null · migrations = []
 - 업그레이드 명령은 packageManager 판정 (npm · pnpm · yarn · bun) 에 맞춘다
+- AGENTS.md gnam 블록에 업그레이드 절차 한 줄 (outdated → 업그레이드 → 이전 항목 수행)
 
 ## gnam link 의 이전 안내
 

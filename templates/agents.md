@@ -12,6 +12,7 @@ npx gnam status    # 설치 · 문제 · 인계 메모 · 요청 · plan 진행 
 작업 순서   spec 확인 → plan 커밋 → 한 단위 구현 → 검증 → impl 커밋 (본문 첫 줄 Plan: <plan hash> <단계>)
 금지        공동 작성자 줄 · squash · plan.md 같은 별도 계획 파일
 강제        commit-msg hook (.githooks) · CI 는 npx gnam verify
+업그레이드  npx gnam outdated → 업그레이드 명령 실행 → 출력된 이전 항목 수행 (gnam link 도 업그레이드 직후 한 번 출력)
 ```
 
 ### 자율 진행 (사용자 확인 없음)

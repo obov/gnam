@@ -139,7 +139,17 @@ gnam status [<경로>…] [--json] [--format F] [--where k=v] [--fields a,b] [--
 gnam sync      gnam.json 기준 hook · skill 링크 · AGENTS.md 블록 · scaffold 재생성
 gnam link      hook · skill 링크만 (postinstall)
 gnam doctor    설치 상태 점검
+gnam outdated [--json]   npm 최신 버전 · 업그레이드 명령 · 그 사이 이전 항목 (네트워크)
 ```
+
+## 업그레이드
+
+```bash
+npx gnam outdated                      # 새 버전 · 업그레이드 명령 · 할 일 (CHANGELOG '이전:' 항목)
+npm install -D @obov/gnam@latest       # postinstall 의 gnam link 가 건너온 버전 사이 이전 항목을 한 번 출력
+```
+
+`gnam status` 는 네트워크를 쓰지 않는다. 새 버전 확인은 `outdated` 만.
 
 ## 개발
 
@@ -148,6 +158,9 @@ npm install
 npm run check     # tsc + node --test + bun test
 npm run build     # dist/ (배포본)
 ```
+
+배포 전 `CHANGELOG.md` 에 `## <version>` 절. 사용자가 저장소 · 설정 · 절차를 바꿔야 하는 변경은 `- 이전: <할 일>` 한 줄씩 (자동으로 맞춰지는 변경은 적지 않는다).
+`gnam outdated` 와 업그레이드 후 `gnam link` 가 이 줄을 보인다.
 
 ## License
 
