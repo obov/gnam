@@ -1,6 +1,6 @@
 /**
  * multi-agent: 에이전트 병렬 구현 · 검토 · 통합 · 위임 · 실험 workflow.
- * 스킬 3개 (multi-agent · harness-execute · agent-routing) 를 링크한다. 배정 · 실측 기록은 run, 통합 커밋은 merge plugin.
+ * 스킬 2개 (multi-agent · agent-routing) 를 링크한다. 세션 실행은 harness, 배정 · 실측 기록은 run, 통합 커밋은 merge plugin.
  */
 import { definePlugin } from "../../core/plugin.ts"
 import { agentsFrom, atcherStatus, runsData, runsDir, runsSummary, show } from "./status.ts"
@@ -8,7 +8,7 @@ import { agentsFrom, atcherStatus, runsData, runsDir, runsSummary, show } from "
 export default definePlugin({
   id: "multi-agent",
   version: "0.1.0",
-  requires: ["run", "merge"],
+  requires: ["run", "merge", "harness"],
   commands: {
     status: {
       describe: "[<run-id>]  위임 상태 트리 (<git common dir>/gnam/runs)",
@@ -24,6 +24,6 @@ export default definePlugin({
     },
     summary: (ctx) => runsSummary(runsDir(ctx.cwd)),
   },
-  skills: ["skills/multi-agent", "skills/harness-execute", "skills/agent-routing"],
+  skills: ["skills/multi-agent", "skills/agent-routing"],
   agentsMd: "agents.md",
 })

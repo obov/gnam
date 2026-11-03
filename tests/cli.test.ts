@@ -130,15 +130,24 @@ test("plugin add: 빠진 내장 의존 자동 추가, remove: 의존 있으면 �
   const added = repo.gnam("plugin", "add", "multi-agent")
   assert.equal(added.status, 0, added.err)
   const plugins = () => JSON.parse(readFileSync(join(repo!.root, "gnam.json"), "utf8")).plugins as string[]
-  assert.deepEqual([...plugins()].sort(), ["@gnam/merge", "@gnam/multi-agent", "@gnam/run"])
+  assert.deepEqual([...plugins()].sort(), ["@gnam/harness", "@gnam/merge", "@gnam/multi-agent", "@gnam/run"])
   assert.ok(existsSync(join(repo.root, ".claude/skills/multi-agent/SKILL.md")))
+  assert.ok(existsSync(join(repo.root, ".claude/skills/harness-execute/SKILL.md")))
   const refused = repo.gnam("plugin", "remove", "run")
   assert.notEqual(refused.status, 0)
   assert.match(refused.err, /multi-agent/)
   assert.equal(repo.gnam("plugin", "remove", "run", "--cascade").status, 0)
-  assert.deepEqual(plugins(), ["@gnam/merge"])
+  assert.deepEqual([...plugins()].sort(), ["@gnam/harness", "@gnam/merge"])
   assert.ok(!existsSync(join(repo.root, ".claude/skills/multi-agent")))
   assert.ok(!existsSync(join(repo.root, ".claude/skills/gnam-run")))
+})
+
+test("multi-agent 는 harness 필요: harness 없는 gnam.json 은 doctor 문제", () => {
+  repo = tempRepo()
+  writeFileSync(join(repo.root, "gnam.json"), JSON.stringify({ format: 1, plugins: ["@gnam/run", "@gnam/merge", "@gnam/multi-agent"] }))
+  const r = repo.gnam("doctor")
+  assert.notEqual(r.status, 0)
+  assert.match(r.out + r.err, /multi-agent 가 harness 필요/)
 })
 
 test("로컬 plugin: 커밋 종류 추가", () => {

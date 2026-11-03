@@ -198,9 +198,9 @@ G5   clone 에도 gnam link → 변형 커밋이 같은 commit-msg 검사를 거
 
 harness-execute 스킬 (adapter · system-prompt · claude-args.sh) 을 내장 plugin `@gnam/harness` 로 분리한다.
 
-- 미구현: multi-agent `requires: [run, merge, harness]`. multirun `requires: [harness]`
-- 미구현: 스킬 경로 · 이름 그대로 (`.agents/skills/harness-execute`). 기존 문서 참조 변경 없음
-- 미구현: 이전 항목 (CHANGELOG): multi-agent 를 쓰는 저장소는 `npx gnam plugin add harness`
+- multi-agent `requires: [run, merge, harness]`. multirun `requires: [harness]`
+- 스킬 경로 · 이름 그대로 (`.agents/skills/harness-execute`). 기존 문서 참조 변경 없음
+- 이전 항목 (CHANGELOG): multi-agent 를 쓰는 저장소는 `npx gnam plugin add harness`
 
 ## 변형 · 요약 세션 규칙
 

@@ -2,6 +2,6 @@
 
 ```text
 흐름      작업 분류 → agent-routing 배정 → run.<topic>.start → harness-execute 실행 → 구현 · 리뷰 · 통합 (spec.<topic>.merge) → run.<topic>.end
-스킬      .agents/skills/multi-agent · harness-execute · agent-routing
+스킬      .agents/skills/multi-agent · agent-routing. 세션 실행 harness-execute 는 harness plugin
 상태      npx gnam run multi-agent status [<run-id>]
 ```

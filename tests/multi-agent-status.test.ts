@@ -108,7 +108,7 @@ function run(atcher: string) {
   writeFileSync(join(bin, "atcher"), `#!/bin/sh\n${atcher}\n`)
   chmodSync(join(bin, "atcher"), 0o755)
   const started = Date.now()
-  writeFileSync(join(dir, "gnam.json"), JSON.stringify({ format: 1, plugins: ["@gnam/merge", "@gnam/run", "@gnam/multi-agent"] }))
+  writeFileSync(join(dir, "gnam.json"), JSON.stringify({ format: 1, plugins: ["@gnam/merge", "@gnam/run", "@gnam/harness", "@gnam/multi-agent"] }))
   const out = spawnSync(process.execPath, [GNAM, "run", "multi-agent", "status", "0924-1402"], {
     cwd: dir,
     env: { MULTI_AGENT_RUNS: dir, PATH: `${bin}:/usr/bin:/bin` },

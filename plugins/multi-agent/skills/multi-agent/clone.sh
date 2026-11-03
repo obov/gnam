@@ -17,7 +17,10 @@ set -euo pipefail
 
 main_root="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"
 registry_dir="$(git rev-parse --path-format=absolute --git-common-dir)/clone"
-claude_args="$(cd "$(dirname "$0")/../harness-execute" && pwd)/claude-args.sh"
+# harness plugin 의 스킬. 링크된 스킬 디렉터리 (.agents/skills) 에서는 형제, gnam 패키지 안에서는 plugins/harness 아래
+here="$(cd "$(dirname "$0")" && pwd)"
+if [ -d "$here/../harness-execute" ]; then claude_args="$(cd "$here/../harness-execute" && pwd)/claude-args.sh"
+else claude_args="$(cd "$here/../../../harness/skills/harness-execute" && pwd)/claude-args.sh"; fi
 
 die() { printf 'clone.sh: %s\n' "$*" >&2; exit 1; }
 need() { [ "$#" -ge "$1" ] || die "인자 부족. 파일 머리 주석의 사용법 참고"; }

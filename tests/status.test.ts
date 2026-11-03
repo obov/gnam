@@ -18,7 +18,7 @@ test("status 트리: 키 순서 · plugin · 종류 · config · install", async
       recall: { spec: "@gnam/recall", kind: "builtin", commands: [{ name: "search", json: true }], agentsMd: true, configProblems: [] },
     })
     expect((tree["builtins"] as { id: string; active: boolean }[]).find((b) => b.id === "recall")?.active).toBe(true)
-    expect((tree["builtins"] as { id: string; requires: string[] }[]).find((b) => b.id === "multi-agent")?.requires).toEqual(["run", "merge"])
+    expect((tree["builtins"] as { id: string; requires: string[] }[]).find((b) => b.id === "multi-agent")?.requires).toEqual(["run", "merge", "harness"])
     expect((tree["kinds"] as { owner: string }[]).every((k) => k.owner === "core")).toBe(true)
     expect(tree["install"]).toMatchObject({ hooks: { expected: ".githooks", commitMsg: false }, agentsMd: { exists: false, inSync: false } })
     expect((tree["problems"] as { source: string }[]).some((p) => p.source === "install")).toBe(true)

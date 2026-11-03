@@ -6,9 +6,10 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 const skills = new URL("../plugins/multi-agent/skills/", import.meta.url).pathname
-const argsScript = join(skills, "harness-execute/claude-args.sh")
+const harness = new URL("../plugins/harness/skills/harness-execute/", import.meta.url).pathname
+const argsScript = join(harness, "claude-args.sh")
 const cloneScript = join(skills, "multi-agent/clone.sh")
-const bundled = join(skills, "harness-execute/system-prompt.md")
+const bundled = join(harness, "system-prompt.md")
 
 function setup() {
   const dir = realpathSync(mkdtempSync(join(tmpdir(), "claude-args-")))

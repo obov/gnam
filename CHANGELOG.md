@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.0
+
+- 내장 plugin `harness`: harness-execute 스킬을 multi-agent 에서 분리. multi-agent 는 harness 를 요구
+- 이전: multi-agent 를 쓰는 저장소는 npx gnam plugin add harness
+
 ## 0.3.2
 
 - multi-agent: claude 시작 인자를 파일로 변경. 프로젝트 `.gnam/claude-args` > 전역 `~/.config/gnam/claude-args` > 기본값. 평소 쓰는 `claude …` 명령을 붙여넣을 수 있음. `harness-execute/claude-args.sh init|source|--json`. 파일이 없으면 동작 동일

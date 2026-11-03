@@ -39,7 +39,7 @@ spec.<topic>.chore:   계획 없는 spec 정리. 본문 Goal · Scope
 
 ```bash
 npx gnam plugin list
-npx gnam plugin add multi-agent        # 빠진 내장 의존 (run · merge) 자동 추가
+npx gnam plugin add multi-agent        # 빠진 내장 의존 (run · merge · harness) 자동 추가
 npx gnam plugin remove run --cascade   # 의존하는 plugin 까지 제거
 npx gnam run <plugin> <command>        # plugin 명령
 ```
@@ -54,7 +54,8 @@ npx gnam run <plugin> <command>        # plugin 명령
 | `recall` | 커밋 · `specs/` 절 · `lore/` 항목 BM25 검색 (한글 bigram) · `search` | - |
 | `request` | `request:` 요청 원문 · 첨부 커밋 · 작업 커밋 `Request:` 검사 · `open` · `show` | - |
 | `s3` | 첨부를 S3 호환 저장소에 sha256 key 로 보관 · `put` · `get` · `url` · `check` | - |
-| `multi-agent` | multi-agent · harness-execute · agent-routing 스킬 · `status` | run, merge |
+| `harness` | harness-execute 스킬 (에이전트 세션 실행 · adapter · `claude-args.sh`) | - |
+| `multi-agent` | multi-agent · agent-routing 스킬 · `status` | run, merge, harness |
 
 표기: `@gnam/<id>` (내장) · `./경로` (로컬) · npm 패키지명 (외부).
 
