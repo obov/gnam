@@ -353,3 +353,86 @@ function readLockFrom(config: Record<string, unknown>): Record<string, SkillLock
   const skills = config[SKILLS_KEY]
   return typeof skills === "object" && skills !== null && !Array.isArray(skills) ? (skills as Record<string, SkillLock>) : {}
 }
+
+// ---------- 명령 (gnam skill list · update · verify) ----------
+
+/** 잠금 대조. 디렉터리 · SKILL.md · 내용 해시 · 선언한 활성 plugin. 문제마다 '<name>  <문제>' */
+export function verifySkills(project: string, plugins: GnamPlugin[]): string[] {
+  const problems: string[] = []
+  const wanted = declared(plugins)
+  for (const [name, entry] of Object.entries(readLock(project)).sort(([a], [b]) => a.localeCompare(b))) {
+    const dir = join(project, SKILLS_DIR, name)
+    if (!existsSync(join(dir, "SKILL.md"))) problems.push(`${name}  ${SKILLS_DIR}/${name}/SKILL.md 없음`)
+    else if (contentHash(dir) !== entry.sha256) problems.push(`${name}  내용 해시 불일치 (잠금 ${String(entry.sha256).slice(0, 12)})`)
+    const inactive = (entry.by ?? []).filter((id) => !(wanted.get(name)?.ids ?? []).includes(id))
+    if (inactive.length > 0) problems.push(`${name}  선언한 활성 plugin 없음: ${inactive.join(", ")}`)
+  }
+  for (const name of wanted.keys())
+    if (readLock(project)[name] === undefined) problems.push(`${name}  잠금 없음 (gnam plugin add 다시)`)
+  return problems
+}
+
+export function listSkills(project: string): string[] {
+  const lock = readLock(project)
+  const names = Object.keys(lock).sort()
+  if (names.length === 0) return ["스킬 의존 없음"]
+  return names.map((name) => {
+    const e = lock[name] as SkillLock
+    return `${name}  ${e.source}  ${e.ref}  ${String(e.commit).slice(0, 7)}  by ${(e.by ?? []).join(", ")}`
+  })
+}
+
+/**
+ * ref 재해석. 선언한 plugin 의 ref (gnam.json plugins 순서로 처음 것) 를 쓴다.
+ * commit 이 바뀌면 diff --stat 을 보이고, apply 일 때만 디렉터리 · 잠금 (config) 을 바꾼다.
+ */
+export function updateSkills(
+  project: string,
+  config: Record<string, unknown>,
+  plugins: GnamPlugin[],
+  names: string[],
+  apply: boolean,
+): { report: string[]; changed: boolean } {
+  const lock = { ...readLockFrom(config) }
+  const wanted = declared(plugins)
+  const targets = names.length > 0 ? names : Object.keys(lock).sort()
+  const report: string[] = []
+  let changed = false
+  for (const name of targets) {
+    const current = lock[name]
+    if (current === undefined) throw new Error(`잠금에 없는 스킬: ${name}`)
+    const ref = wanted.get(name)?.dep.ref ?? current.ref
+    mkdirSync(join(project, ".gnam"), { recursive: true })
+    const scratch = mkdtempSync(join(project, ".gnam", ".update-"))
+    try {
+      const got = fetchSkill(scratch, { name, source: current.source, ref })
+      if (got.commit === current.commit && ref === current.ref) {
+        report.push(`${name}  최신 (${ref} = ${current.commit.slice(0, 7)})`)
+        continue
+      }
+      const next = join(scratch, SKILLS_DIR, name)
+      const dir = join(project, SKILLS_DIR, name)
+      const stat = spawnSync("git", ["diff", "--no-index", "--stat", "--", dir, next], { encoding: "utf8" })
+      report.push(`${name}  ${current.ref} ${current.commit.slice(0, 7)} → ${ref} ${got.commit.slice(0, 7)}`)
+      if (stat.stdout.trim() !== "") report.push(...stat.stdout.trimEnd().split("\n").map((l) => `  ${l}`))
+      if (!apply) continue
+      const old = `${dir}.old-${process.pid}`
+      const had = existsSync(dir)
+      if (had) renameSync(dir, old)
+      try {
+        renameSync(next, dir)
+      } catch (error) {
+        if (had) renameSync(old, dir)
+        throw error
+      }
+      rmSync(old, { recursive: true, force: true })
+      lock[name] = { ...current, ref, commit: got.commit, sha256: got.sha256 }
+      changed = true
+    } finally {
+      rmSync(scratch, { recursive: true, force: true })
+    }
+  }
+  if (changed) config[SKILLS_KEY] = Object.fromEntries(Object.keys(lock).sort().map((k) => [k, lock[k]]))
+  if (!apply && report.some((l) => l.includes(" → "))) report.push("적용: gnam skill update [<name>…] --yes")
+  return { report, changed }
+}

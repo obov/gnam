@@ -12,6 +12,7 @@ import type { StatusContext } from "./plugin.ts"
 import { pluginLine, summary } from "./summary.ts"
 import { CORE_RULES } from "./rules.ts"
 import { collectTrace } from "./trace.ts"
+import { verifySkills } from "./skills.ts"
 import { agentsProblems, HOOKS_DIR, hookProblems, isLink, skillDirs, skillProblems, skillSources } from "./project.ts"
 
 export const SCHEMA = 1
@@ -212,6 +213,7 @@ export async function problemsOf(ctx: Context): Promise<Problem[]> {
   problems.push(...pluginIssues)
   for (const message of [...hookProblems(ctx.cwd), ...skillProblems(ctx.cwd, loaded), ...agentsProblems(ctx.cwd, loaded)])
     problems.push({ source: "install", message })
+  for (const message of verifySkills(ctx.cwd, loaded.map((l) => l.plugin))) problems.push({ source: "install", message: `스킬 ${message}` })
   problems.push(...ctx.late)
   return problems
 }

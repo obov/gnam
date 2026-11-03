@@ -258,3 +258,54 @@ test("수명: 받기 실패면 gnam.json · .gnam/skills 를 바꾸지 않는다
     rmSync(f.root, { recursive: true, force: true })
   }
 })
+
+// ---------- 명령 ----------
+
+test("skill update · verify · list · status problems", () => {
+  const f = fixture()
+  const repo = tempRepo()
+  process.env["GNAM_SKILL_GIT_BASE"] = f.base
+  const declare = (ref: string) => {
+    mkdirSync(join(repo.root, "pa"), { recursive: true })
+    writeFileSync(join(repo.root, "pa", "index.mjs"), `export default ${JSON.stringify({ id: "pa", version: "0.1.0", skillDeps: [{ ...dep, ref }] })}\n`)
+  }
+  const gnamJson = () => JSON.parse(readFileSync(join(repo.root, "gnam.json"), "utf8")) as { skills: Record<string, Record<string, unknown>> }
+  try {
+    declare("v1")
+    expect(repo.gnam("plugin", "add", "./pa").status).toBe(0)
+    expect(repo.gnam("skill", "list").out).toBe(`harness-execute  ${dep.source}  v1  ${f.v1.slice(0, 7)}  by pa\n`)
+    expect(repo.gnam("skill", "update").out).toContain(`harness-execute  최신 (v1 = ${f.v1.slice(0, 7)})`)
+
+    declare("dev")
+    const dry = repo.gnam("skill", "update")
+    expect(dry.status).toBe(0)
+    expect(dry.out).toContain(`harness-execute  v1 ${f.v1.slice(0, 7)} → dev ${f.dev.slice(0, 7)}`)
+    expect(dry.out).toContain("SKILL.md")
+    expect(dry.out).toContain("적용: gnam skill update [<name>…] --yes")
+    expect(gnamJson().skills["harness-execute"]).toMatchObject({ ref: "v1", commit: f.v1 })
+
+    const applied = repo.gnam("skill", "update", "harness-execute", "--yes")
+    expect(applied.status).toBe(0)
+    expect(gnamJson().skills["harness-execute"]).toMatchObject({ ref: "dev", commit: f.dev })
+    expect(readFileSync(join(repo.root, ".gnam", "skills", "harness-execute", "SKILL.md"), "utf8")).toContain("dev")
+    expect(readdirSync(join(repo.root, ".gnam")).sort()).toEqual(["skills"])
+
+    expect(repo.gnam("skill", "verify")).toMatchObject({ status: 0, out: "gnam skill verify: 스킬 1개 확인\n" })
+    writeFileSync(join(repo.root, ".gnam", "skills", "harness-execute", "SKILL.md"), "변조\n")
+    const bad = repo.gnam("skill", "verify")
+    expect(bad.status).toBe(1)
+    expect(bad.err).toContain("harness-execute  내용 해시 불일치")
+
+    const json = gnamJson()
+    ;(json.skills["harness-execute"] as { by: string[] }).by.push("ghost")
+    writeFileSync(join(repo.root, "gnam.json"), JSON.stringify(json))
+    const status = repo.gnam("status", "problems")
+    expect(status.out).toContain("스킬 harness-execute  내용 해시 불일치")
+    expect(status.out).toContain("스킬 harness-execute  선언한 활성 plugin 없음: ghost")
+    expect(repo.gnam("status", "--check").status).toBe(3)
+  } finally {
+    delete process.env["GNAM_SKILL_GIT_BASE"]
+    repo.cleanup()
+    rmSync(f.root, { recursive: true, force: true })
+  }
+})

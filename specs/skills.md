@@ -86,11 +86,11 @@ gnam link · sync       받지 않는다. 링크만 복구 (clone 후 postinstal
 ```text
 gnam skill list               name · source · ref · commit 7자 · by
 gnam skill update [<name>…]   ref 재해석. commit 이 바뀌면 파일 diff (git diff --no-index --stat) 출력, --yes 없으면 적용하지 않는다
+                              ref = 선언한 plugin 의 ref (plugins 순서로 처음 것). 선언이 없으면 잠금의 ref
 gnam skill verify             디스크 내용 sha256 ↔ 잠금 대조 · 링크 확인. 불일치 = 이름 · 문제 출력 · exit 1
 ```
 
-- 미구현: 위 명령
-- 미구현: `gnam status` problems 에 verify 불일치 · 잠금에 있는데 선언한 활성 plugin 없음 (by 의 id 비활성)
+- `gnam status` problems (source install) 에 `스킬 <name>  <문제>`: SKILL.md 없음 · 내용 해시 불일치 · 선언한 활성 plugin 없음 (by 의 id 비활성) · 선언은 있는데 잠금 없음
 
 ## 범위 밖
 

@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { validateCommit } from "./core/commit.ts"
-import { readConfig, requireConfig } from "./core/config.ts"
+import { readConfig, requireConfig, writeConfig } from "./core/config.ts"
 import { git, gitOrThrow, lines, nulList } from "./core/git.ts"
 import { boundaryOf, cleanMessage, commitInput, gitLookup, historyArgs, pushRange } from "./core/history.ts"
 import { builtinIds, loadPlugins, PACKAGE_ROOT } from "./core/loader.ts"
@@ -9,6 +9,7 @@ import type { GnamPlugin } from "./core/plugin.ts"
 import { OutputError, output, type OutputOptions, render, type Renderer } from "./core/output.ts"
 import { schemaAt, statusSchema } from "./core/schema.ts"
 import { addPlugin, init, link, realProject, removePlugin, sync } from "./core/project.ts"
+import { listSkills, updateSkills, verifySkills } from "./core/skills.ts"
 import { collectStatus, Context, problemsOf, summaryOf } from "./core/status.ts"
 import { TraceError } from "./core/trace.ts"
 import { format, type Violation } from "./core/violation.ts"
@@ -20,6 +21,7 @@ const USAGE = `gnam — Git-Native Agent Memory
   gnam verify [--range A..B | --push BEFORE SHA]            커밋 history (기본: HEAD, gnam 도입 이후) + plugin 파일 검사
   gnam plugin list | add <spec> | remove <spec> [--cascade] plugin 관리. spec = <내장 id> · ./경로 · npm 패키지
   gnam run <plugin> <command> [args…]                       plugin 명령
+  gnam skill list | update [<name>…] [--yes] | verify       plugin 이 선언한 GitHub 스킬 (.gnam/skills)
   gnam sync                                                 gnam.json 기준 hook · skill · AGENTS.md 블록 재생성
   gnam link                                                 hook · skill 링크 복구 (postinstall)
   gnam status [<경로>…] [--json] [--format F] [--where k=v] [--fields a,b] [--keys]
@@ -247,6 +249,30 @@ async function status(args: string[]): Promise<number> {
   }
 }
 
+async function skill(project: string, args: string[]): Promise<number> {
+  const [sub, ...rest] = args
+  const config = requireConfig(project)
+  const plugins = (await loadPlugins(project, config)).map((l) => l.plugin)
+  if (sub === "list") return print(listSkills(project))
+  if (sub === "verify") {
+    const problems = verifySkills(project, plugins)
+    for (const p of problems) console.error(p)
+    if (problems.length > 0) return 1
+    console.log(`gnam skill verify: 스킬 ${listSkills(project).filter((l) => l !== "스킬 의존 없음").length}개 확인`)
+    return 0
+  }
+  if (sub === "update") {
+    const apply = rest.includes("--yes")
+    const { report, changed } = updateSkills(project, config, plugins, rest.filter((a) => a !== "--yes"), apply)
+    if (changed) {
+      writeConfig(project, config)
+      report.push(...(await sync(project)))
+    }
+    return print(report)
+  }
+  throw new Error("사용: gnam skill list | update [<name>…] [--yes] | verify")
+}
+
 function print(report: string[]): number {
   for (const line of report) console.log(line)
   return 0
@@ -282,6 +308,8 @@ export async function main(argv: string[]): Promise<number> {
         return await plugin(realProject("."), args)
       case "run":
         return await run(realProject("."), args)
+      case "skill":
+        return await skill(realProject("."), args)
       case "sync":
         return print(await sync(realProject(".")))
       case "link":
