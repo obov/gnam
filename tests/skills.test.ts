@@ -1,9 +1,13 @@
+import { spawnSync } from "node:child_process"
+import { chmodSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import { test } from "node:test"
 import { expect } from "./expect.ts"
 import { configProblems } from "../src/core/config.ts"
 import { type Loaded, pluginProblems } from "../src/core/loader.ts"
 import type { GnamPlugin } from "../src/core/plugin.ts"
-import { parseSource, skillDepProblems, skillsLockProblems } from "../src/core/skills.ts"
+import { contentHash, fetchSkill, parseSource, skillDepProblems, skillsLockProblems } from "../src/core/skills.ts"
 
 const plugin = (id: string, skillDeps?: unknown): GnamPlugin => ({ id, version: "0.1.0", skillDeps } as GnamPlugin)
 const loaded = (...plugins: GnamPlugin[]): Loaded[] =>
@@ -62,4 +66,98 @@ test("잠금: commit 40자 · sha256 64자 · 빈 by · 형식", () => {
 test("configProblems 가 gnam.json skills 를 검사", () => {
   expect(configProblems({ format: 1, plugins: [], skills: { h: lock } })).toEqual([])
   expect(configProblems({ format: 1, plugins: [], skills: { h: { ...lock, commit: "x" } } })).toEqual(["skills.h.commit = 40자 hex"])
+})
+
+// ---------- 받기 ----------
+
+/** 로컬 bare 저장소 <base>/obov/agent-skills.git. v1 tag · dev 브랜치 · 저장소 밖 symlink · 실행 파일 */
+function fixture() {
+  const root = mkdtempSync(join(tmpdir(), "gnam-skills-"))
+  const work = join(root, "work")
+  const g = (cwd: string, ...args: string[]) => {
+    const r = spawnSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", ...args], { cwd, encoding: "utf8" })
+    if (r.status !== 0) throw new Error(r.stderr)
+    return r.stdout.trim()
+  }
+  mkdirSync(join(work, "harness-execute", "adapters"), { recursive: true })
+  mkdirSync(join(work, "no-skill"), { recursive: true })
+  g(root, "init", "-q", "-b", "main", work)
+  writeFileSync(join(work, "harness-execute", "SKILL.md"), "---\nname: harness-execute\n---\nv1\n")
+  writeFileSync(join(work, "harness-execute", "adapters", "a.md"), "a\n")
+  writeFileSync(join(work, "harness-execute", "run.sh"), "#!/bin/sh\n")
+  chmodSync(join(work, "harness-execute", "run.sh"), 0o755)
+  symlinkSync("/etc/hosts", join(work, "harness-execute", "outside"))
+  writeFileSync(join(work, "no-skill", "README.md"), "x\n")
+  writeFileSync(join(work, "README.md"), "root\n")
+  g(work, "add", "-A")
+  g(work, "commit", "-q", "-m", "v1")
+  const v1 = g(work, "rev-parse", "HEAD")
+  g(work, "tag", "v1")
+  g(work, "checkout", "-q", "-b", "dev")
+  writeFileSync(join(work, "harness-execute", "SKILL.md"), "---\nname: harness-execute\n---\ndev\n")
+  g(work, "commit", "-q", "-am", "dev")
+  const dev = g(work, "rev-parse", "HEAD")
+  g(work, "checkout", "-q", "main")
+  mkdirSync(join(root, "base", "obov"), { recursive: true })
+  g(root, "clone", "-q", "--bare", work, join(root, "base", "obov", "agent-skills.git"))
+  const project = join(root, "project")
+  mkdirSync(project)
+  return { root, project, base: join(root, "base"), v1, dev }
+}
+
+test("받기: tag · branch · sha ref 가 commit 으로 잠김 · symlink 제외 · 실행 비트 유지", () => {
+  const f = fixture()
+  process.env["GNAM_SKILL_GIT_BASE"] = f.base
+  try {
+    const byTag = fetchSkill(f.project, { ...dep, ref: "v1" })
+    expect(byTag.commit).toBe(f.v1)
+    expect(byTag.skipped).toEqual(["outside"])
+    const target = join(f.project, ".gnam", "skills", "harness-execute")
+    expect(readdirSync(target).sort()).toEqual(["SKILL.md", "adapters", "run.sh"])
+    expect(statSync(join(target, "run.sh")).mode & 0o111).toBeGreaterThan(0)
+    expect(byTag.sha256).toBe(contentHash(target))
+    expect(fetchSkill(f.project, { ...dep, ref: f.v1.slice(0, 10) }).commit).toBe(f.v1)
+    const byBranch = fetchSkill(f.project, { ...dep, ref: "dev" })
+    expect(byBranch.commit).toBe(f.dev)
+    expect(readFileSync(join(target, "SKILL.md"), "utf8")).toContain("dev")
+    expect(byBranch.sha256).not.toBe(byTag.sha256)
+    expect(readdirSync(join(f.project, ".gnam", "skills"))).toEqual(["harness-execute"])
+  } finally {
+    delete process.env["GNAM_SKILL_GIT_BASE"]
+    rmSync(f.root, { recursive: true, force: true })
+  }
+})
+
+test("받기 실패: SKILL.md 없음 · 경로 없음 · ref 없음 → 기존 디렉터리 유지", () => {
+  const f = fixture()
+  process.env["GNAM_SKILL_GIT_BASE"] = f.base
+  try {
+    const first = fetchSkill(f.project, { ...dep, ref: "v1" })
+    const target = join(f.project, ".gnam", "skills", "harness-execute")
+    const bad = [
+      { ...dep, ref: "v1", source: "github:obov/agent-skills/no-skill" },
+      { ...dep, ref: "v1", source: "github:obov/agent-skills/missing" },
+      { ...dep, ref: "nope" },
+      { ...dep, ref: "v1", source: "github:obov/none" },
+      { ...dep, ref: "v1", source: "github:obov/agent-skills" },
+    ]
+    const messages = bad.map((d) => {
+      try {
+        fetchSkill(f.project, d)
+        return "통과"
+      } catch (error) {
+        return (error as Error).message
+      }
+    })
+    expect(messages[0]).toContain("SKILL.md 없음")
+    expect(messages[1]).toContain("경로 없음")
+    expect(messages[2]).toContain("ref 없음: nope")
+    expect(messages[3]).toContain("git clone")
+    expect(messages[4]).toContain("SKILL.md 없음")
+    expect(contentHash(target)).toBe(first.sha256)
+    expect(readdirSync(join(f.project, ".gnam", "skills"))).toEqual(["harness-execute"])
+  } finally {
+    delete process.env["GNAM_SKILL_GIT_BASE"]
+    rmSync(f.root, { recursive: true, force: true })
+  }
 })

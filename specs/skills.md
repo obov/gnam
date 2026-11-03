@@ -56,15 +56,17 @@ by       이 스킬을 선언한 활성 plugin id
 .agents/skills/<name>            → ../../.gnam/skills/<name> (상대 symlink). 커밋 대상
 ```
 
-- 미구현: 받은 디렉터리에 SKILL.md 가 없으면 받은 파일을 지우고 add 거부 · exit 1
+- 받은 디렉터리에 SKILL.md 가 없으면 받은 파일을 지우고 거부
 - 미구현: `.claude/skills/<name>` 가 저장소 소유 디렉터리 (링크 아님) 면 링크 생략 · 보고 (기존 linkSkills 규칙)
 - 미구현: `.claude/skills` 가 `.agents/skills` 링크면 한쪽만 (기존 skillDirs 규칙)
-- 미구현: `.git` 디렉터리 · symlink 는 받지 않는다 (저장소 밖을 가리키는 링크 차단)
+- `.git` 디렉터리 · symlink · 특수 파일은 받지 않는다 (저장소 밖을 가리키는 링크 차단). 실행 비트는 유지
 
 ## 받기
 
-- 미구현: `git` 로 받는다. 인증은 사용자의 git 자격 (비공개 저장소 포함). 경로가 있으면 sparse checkout 으로 그 디렉터리만
-- 미구현: 받은 내용은 임시 디렉터리에서 sha256 계산 → `.gnam/skills/<name>/` 로 옮긴다. 실패하면 기존 디렉터리 유지
+- `git` 로 받는다 (`--filter=blob:none`). 인증은 사용자의 git 자격 (비공개 저장소 포함), 대화형 자격 입력은 끈다. 경로가 있으면 sparse checkout 으로 그 디렉터리만
+- ref 해석 순서: tag → branch → commit sha (축약 가능)
+- 저장소 URL = `https://github.com/<owner>/<repo>.git`. 환경 변수 `GNAM_SKILL_GIT_BASE` 가 있으면 `<base>/<owner>/<repo>.git` (테스트 · 미러)
+- 받은 내용은 `.gnam/skills/` 안 임시 디렉터리에서 sha256 계산 → `.gnam/skills/<name>/` 로 교체. 실패하면 기존 디렉터리 유지
 - 네트워크는 `plugin add` · `skill update` 만 쓴다. `gnam link` · `gnam verify` · commit-msg 는 쓰지 않는다
 
 ## 수명
