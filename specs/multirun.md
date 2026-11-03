@@ -200,6 +200,7 @@ harness-execute 스킬 (adapter · system-prompt · claude-args.sh) 을 내장 p
 
 - multi-agent `requires: [run, merge, harness]`. multirun `requires: [harness]`
 - 스킬 경로 · 이름 그대로 (`.agents/skills/harness-execute`). 기존 문서 참조 변경 없음
+- 세션별 claude 시작 인자: `claude-args.sh --file <경로>` 가 프로젝트 · 전역 파일 대신 그 파일을 쓴다 (형식 · --session-id · --model · --effort 제거 규칙 같음, 없는 경로 = exit 1). multirun 배정에서 변형마다 지정할 수 있다. model · effort 는 start 의 --model · --effort
 - 이전 항목 (CHANGELOG): multi-agent 를 쓰는 저장소는 `npx gnam plugin add harness`
 
 ## 변형 · 요약 세션 규칙
