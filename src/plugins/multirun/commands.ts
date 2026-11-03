@@ -122,6 +122,22 @@ export function detectSetup(dir: string): string | null {
   return null
 }
 
+/**
+ * clone 에서 link 를 돌릴 gnam. clone 자신의 설치본 → clone 이 gnam 패키지 자체 → 실행 중인 gnam 순.
+ * 실행 중인 gnam (원본의 설치본) 을 쓰면 스킬 링크가 원본 경로를 가리켜 clone 이 dirty 가 된다.
+ */
+export function gnamBinFor(clone: string): string {
+  const installed = join(clone, "node_modules", "@obov", "gnam", "bin", "gnam.js")
+  if (existsSync(installed)) return installed
+  try {
+    const pkg = JSON.parse(readFileSync(join(clone, "package.json"), "utf8")) as { name?: unknown }
+    if (pkg.name === "@obov/gnam" && existsSync(join(clone, "bin", "gnam.js"))) return join(clone, "bin", "gnam.js")
+  } catch {
+    // package.json 없음 · 형식 오류 = 설치본 없음
+  }
+  return join(PACKAGE_ROOT, "bin", "gnam.js")
+}
+
 /** vN=값 지정. 'x' 만 쓰면 전체 기본값 */
 function perVariant(args: string[], flag: string): { all: string | null; by: Map<string, string> } {
   const by = new Map<string, string>()
@@ -193,6 +209,8 @@ export function start(args: string[], cwd: string, config: GnamConfig): number {
       must(["clone", "-q", "--no-tags", "--single-branch", "--branch", state.branch, source, clone], source)
       must(["remote", "remove", "origin"], clone)
       must(["checkout", "-q", "-b", name], clone)
+      // 기준 브랜치 사본은 지운다 (보존 tag 에 원본과 같은 브랜치가 변형마다 생기지 않게). Base 는 vN 이력에 있다
+      must(["branch", "-q", "-D", state.branch], clone)
       for (const path of copy) if (existsSync(join(source, path))) cpSync(join(source, path), join(clone, path), { recursive: true })
       const command = setup ?? detectSetup(clone)
       if (command !== null) {
@@ -200,7 +218,7 @@ export function start(args: string[], cwd: string, config: GnamConfig): number {
         if (r.status !== 0) throw new Failure(`${name} setup 실패 (${command})\n${r.stdout ?? ""}${r.stderr ?? ""}`.trimEnd())
       }
       if (existsSync(join(clone, "gnam.json"))) {
-        const r = spawnSync(process.execPath, [join(PACKAGE_ROOT, "bin", "gnam.js"), "link"], { cwd: clone, encoding: "utf8" })
+        const r = spawnSync(process.execPath, [gnamBinFor(clone), "link"], { cwd: clone, encoding: "utf8" })
         if (r.status !== 0) throw new Failure(`${name} gnam link 실패\n${r.stdout ?? ""}${r.stderr ?? ""}`.trimEnd())
       }
       const agent = agents.by.get(name) === "codex" ? "codex" : "claude"
@@ -337,6 +355,8 @@ export interface RunStatus {
 }
 
 export function runStatus(state: RunState): RunStatus {
+  const startCommit = startOf(state)
+  const committed = new Map(agentsOf(startCommit?.body ?? "").map((a) => [a.name, a.fields["model"] ?? ""]))
   const variants = state.variants.map((v): VariantStatus => {
     const alive = existsSync(v.clone)
     const tag = `${tagPrefix(state.id, v.name)}/heads/${v.name}`
@@ -351,7 +371,7 @@ export function runStatus(state: RunState): RunStatus {
             .find(([, ...s]) => VARIANT_COMMIT.test(s.join(" ")))?.[0] ?? null)
     return {
       name: v.name,
-      model: v.model,
+      model: committed.get(v.name) || v.model,
       clone: alive ? v.clone : null,
       tip,
       variant: variantCommit,
@@ -363,7 +383,7 @@ export function runStatus(state: RunState): RunStatus {
     id: state.id,
     plan: state.plan,
     topic: state.topic,
-    start: startOf(state)?.hash ?? null,
+    start: startCommit?.hash ?? null,
     report: reportOf(state)?.hash ?? null,
     closed: state.closed,
     variants,
@@ -420,6 +440,7 @@ const commitTime = (source: string, rev: string) => Number(must(["show", "-s", "
 
 export async function collectData(state: RunState) {
   const startCommit = startOf(state)
+  const assigned = new Map(agentsOf(startCommit?.body ?? "").map((a) => [a.name, a.fields]))
   const startAt = startCommit !== null ? commitTime(state.source, startCommit.hash) : Math.round(Date.parse(state.created) / 1000)
   const variants = []
   for (const v of state.variants) {
@@ -462,6 +483,8 @@ export async function collectData(state: RunState) {
       }
     variants.push({
       name: v.name,
+      model: assigned.get(v.name)?.["model"] ?? v.model,
+      effort: assigned.get(v.name)?.["effort"] ?? v.effort,
       agent: v.agent,
       session: v.session,
       tip,
@@ -585,14 +608,13 @@ const agentLine = (name: string, fields: Record<string, string | number | null |
 export function reportDraft(data: Awaited<ReturnType<typeof collectData>>, state: RunState, outcome: string): string {
   const variantLines = data.variants.filter((v) => v.tip !== null).map((v) => `${v.name} ${v.tip?.slice(0, 7)} ${v.tag}`)
   const agents = data.variants.map((v) => {
-    const s = state.variants.find((x) => x.name === v.name)
     const u = v.usage
     const workflow = (v.variant?.["Approach"] ?? "").split(/[\s,.(]/)[0] || undefined
     const na = (value: number | undefined) => (value === undefined ? NA : value)
     return agentLine(v.name, {
       role: "variant",
-      model: u?.model ?? s?.model ?? "?",
-      effort: u?.effort ?? s?.effort ?? "?",
+      model: u?.model ?? v.model,
+      effort: u?.effort ?? v.effort,
       agent: v.agent,
       session: v.session,
       workflow,

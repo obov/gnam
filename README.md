@@ -56,6 +56,7 @@ npx gnam run <plugin> <command>        # plugin 명령
 | `s3` | 첨부를 S3 호환 저장소에 sha256 key 로 보관 · `put` · `get` · `url` · `check` | - |
 | `harness` | harness-execute 스킬 (에이전트 세션 실행 · adapter · `claude-args.sh`) | - |
 | `multi-agent` | multi-agent · agent-routing 스킬 · `status` | run, merge, harness |
+| `multirun` | 같은 plan 을 N 개 clone 에서 변형 실행 · 원본 tag 보존 · report 비교 · `start` · `sync` · `status` · `collect` · `open` · `close` · `abort` | harness |
 
 표기: `@gnam/<id>` (내장) · `./경로` (로컬) · npm 패키지명 (외부).
 

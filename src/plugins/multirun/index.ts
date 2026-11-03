@@ -46,6 +46,8 @@ export default definePlugin({
   status: { summary: (ctx) => summaryLines(ctx.cwd) },
   configDefaults: MULTIRUN_DEFAULTS,
   configProblems: multirunConfigProblems,
+  skills: ["skills/gnam-multirun"],
+  agentsMd: "agents.md",
   rules: [
     { id: "commit/multirun-empty", why: "multirun 커밋은 빈 커밋" },
     { id: "commit/multirun-body", why: "multirun 본문 필드 (Id · Plan · Base · Start · Outcome · Variants …)" },

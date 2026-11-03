@@ -164,7 +164,7 @@ test("start: plan 검사 · clone (remote 없음 · 브랜치 vN · tag 없음) 
     expect(s.variants[1].session).toBe("na")
     for (const v of s.variants) {
       expect(t.inClone(v.clone, "remote").stdout).toBe("")
-      expect(t.inClone(v.clone, "branch", "--show-current").stdout.trim()).toBe(v.name)
+      expect(t.inClone(v.clone, "branch", "--format=%(refname:short)").stdout.trim()).toBe(v.name)
       expect(t.inClone(v.clone, "tag").stdout).toBe("")
       expect(readFileSync(join(v.clone, ".env"), "utf8")).toBe("SECRET=1\n")
       expect(t.inClone(v.clone, "config", "core.hooksPath").stdout.trim()).toBe(".githooks")
@@ -323,5 +323,22 @@ test("close: report 없음 · 미커밋 · untracked · stash · 미보존 거�
     expect(t.repo.gnam("status").out).not.toContain(`multirun ${id}`)
   } finally {
     t.done()
+  }
+})
+
+test("clone 의 link 는 clone 자신의 gnam (설치본 → gnam 패키지 자체 → 실행 중인 gnam)", async () => {
+  const { gnamBinFor } = await import("../src/plugins/multirun/commands.ts")
+  const dir = mkdtempSync(join(tmpdir(), "multirun-bin-"))
+  try {
+    expect(gnamBinFor(dir)).toBe(join(PACKAGE, "bin", "gnam.js"))
+    mkdirSync(join(dir, "bin"))
+    writeFileSync(join(dir, "bin/gnam.js"), "")
+    writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "@obov/gnam" }))
+    expect(gnamBinFor(dir)).toBe(join(dir, "bin/gnam.js"))
+    mkdirSync(join(dir, "node_modules/@obov/gnam/bin"), { recursive: true })
+    writeFileSync(join(dir, "node_modules/@obov/gnam/bin/gnam.js"), "")
+    expect(gnamBinFor(dir)).toBe(join(dir, "node_modules/@obov/gnam/bin/gnam.js"))
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
   }
 })

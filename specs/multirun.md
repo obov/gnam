@@ -13,7 +13,7 @@ spec.<topic>.plan
   gnam run multirun close     보존 확인 (G1) 후 clone 삭제
 ```
 
-미구현: 내장 plugin `@gnam/multirun`. requires `harness` (세션 실행). multi-agent 는 의존하지 않는다. 설치돼 있으면 변형이 쓰도록 권장한다.
+내장 plugin `@gnam/multirun`. requires `harness` (세션 실행). multi-agent 는 의존하지 않는다. 설치돼 있으면 변형이 쓰도록 권장한다.
 
 ## 식별
 
@@ -105,8 +105,8 @@ checks          pass · fail · na (요약 세션 재실행 결과)
 Multirun: <report hash> <v<N> | combine | discard>
 ```
 
-- 미구현: 채택 (vN) = `spec.<topic>.merge:` (merge plugin) 또는 merge 커밋. 변형 tag 를 rebase 후 `merge --no-ff`. 원래 hash 는 tag 에 남는다
-- 미구현: 조합 · 폐기 = 새 `spec.<topic>.plan:` (Supersedes: 원래 plan, `Sources: multirun/<run-id>/v2 Step 1` 처럼 출처)
+- 채택 (vN) = `spec.<topic>.merge:` (merge plugin) 또는 merge 커밋. 변형 tag 를 rebase 후 `merge --no-ff`. 원래 hash 는 tag 에 남는다
+- 조합 · 폐기 = 새 `spec.<topic>.plan:` (Supersedes: 원래 plan, `Sources: multirun/<run-id>/v2 Step 1` 처럼 출처)
 - 검사: report hash 가 조상이고 제목이 `multirun.<topic>.report:` (같은 topic), 선택이 report Variants 에 있는 변형 · combine · discard
 
 ## 명령
@@ -126,8 +126,8 @@ CLI 는 기계적인 부분만. 세션 실행 · 지시 · 요약은 스킬 (gna
 ### start
 
 - plan 검사: 제목 `spec.<topic>.plan:` · HEAD 의 조상 · 본문 `Blocking: 없음`. 실패 = exit 1, 아무것도 만들지 않음
-- 변형마다 `git clone --no-tags --single-branch --branch <현재 브랜치> <원본> <clone>` → remote origin 제거 → 브랜치 `vN` 생성 · checkout
-- 준비: `multirun.copy` 파일 복사 (원본 작업 트리 기준, 없으면 건너뜀) → `multirun.setup` 명령 → `gnam link` (clone 에 hook · 스킬)
+- 변형마다 `git clone --no-tags --single-branch --branch <현재 브랜치> <원본> <clone>` → remote origin 제거 → 브랜치 `vN` 생성 · checkout → 기준 브랜치 사본 삭제 (보존 tag 중복 방지)
+- 준비: `multirun.copy` 파일 복사 (원본 작업 트리 기준, 없으면 건너뜀) → `multirun.setup` 명령 → `gnam link` (clone 에 hook · 스킬). link 는 clone 자신의 gnam (설치본 → clone 이 gnam 패키지 자체 → 실행 중인 gnam 순)
 - session id 를 변형마다 만든다 (claude). codex = na
 - 상태 파일 기록 후 start 커밋 초안을 출력 · 상태 디렉터리 start-message.txt 에 저장. 커밋은 조정자가 한다 (모델 · effort 배정이 조정자 몫). 지정 안 한 model · effort 는 ? (검사가 막음)
 - 중간 실패 = 만든 clone 삭제 · 상태 삭제 · exit 1
