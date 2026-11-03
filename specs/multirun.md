@@ -107,7 +107,7 @@ Multirun: <report hash> <v<N> | combine | discard>
 
 - 미구현: 채택 (vN) = `spec.<topic>.merge:` (merge plugin) 또는 merge 커밋. 변형 tag 를 rebase 후 `merge --no-ff`. 원래 hash 는 tag 에 남는다
 - 미구현: 조합 · 폐기 = 새 `spec.<topic>.plan:` (Supersedes: 원래 plan, `Sources: multirun/<run-id>/v2 Step 1` 처럼 출처)
-- 미구현: 검사: report hash 가 조상이고 제목이 `multirun.<topic>.report:` (같은 topic), 선택이 report Variants 에 있는 변형 · combine · discard
+- 검사: report hash 가 조상이고 제목이 `multirun.<topic>.report:` (같은 topic), 선택이 report Variants 에 있는 변형 · combine · discard
 
 ## 명령
 
