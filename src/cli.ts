@@ -8,7 +8,8 @@ import { builtinIds, loadPlugins, PACKAGE_ROOT } from "./core/loader.ts"
 import type { GnamPlugin } from "./core/plugin.ts"
 import { OutputError, output, type OutputOptions, render, type Renderer } from "./core/output.ts"
 import { schemaAt, statusSchema } from "./core/schema.ts"
-import { addPlugin, init, link, realProject, removePlugin, sync } from "./core/project.ts"
+import { addPlugin, init, link, packageManager, realProject, removePlugin, sync } from "./core/project.ts"
+import { formatOutdated, outdated } from "./core/upgrade.ts"
 import { listSkills, updateSkills, verifySkills } from "./core/skills.ts"
 import { collectStatus, Context, problemsOf, summaryOf } from "./core/status.ts"
 import { TraceError } from "./core/trace.ts"
@@ -27,6 +28,7 @@ const USAGE = `gnam — Git-Native Agent Memory
   gnam status [<경로>…] [--json] [--format F] [--where k=v] [--fields a,b] [--keys]
               [--since REV] [--deep] [--check] [-C DIR]…   작업 기록 상태. 인자 없으면 요약, 경로 · --json 이면 JSON 트리
   gnam doctor                                               설치 상태 점검
+  gnam outdated [--json]                                    npm 최신 버전 · 업그레이드 명령 · 그 사이 이전 항목
 `
 
 async function activePlugins(project: string): Promise<GnamPlugin[]> {
@@ -308,6 +310,12 @@ export async function main(argv: string[]): Promise<number> {
         return await plugin(realProject("."), args)
       case "run":
         return await run(realProject("."), args)
+      case "outdated": {
+        const result = await outdated(packageManager(realProject(".")))
+        if (args.includes("--json")) console.log(JSON.stringify(result, null, 2))
+        else for (const line of formatOutdated(result)) console.log(line)
+        return 0
+      }
       case "skill":
         return await skill(realProject("."), args)
       case "sync":

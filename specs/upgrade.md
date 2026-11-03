@@ -36,11 +36,11 @@ gnam 0.3.2 → 0.4.0 (latest)
   0.4.0  npx gnam plugin add multi-agent 다시 실행 (.gnam/skills/harness-execute 생성)
 ```
 
-- 미구현: npm registry 의 `@obov/gnam` dist-tags.latest 조회. timeout 2초
-- 미구현: 최신과 같거나 더 높으면 `gnam <설치> (latest <최신>) · 최신` · exit 0
-- 미구현: 새 버전이 있으면 위 형식 · exit 0. 이전 항목은 최신 버전의 CHANGELOG.md (registry 의 그 버전 tarball) 에서 추출
-- 미구현: 네트워크 · registry 오류 = stderr 에 원인 · exit 1. 다른 출력 없음
-- 미구현: `--json` = `{ installed · latest · upgrade · migrations: [{ version · text }] }`
+- npm registry 의 `@obov/gnam` dist-tags.latest 조회. 요청마다 timeout 2초. registry = `npm_config_registry` 가 있으면 그것, 없으면 registry.npmjs.org
+- 최신과 같거나 더 높으면 `gnam <설치> (latest <최신>) · 최신` · exit 0. tarball 은 받지 않는다
+- 새 버전이 있으면 위 형식 · exit 0. 이전 항목은 최신 버전의 CHANGELOG.md (registry 의 그 버전 tarball, gunzip + tar 직접 읽기) 에서 추출. 이전 항목이 없으면 '이전 항목' 줄 생략
+- 네트워크 · registry 오류 = stderr 에 원인 · exit 1. 다른 출력 없음
+- `--json` = `{ installed · latest · upgrade · migrations: [{ version · text }] }`. 최신이면 upgrade = null · migrations = []
 - 업그레이드 명령은 packageManager 판정 (npm · pnpm · yarn · bun) 에 맞춘다
 
 ## gnam link 의 이전 안내

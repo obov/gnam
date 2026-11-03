@@ -6,6 +6,7 @@
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
+import { gunzipSync } from "node:zlib"
 import { git } from "./git.ts"
 import { PACKAGE_ROOT } from "./loader.ts"
 
@@ -106,4 +107,76 @@ export function upgradeNotice(
   }
   mkdirSync(dirname(path), { recursive: true })
   writeFileSync(path, `${installed}\n`)
+}
+
+// ---------- gnam outdated ----------
+
+export const PACKAGE_NAME = "@obov/gnam"
+const TIMEOUT_MS = 2000
+
+/** npm_config_registry (npm · 사내 registry) 를 따른다 */
+export const registryUrl = (): string => (process.env["npm_config_registry"] ?? "https://registry.npmjs.org").replace(/\/$/, "")
+
+export interface Outdated {
+  installed: string
+  latest: string
+  /** 새 버전이 없으면 null */
+  upgrade: string | null
+  migrations: Migration[]
+}
+
+async function get(url: string, accept?: string): Promise<Response> {
+  const response = await fetch(url, {
+    headers: accept === undefined ? {} : { accept },
+    signal: AbortSignal.timeout(TIMEOUT_MS),
+  })
+  if (!response.ok) throw new Error(`${url}: HTTP ${response.status}`)
+  return response
+}
+
+/** tar (ustar) 에서 파일 하나. 없으면 null */
+export function tarEntry(tar: Uint8Array, wanted: string): Buffer | null {
+  const text = (from: number, to: number) => Buffer.from(tar.subarray(from, to)).toString("utf8").replace(/\0.*$/s, "")
+  for (let at = 0; at + 512 <= tar.length; ) {
+    const name = text(at, at + 100)
+    if (name === "") return null
+    const prefix = text(at + 345, at + 500)
+    const size = Number.parseInt(text(at + 124, at + 136).trim() || "0", 8)
+    const full = prefix === "" ? name : `${prefix}/${name}`
+    if (full === wanted) return Buffer.from(tar.subarray(at + 512, at + 512 + size))
+    at += 512 + Math.ceil(size / 512) * 512
+  }
+  return null
+}
+
+export const upgradeCommand = (pm: "bun" | "pnpm" | "yarn" | "npm"): string =>
+  pm === "npm" ? `npm install -D ${PACKAGE_NAME}@latest` : `${pm} add -D ${PACKAGE_NAME}@latest`
+
+/** registry dist-tags.latest 와 비교. 새 버전이면 그 tarball 의 CHANGELOG.md 에서 이전 항목 */
+export async function outdated(
+  pm: "bun" | "pnpm" | "yarn" | "npm",
+  installed: string = installedVersion(),
+  registry: string = registryUrl(),
+): Promise<Outdated> {
+  const meta = (await (await get(`${registry}/${PACKAGE_NAME.replace("/", "%2f")}`, "application/vnd.npm.install-v1+json")).json()) as {
+    "dist-tags"?: { latest?: string }
+    versions?: Record<string, { dist?: { tarball?: string } }>
+  }
+  const latest = meta["dist-tags"]?.latest
+  if (latest === undefined) throw new Error(`${registry}: ${PACKAGE_NAME} dist-tags.latest 없음`)
+  if (compareVersions(latest, installed) <= 0) return { installed, latest, upgrade: null, migrations: [] }
+  const tarball = meta.versions?.[latest]?.dist?.tarball
+  if (tarball === undefined) throw new Error(`${registry}: ${PACKAGE_NAME}@${latest} tarball 없음`)
+  const tar = gunzipSync(Buffer.from(await (await get(tarball)).arrayBuffer()))
+  const changelog = tarEntry(tar, "package/CHANGELOG.md")?.toString("utf8") ?? ""
+  return { installed, latest, upgrade: upgradeCommand(pm), migrations: migrationsBetween(changelog, installed, latest) }
+}
+
+export function formatOutdated(o: Outdated): string[] {
+  if (o.upgrade === null) return [`gnam ${o.installed} (latest ${o.latest}) · 최신`]
+  return [
+    `gnam ${o.installed} → ${o.latest} (latest)`,
+    `업그레이드  ${o.upgrade}`,
+    ...(o.migrations.length > 0 ? ["이전 항목", ...o.migrations.map((m) => `  ${m.version}  ${m.text}`)] : []),
+  ]
 }
