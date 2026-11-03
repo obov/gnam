@@ -2,6 +2,20 @@
  * multirun: 같은 plan 을 N 개 clone 에서 변형 실행하고 원본 tag 로 보존 · report 로 비교한다 (specs/multirun.md).
  */
 import { definePlugin } from "../../core/plugin.ts"
+import {
+  abort,
+  close,
+  collect,
+  guarded,
+  MULTIRUN_DEFAULTS,
+  multirunConfigProblems,
+  open,
+  showStatus,
+  start,
+  statusData,
+  summaryLines,
+  sync,
+} from "./commands.ts"
 import { decisionProblems, MULTIRUN_SUBJECT, validateMultirun } from "./model.ts"
 
 export default definePlugin({
@@ -13,6 +27,25 @@ export default definePlugin({
     if (owner === "multirun") return []
     return decisionProblems(ctx)
   },
+  commands: {
+    start: {
+      describe: "<plan> -n <N> [--model [vN=]<id>] [--effort [vN=]<e>] [--agent vN=codex]  변형 clone 준비 · start 커밋 초안",
+      run: guarded(start),
+    },
+    sync: { describe: "[<run-id>]  clone 의 브랜치 · tag → 원본 tag multirun/<id>/vN/…", run: guarded(sync) },
+    status: {
+      describe: "[<run-id>]  변형별 clone · tip · variant 커밋 · sync · dirty",
+      run: guarded(showStatus),
+      data: (args, ctx) => statusData(args, ctx.cwd),
+    },
+    collect: { describe: "<run-id>  요약 세션 입력 JSON (sync 후 tag 기준)", run: guarded(collect) },
+    open: { describe: "<run-id> <vN>  보존 tag 기준 detached worktree (결과 검토)", run: guarded(open) },
+    close: { describe: "<run-id> [--push <remote>]  보존 확인 (G1) 후 clone · worktree 삭제", run: guarded(close) },
+    abort: { describe: "<run-id>  sync 후 report 초안 (Outcome: aborted)", run: guarded(abort) },
+  },
+  status: { summary: (ctx) => summaryLines(ctx.cwd) },
+  configDefaults: MULTIRUN_DEFAULTS,
+  configProblems: multirunConfigProblems,
   rules: [
     { id: "commit/multirun-empty", why: "multirun 커밋은 빈 커밋" },
     { id: "commit/multirun-body", why: "multirun 본문 필드 (Id · Plan · Base · Start · Outcome · Variants …)" },

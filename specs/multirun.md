@@ -112,7 +112,7 @@ Multirun: <report hash> <v<N> | combine | discard>
 ## 명령
 
 ```text
-gnam run multirun start <plan> -n <N> [--model vN=<id> …] [--agent vN=codex …]
+gnam run multirun start <plan> -n <N> [--model [vN=]<id> …] [--effort [vN=]<e> …] [--agent vN=codex …]
 gnam run multirun sync [<run-id>]
 gnam run multirun status [<run-id>] [--json]
 gnam run multirun collect <run-id>                 JSON (요약 세션 입력)
@@ -125,12 +125,12 @@ CLI 는 기계적인 부분만. 세션 실행 · 지시 · 요약은 스킬 (gna
 
 ### start
 
-- 미구현: plan 검사: 제목 `spec.<topic>.plan:` · HEAD 의 조상 · 본문 `Blocking: 없음`. 실패 = exit 1, 아무것도 만들지 않음
-- 미구현: 변형마다 `git clone --no-tags --single-branch --branch <현재 브랜치> <원본> <clone>` → remote origin 제거 → 브랜치 `vN` 생성 · checkout
-- 미구현: 준비: `multirun.copy` 파일 복사 (원본 작업 트리 기준, 없으면 건너뜀) → `multirun.setup` 명령 → `gnam link` (clone 에 hook · 스킬)
-- 미구현: session id 를 변형마다 만든다 (claude). codex = na
-- 미구현: 상태 파일 기록 후 start 커밋 초안을 출력. 커밋은 조정자가 한다 (모델 · effort 배정이 조정자 몫)
-- 미구현: 중간 실패 = 만든 clone 삭제 · 상태 삭제 · exit 1
+- plan 검사: 제목 `spec.<topic>.plan:` · HEAD 의 조상 · 본문 `Blocking: 없음`. 실패 = exit 1, 아무것도 만들지 않음
+- 변형마다 `git clone --no-tags --single-branch --branch <현재 브랜치> <원본> <clone>` → remote origin 제거 → 브랜치 `vN` 생성 · checkout
+- 준비: `multirun.copy` 파일 복사 (원본 작업 트리 기준, 없으면 건너뜀) → `multirun.setup` 명령 → `gnam link` (clone 에 hook · 스킬)
+- session id 를 변형마다 만든다 (claude). codex = na
+- 상태 파일 기록 후 start 커밋 초안을 출력 · 상태 디렉터리 start-message.txt 에 저장. 커밋은 조정자가 한다 (모델 · effort 배정이 조정자 몫). 지정 안 한 model · effort 는 ? (검사가 막음)
+- 중간 실패 = 만든 clone 삭제 · 상태 삭제 · exit 1
 
 ```text
 gnam.json multirun 설정 (기본값)
@@ -140,9 +140,9 @@ copy    [".env"]. 원본 작업 트리 기준 상대 경로
 
 ### sync
 
-- 미구현: clone 마다 원본에서 `git fetch <clone> +refs/heads/*:refs/tags/multirun/<id>/vN/heads/* +refs/tags/*:refs/tags/multirun/<id>/vN/tags/*`
-- 미구현: clone 에서 사라진 브랜치의 tag 는 지우지 않는다 (보존 우선)
-- 미구현: 출력: 변형마다 갱신된 ref 수. clone 이 없는 변형 = 건너뜀 표시
+- clone 마다 원본에서 `git fetch <clone> +refs/heads/*:refs/tags/multirun/<id>/vN/heads/* +refs/tags/*:refs/tags/multirun/<id>/vN/tags/*`
+- clone 에서 사라진 브랜치의 tag 는 지우지 않는다 (보존 우선)
+- 출력: 변형마다 갱신된 ref 수. clone 이 없는 변형 = 건너뜀 표시
 
 ### status
 
@@ -153,9 +153,9 @@ a1b2c3d-1  spec.workspace.plan · start 3f2a1b0 · report 없음
   v3  -                clone 없음    tip 5a6b7c8  synced    -
 ```
 
-- 미구현: run-id 생략 = 닫히지 않은 run 전부
-- 미구현: `--json` = `{ runs: [{ id · plan · topic · start · report · closed · variants: [{ name · clone · tip · variant · synced · dirty }] }] }`
-- 미구현: gnam status 요약 줄 (plugin summary): `multirun <id> 미sync clone vN …` · `multirun <id> report 없음` (G3)
+- run-id 생략 = 닫히지 않은 run 전부
+- `--json` = `{ runs: [{ id · plan · topic · start · report · closed · variants: [{ name · clone · tip · variant · synced · dirty }] }] }`
+- gnam status 요약 줄 (plugin summary): `multirun <id> 미sync clone vN …` · `multirun <id> report 없음` (G3)
 
 ### collect
 
@@ -171,8 +171,8 @@ a1b2c3d-1  spec.workspace.plan · start 3f2a1b0 · report 없음
 
 ### open
 
-- 미구현: 원본 저장소에 tag `multirun/<id>/vN/heads/vN` 기준 detached worktree: `<clone 상위>/open-vN`. 경로 출력
-- 미구현: clone 삭제 뒤 결과 검토용. close 가 함께 지운다
+- 원본 저장소에 tag `multirun/<id>/vN/heads/vN` 기준 detached worktree: `<clone 상위>/open-vN`. 경로 출력
+- clone 삭제 뒤 결과 검토용. close 가 함께 지운다
 
 ### close
 
@@ -186,13 +186,13 @@ G4   abort: 커밋된 것만 sync. report 초안 (Outcome: aborted) 출력
 G5   clone 에도 gnam link → 변형 커밋이 같은 commit-msg 검사를 거친다
 ```
 
-- 미구현: report 커밋 (Start 가 이 run 의 start) 이 없으면 거부. abort 경로도 report 를 먼저 쓴다
-- 미구현: 통과 = clone · open worktree 삭제, 상태 `closed` 기록. tag 는 지우지 않는다
-- 미구현: `--push <remote>` = `git push <remote> refs/tags/multirun/<id>/*` (삭제 전). 기본은 push 안 함
+- report 커밋 (Start 가 이 run 의 start) 이 없으면 거부. abort 경로도 report 를 먼저 쓴다
+- 통과 = clone · open worktree 삭제, 상태 `closed` 기록. tag 는 지우지 않는다
+- `--push <remote>` = `git push <remote> refs/tags/multirun/<id>/*` (삭제 전). 기본은 push 안 함
 
 ### abort
 
-- 미구현: sync 후 report 초안 출력 (Outcome: aborted, 측정값은 collect 와 같은 방식). clone 은 지우지 않는다 (close 가 지움)
+- sync 후 report 초안 출력 · report-message.txt 저장 (Outcome: aborted, 측정값은 collect 와 같은 방식, summarizer 줄은 ? 채움). clone 은 지우지 않는다 (close 가 지움)
 
 ## harness plugin
 

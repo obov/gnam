@@ -34,7 +34,7 @@ const text: Check = (value) => value !== ""
 /** 허용 키. 선언 순서 = 줄 안 키 순서 */
 const KEYS: Record<string, Check> = {
   role: oneOf("variant", "summarizer"),
-  model: (value) => value !== "" && !ALIASES.includes(value),
+  model: (value) => value !== "" && value !== "?" && !ALIASES.includes(value),
   effort: oneOf(...EFFORTS),
   agent: oneOf("claude", "codex"),
   session: text,
