@@ -20,7 +20,7 @@ command -v awake                           # awake CLI (없으면 아래 awake �
 `herdr agent start` 는 claude 실행 파일만 띄운다. awake 래퍼는 `pane run` 으로 띄운다. herdr 는 그 claude 를 agent 로 인식한다 (`agent list` 의 session = `--session-id`).
 
 ```sh
-args=(); while IFS= read -r a; do args+=("$a"); done < <(bash <repo>/.agents/skills/harness-execute/claude-args.sh)
+args=(); while IFS= read -r a; do args+=("$a"); done < <(bash <repo>/.agents/skills/harness-execute/claude-args.sh [--file <세션별 인자 파일>])
 herdr pane run <pane> "awake claude --parent $AWAKE_SESSION_ID -- $(printf "'%s' " "${args[@]}") \
   --session-id <session id> --model <모델 ID> --effort <effort>"
 herdr agent rename <pane> <name>

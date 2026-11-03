@@ -32,7 +32,7 @@ herdr pane wait-output <pane> --match "<worktree 이름>" --timeout 10000
 ## start
 
 ```sh
-args=(); while IFS= read -r a; do args+=("$a"); done < <(bash <repo>/.agents/skills/harness-execute/claude-args.sh)
+args=(); while IFS= read -r a; do args+=("$a"); done < <(bash <repo>/.agents/skills/harness-execute/claude-args.sh [--file <세션별 인자 파일>])
 herdr agent start <name> --kind claude --pane <pane> --timeout 60000 -- "${args[@]}" \
   --session-id <session id> \
   --model <모델 ID> --effort <effort>   # 지정이 없으면 --model · --effort 생략 (사용자 설정)

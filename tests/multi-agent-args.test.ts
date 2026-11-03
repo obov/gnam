@@ -42,6 +42,23 @@ test("claude 시작 인자: 파일이 없으면 기본값", () => {
   }
 })
 
+test("claude 시작 인자: --file 세션별 파일이 프로젝트 · 전역보다 우선", () => {
+  const t = setup()
+  try {
+    t.put(t.project, "--system-prompt-file /p/prompt.md\n")
+    const own = join(t.dir, "v1.args")
+    writeFileSync(own, ["claude \\", "--tools Bash,Read \\", "--model opus --effort medium \\", "--settings ~/s.json"].join("\n"))
+    expect(t.run("--file", own).out.split("\n")).toEqual(["--tools", "Bash,Read", "--settings", join(t.home, "s.json")])
+    expect(t.run("--file", own, "source").out).toBe(`file ${own}`)
+    expect(JSON.parse(t.run("--file", own, "--json").out)).toEqual(["--tools", "Bash,Read", "--settings", join(t.home, "s.json")])
+    const missing = t.run("--file", join(t.dir, "none"))
+    expect(missing.status).toBe(1)
+    expect(t.run().out).toBe("--system-prompt-file\n/p/prompt.md")
+  } finally {
+    rmSync(t.dir, { recursive: true, force: true })
+  }
+})
+
 test("claude 시작 인자: 프로젝트 > 전역 > 기본값, 붙여 넣은 명령 정규화", () => {
   const t = setup()
   try {

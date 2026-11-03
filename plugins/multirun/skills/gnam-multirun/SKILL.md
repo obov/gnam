@@ -19,6 +19,7 @@ description: 착수 가능한 plan 하나를 N 개 clone 에서 서로 다른 �
 `<plan>` = 착수 가능한 `spec.<topic>.plan:` hash. `<id>` = start 가 출력하는 run-id.
 
 1. 배정 — 변형 수 N (사용자 지정) · 변형마다 모델 · effort · agent (claude · codex). 정하지 않았으면 사용자에게 묻는다
+   선택: 변형마다 claude 시작 인자 파일 (`claude \ --tools … --settings …` 형식). 없으면 프로젝트 · 전역 claude-args. start 때 adapter 에 `--file <경로>`. 파일의 --model · --effort 는 버려진다 (start 의 --model · --effort 로)
 2. `npx gnam run multirun start <plan> -n <N> --model v1=<id> --model v2=<id> --effort high [--agent v3=codex]`
    → clone 경로 · session id · start 커밋 초안 (`.git/gnam/multirun/<id>/start-message.txt`)
 3. start 커밋 (main) — 초안의 `?` 를 채워 `git commit --allow-empty -F <초안>`

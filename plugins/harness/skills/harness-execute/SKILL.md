@@ -61,12 +61,14 @@ claude 세션의 기본 인자는 `claude-args.sh` 가 정한다. 첫 번째로 
 bash .agents/skills/harness-execute/claude-args.sh init            # 프로젝트 파일 생성 (기본값으로 채움). --global 이면 전역
 bash .agents/skills/harness-execute/claude-args.sh source          # 적용 중인 출처
 bash .agents/skills/harness-execute/claude-args.sh                 # 최종 인자
+bash .agents/skills/harness-execute/claude-args.sh --file <경로>   # 세션별 파일 (위 우선순위 대신). source · --json 과 조합
 ```
 
 - 형식: 평소 쓰는 `claude \ --tools … --settings … --system-prompt-file …` 를 그대로 붙여 넣는다. 셸 단어 규칙 · 줄 끝 `\` · `#` 주석. 맨 앞 `claude` 는 무시. 값 확장 · eval 없음. 경로는 절대 경로 또는 `~/`
 - `--session-id` · `--model` · `--effort` 는 파일에 있어도 버린다. 세션마다 호출자가 붙인다 (agent-routing 배정 · 측정 키)
 - 적용 범위: herdr-claude · herdr-awake-claude · atcher-claude · multi-agent clone.sh. claude-print (단발) 와 herdr-codex 는 제외. 각 adapter 가 인자를 따로 정한다
 - 파일을 저장소에 커밋하면 팀이 공유하고, `.gitignore` 에 넣으면 개인 설정. 실행 중인 세션은 바뀌지 않는다. 새로 띄우는 세션부터 적용
+- 세션별 파일: 세션마다 다른 인자가 필요하면 호출자가 `--file <경로>` 를 adapter start 에 넘긴다. 형식 · 제거 규칙 같음. 없는 경로 = exit 1
 - 파일이 있으면 기본값은 쓰이지 않는다. `--dangerously-skip-permissions` 를 빼면 세션이 권한 확인에서 blocked
 
 ## adapter 선택

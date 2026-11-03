@@ -6,6 +6,7 @@
 #   claude-args.sh --json        JSON 배열 (atcher layout 의 args)
 #   claude-args.sh source        적용 중인 출처: "project|global|default <경로>"
 #   claude-args.sh init [--global]   현재 기본값으로 설정 파일 생성 (있으면 거부). 이후 파일을 편집
+#   claude-args.sh --file <경로> [--json|source]   세션별 파일. 아래 우선순위 대신 그 파일 (없으면 exit 1)
 #
 # 우선순위 (첫 번째 존재하는 파일)
 #   1. 프로젝트   <main 저장소>/.gnam/claude-args
@@ -24,13 +25,23 @@ common="$(git rev-parse --path-format=absolute --git-common-dir 2> /dev/null || 
 project_file=""
 [ -z "$common" ] || project_file="$(dirname "$common")/.gnam/claude-args"
 global_file="${XDG_CONFIG_HOME:-$HOME/.config}/gnam/claude-args"
+session_file=""
+if [ "${1:-}" = --file ]; then
+  [ -n "${2:-}" ] || { printf 'claude-args.sh: --file <경로>\n' >&2; exit 1; }
+  session_file="$2"
+  case "$session_file" in "~/"*) session_file="$HOME/${session_file#\~/}" ;; esac
+  [ -f "$session_file" ] || { printf 'claude-args.sh: 파일 없음: %s\n' "$session_file" >&2; exit 1; }
+  shift 2
+fi
 
 default_args() {
   printf '%s\n' --dangerously-skip-permissions --system-prompt-file "$bundled"
 }
 
 pick() { # → "<kind> <path>"
-  if [ -n "$project_file" ] && [ -f "$project_file" ]; then
+  if [ -n "$session_file" ]; then
+    printf 'file %s\n' "$session_file"
+  elif [ -n "$project_file" ] && [ -f "$project_file" ]; then
     printf 'project %s\n' "$project_file"
   elif [ -f "$global_file" ]; then
     printf 'global %s\n' "$global_file"
