@@ -1,9 +1,24 @@
 import { spawnSync } from "node:child_process"
-import { chmodSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs"
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  readlinkSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { test } from "node:test"
 import { expect } from "./expect.ts"
+import { tempRepo } from "./helpers.ts"
+import { isLink } from "../src/core/project.ts"
 import { configProblems } from "../src/core/config.ts"
 import { type Loaded, pluginProblems } from "../src/core/loader.ts"
 import type { GnamPlugin } from "../src/core/plugin.ts"
@@ -158,6 +173,88 @@ test("받기 실패: SKILL.md 없음 · 경로 없음 · ref 없음 → 기존 �
     expect(readdirSync(join(f.project, ".gnam", "skills"))).toEqual(["harness-execute"])
   } finally {
     delete process.env["GNAM_SKILL_GIT_BASE"]
+    rmSync(f.root, { recursive: true, force: true })
+  }
+})
+
+// ---------- 수명 ----------
+
+test("수명: plugin 둘이 같은 스킬 → 하나 remove 유지 · 둘 다 remove 삭제 · link 는 받지 않고 링크만 복구", () => {
+  const f = fixture()
+  const repo = tempRepo()
+  process.env["GNAM_SKILL_GIT_BASE"] = f.base
+  const declare = (id: string, ref: string) => {
+    mkdirSync(join(repo.root, id))
+    writeFileSync(
+      join(repo.root, id, "index.mjs"),
+      `export default ${JSON.stringify({ id, version: "0.1.0", skillDeps: [{ ...dep, ref }] })}\n`,
+    )
+  }
+  const lockOf = () => (JSON.parse(readFileSync(join(repo.root, "gnam.json"), "utf8")) as { skills?: Record<string, { by: string[]; commit: string; ref: string }> }).skills
+  const vendored = join(repo.root, ".gnam", "skills", "harness-execute")
+  const links = [".claude/skills/harness-execute", ".agents/skills/harness-execute"].map((l) => join(repo.root, l))
+  try {
+    declare("pa", "v1")
+    declare("pb", "dev")
+    const a = repo.gnam("plugin", "add", "./pa")
+    expect(a.status).toBe(0)
+    expect(a.out).toContain(`스킬 harness-execute 받음 ${dep.source}@v1 = ${f.v1.slice(0, 7)}`)
+    expect(a.out).toContain("받지 않은 symlink · 특수 파일 outside")
+    expect(lockOf()?.["harness-execute"]).toMatchObject({ ref: "v1", commit: f.v1, by: ["pa"] })
+    for (const link of links) {
+      expect(readlinkSync(link)).toBe("../../.gnam/skills/harness-execute")
+      expect(existsSync(join(link, "SKILL.md"))).toBe(true)
+    }
+
+    const b = repo.gnam("plugin", "add", "./pb")
+    expect(b.status).toBe(0)
+    expect(b.out).toContain("스킬 harness-execute: pb 가 ref dev 선언, 잠금 v1 유지")
+    expect(lockOf()?.["harness-execute"]).toMatchObject({ commit: f.v1, by: ["pa", "pb"] })
+
+    expect(repo.gnam("plugin", "remove", "pa").status).toBe(0)
+    expect(lockOf()?.["harness-execute"]?.by).toEqual(["pb"])
+    expect(existsSync(join(vendored, "SKILL.md"))).toBe(true)
+
+    process.env["GNAM_SKILL_GIT_BASE"] = join(f.root, "없음")
+    for (const link of links) unlinkSync(link)
+    const l = repo.gnam("link")
+    expect(l.status).toBe(0)
+    for (const link of links) expect(readlinkSync(link)).toBe("../../.gnam/skills/harness-execute")
+
+    expect(repo.gnam("plugin", "remove", "pb").status).toBe(0)
+    expect(existsSync(vendored)).toBe(false)
+    for (const link of links) expect(existsSync(link) || isLink(link)).toBe(false)
+    expect(lockOf()).toBeUndefined()
+  } finally {
+    delete process.env["GNAM_SKILL_GIT_BASE"]
+    repo.cleanup()
+    rmSync(f.root, { recursive: true, force: true })
+  }
+})
+
+test("수명: 받기 실패면 gnam.json · .gnam/skills 를 바꾸지 않는다", () => {
+  const f = fixture()
+  const repo = tempRepo()
+  process.env["GNAM_SKILL_GIT_BASE"] = f.base
+  try {
+    mkdirSync(join(repo.root, "pc"))
+    writeFileSync(
+      join(repo.root, "pc", "index.mjs"),
+      `export default ${JSON.stringify({
+        id: "pc",
+        version: "0.1.0",
+        skillDeps: [{ ...dep, ref: "v1" }, { name: "broken", source: "github:obov/agent-skills/no-skill", ref: "v1" }],
+      })}\n`,
+    )
+    const before = readFileSync(join(repo.root, "gnam.json"), "utf8")
+    const r = repo.gnam("plugin", "add", "./pc")
+    expect(r.status).toBe(1)
+    expect(r.err).toContain("broken: SKILL.md 없음")
+    expect(readFileSync(join(repo.root, "gnam.json"), "utf8")).toBe(before)
+    expect(readdirSync(join(repo.root, ".gnam", "skills"))).toEqual([])
+  } finally {
+    delete process.env["GNAM_SKILL_GIT_BASE"]
+    repo.cleanup()
     rmSync(f.root, { recursive: true, force: true })
   }
 })

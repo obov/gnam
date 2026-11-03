@@ -240,3 +240,116 @@ export function fetchSkill(project: string, dep: SkillDep, pinned?: string): Fet
     rmSync(stage, { recursive: true, force: true })
   }
 }
+
+// ---------- 수명 (plugin add · remove · init) ----------
+
+/** gnam.json skills 를 형식 검사 없이 읽는다 (검사는 configProblems) */
+export function readLock(project: string): Record<string, SkillLock> {
+  try {
+    const raw = JSON.parse(readFileSync(join(project, "gnam.json"), "utf8")) as Record<string, unknown>
+    const skills = raw[SKILLS_KEY]
+    return typeof skills === "object" && skills !== null && !Array.isArray(skills) ? (skills as Record<string, SkillLock>) : {}
+  } catch {
+    return {}
+  }
+}
+
+/** 잠금의 스킬 → 링크 원본 (.gnam/skills/<name>) */
+export function vendoredSources(project: string): { name: string; source: string }[] {
+  return Object.keys(readLock(project))
+    .sort()
+    .map((name) => ({ name, source: join(project, SKILLS_DIR, name) }))
+}
+
+/** 활성 plugin 의 선언 → name → { dep (먼저 선언한 것) · ids } */
+function declared(plugins: GnamPlugin[]): Map<string, { dep: SkillDep; ids: string[] }> {
+  const map = new Map<string, { dep: SkillDep; ids: string[] }>()
+  for (const plugin of plugins)
+    for (const dep of plugin.skillDeps ?? []) {
+      const entry = map.get(dep.name)
+      if (entry === undefined) map.set(dep.name, { dep, ids: [plugin.id] })
+      else if (!entry.ids.includes(plugin.id)) entry.ids.push(plugin.id)
+    }
+  return map
+}
+
+/**
+ * 선언과 잠금을 맞춘다. config.skills 를 고친다 (저장은 호출 측).
+ *   fetch=true   잠금에 없는 스킬 · 디렉터리가 없는 스킬을 받는다 (plugin add · init)
+ *   fetch=false  받지 않는다. by 정리 · 삭제만 (plugin remove)
+ */
+export function reconcileSkills(
+  project: string,
+  config: Record<string, unknown>,
+  plugins: GnamPlugin[],
+  report: string[],
+  fetch: boolean,
+): void {
+  const lock: Record<string, SkillLock> = { ...readLockFrom(config) }
+  const wanted = declared(plugins)
+  const fetched: string[] = []
+  try {
+    reconcileWanted(project, lock, wanted, plugins, report, fetch, fetched)
+  } catch (error) {
+    // 이번에 새로 받은 디렉터리는 잠금에 기록되지 않으므로 지운다
+    for (const name of fetched) rmSync(join(project, SKILLS_DIR, name), { recursive: true, force: true })
+    throw error
+  }
+  for (const name of Object.keys(lock)) {
+    if (wanted.has(name)) continue
+    delete lock[name]
+    rmSync(join(project, SKILLS_DIR, name), { recursive: true, force: true })
+    report.push(`스킬 ${name} 제거 (선언한 plugin 없음)`)
+  }
+  if (Object.keys(lock).length === 0) delete config[SKILLS_KEY]
+  else config[SKILLS_KEY] = Object.fromEntries(Object.keys(lock).sort().map((k) => [k, lock[k]]))
+}
+
+function reconcileWanted(
+  project: string,
+  lock: Record<string, SkillLock>,
+  wanted: Map<string, { dep: SkillDep; ids: string[] }>,
+  plugins: GnamPlugin[],
+  report: string[],
+  fetch: boolean,
+  fetched: string[],
+): void {
+  for (const [name, { dep, ids }] of wanted) {
+    const current = lock[name]
+    const dir = join(project, SKILLS_DIR, name)
+    if (current !== undefined && current.source === dep.source) {
+      lock[name] = { ...current, by: ids }
+      for (const id of ids) {
+        const own = plugins.find((p) => p.id === id)?.skillDeps?.find((d) => d.name === name)
+        if (own !== undefined && own.ref !== current.ref)
+          report.push(`스킬 ${name}: ${id} 가 ref ${own.ref} 선언, 잠금 ${current.ref} 유지 (gnam skill update ${name})`)
+      }
+      if (existsSync(join(dir, "SKILL.md"))) continue
+      if (!fetch) {
+        report.push(`스킬 ${name}: ${SKILLS_DIR}/${name} 없음 (git checkout 또는 gnam skill update ${name})`)
+        continue
+      }
+      const got = fetchSkill(project, { name, source: current.source, ref: current.ref }, current.commit)
+      if (got.sha256 !== current.sha256) {
+        rmSync(dir, { recursive: true, force: true })
+        throw new Error(`스킬 ${name}: 내용 해시 불일치 (잠금 ${current.sha256.slice(0, 12)} · 받은 것 ${got.sha256.slice(0, 12)})`)
+      }
+      report.push(`스킬 ${name} 복원 ${current.commit.slice(0, 7)}`)
+      continue
+    }
+    if (!fetch) continue
+    const existed = existsSync(join(project, SKILLS_DIR, name))
+    const got = fetchSkill(project, dep)
+    if (!existed) fetched.push(name)
+    lock[name] = { source: dep.source, ref: dep.ref, commit: got.commit, sha256: got.sha256, by: ids }
+    report.push(
+      `스킬 ${name} ${current === undefined ? "받음" : `출처 변경 (${current.source} →)`} ${dep.source}@${dep.ref} = ${got.commit.slice(0, 7)}`,
+    )
+    if (got.skipped.length > 0) report.push(`스킬 ${name}: 받지 않은 symlink · 특수 파일 ${got.skipped.join(", ")}`)
+  }
+}
+
+function readLockFrom(config: Record<string, unknown>): Record<string, SkillLock> {
+  const skills = config[SKILLS_KEY]
+  return typeof skills === "object" && skills !== null && !Array.isArray(skills) ? (skills as Record<string, SkillLock>) : {}
+}

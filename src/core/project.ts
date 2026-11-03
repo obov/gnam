@@ -21,6 +21,7 @@ import {
 import { basename, dirname, join, relative, resolve, sep } from "node:path"
 import { defaultConfig, readConfig, requireConfig, writeConfig, type GnamConfig } from "./config.ts"
 import { exec, git } from "./git.ts"
+import { reconcileSkills, SKILLS_DIR, vendoredSources } from "./skills.ts"
 import {
   BUILTIN_PREFIX,
   builtinIds,
@@ -106,7 +107,7 @@ export function skillSources(project: string, loaded: Loaded[]): SkillSource[] {
   const fromPlugins = loaded.flatMap(({ root, plugin }) =>
     (plugin.skills ?? []).map((dir) => ({ name: basename(dir), source: stable(project, join(root, dir)) })),
   )
-  return [core, ...fromPlugins]
+  return [core, ...fromPlugins, ...vendoredSources(project)]
 }
 
 /** .claude/skills 가 .agents/skills 를 가리키는 링크면 한쪽만 */
@@ -119,7 +120,7 @@ export function skillDirs(project: string): string[] {
 /** gnam 이 만든 링크인가: 패키지 · node_modules/@obov/gnam · 활성 plugin 자원을 가리킨다 */
 function managed(project: string, link: string, roots: string[]): boolean {
   const target = resolve(dirname(link), readlinkSync(link))
-  const owners = [PACKAGE_ROOT, join(project, "node_modules", "@obov", "gnam"), ...roots]
+  const owners = [PACKAGE_ROOT, join(project, "node_modules", "@obov", "gnam"), join(project, SKILLS_DIR), ...roots]
   return owners.some((o) => target === o || target.startsWith(o.endsWith(sep) ? o : o + sep))
 }
 
@@ -303,6 +304,8 @@ export async function init(project: string, options: InitOptions = {}): Promise<
   const config = readConfig(project) ?? defaultConfig()
   for (const input of options.plugins ?? []) addSpec(config, normalizeSpec(input))
   await withRequires(project, config)
+  const loaded = await Promise.all(config.plugins.map((s) => loadPlugin(s, project)))
+  reconcileSkills(project, config, loaded.map((l) => l.plugin), report, true)
   writeConfig(project, config)
   report.push(`gnam.json (plugins: ${config.plugins.join(", ") || "-"})`)
   preparePackage(project, report)
@@ -342,10 +345,13 @@ export async function addPlugin(project: string, input: string): Promise<Report>
   if (config.plugins.includes(spec)) return [`${spec} 이미 있음`]
   addSpec(config, spec)
   const added = await withRequires(project, config)
-  const problems = pluginProblems(await Promise.all(config.plugins.map((s) => loadPlugin(s, project))), config)
+  const loaded = await Promise.all(config.plugins.map((s) => loadPlugin(s, project)))
+  const problems = pluginProblems(loaded, config)
   if (problems.length > 0) throw new Error(`추가 거부: ${problems.join(" · ")}`)
+  const report: Report = [`plugin 추가 ${spec}${added.length > 0 ? ` (의존 자동 추가: ${added.join(", ")})` : ""}`]
+  reconcileSkills(project, config, loaded.map((l) => l.plugin), report, true)
   writeConfig(project, config)
-  return [`plugin 추가 ${spec}${added.length > 0 ? ` (의존 자동 추가: ${added.join(", ")})` : ""}`, ...(await sync(project))]
+  return [...report, ...(await sync(project))]
 }
 
 export async function removePlugin(project: string, input: string, cascade = false): Promise<Report> {
@@ -367,8 +373,10 @@ export async function removePlugin(project: string, input: string, cascade = fal
   }
   const removed = loaded.filter((l) => removing.has(l.plugin.id))
   config.plugins = config.plugins.filter((s) => !removed.some((l) => l.spec === s))
+  const report: Report = [`plugin 제거 ${removed.map((l) => l.plugin.id).join(", ")}`]
+  reconcileSkills(project, config, loaded.filter((l) => !removing.has(l.plugin.id)).map((l) => l.plugin), report, false)
   writeConfig(project, config)
-  return [`plugin 제거 ${removed.map((l) => l.plugin.id).join(", ")}`, ...(await sync(project, removed))]
+  return [...report, ...(await sync(project, removed))]
 }
 
 export const realProject = (cwd: string) => {

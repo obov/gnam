@@ -20,7 +20,7 @@ ref      tag · branch · commit sha. 어느 쪽이든 받은 시점의 commit �
 
 - `skillDeps` 형식 문제 (name 형식 · source 접두 · ref 빈 값) = plugin 문제 (pluginProblems)
 - 같은 name 을 plugin 둘이 다른 source 로 선언 = plugin 문제 (add 거부)
-- 미구현: 같은 source 다른 ref = 먼저 잠긴 것 유지 · 경고
+- 같은 source 다른 ref = 먼저 잠긴 것 유지 · 경고
 - gnam status 트리 plugin 객체에 `skillDeps` (name · source · ref)
 
 ## 잠금 (gnam.json)
@@ -57,8 +57,8 @@ by       이 스킬을 선언한 활성 plugin id
 ```
 
 - 받은 디렉터리에 SKILL.md 가 없으면 받은 파일을 지우고 거부
-- 미구현: `.claude/skills/<name>` 가 저장소 소유 디렉터리 (링크 아님) 면 링크 생략 · 보고 (기존 linkSkills 규칙)
-- 미구현: `.claude/skills` 가 `.agents/skills` 링크면 한쪽만 (기존 skillDirs 규칙)
+- `.claude/skills/<name>` 가 저장소 소유 디렉터리 (링크 아님) 면 링크 생략 · 보고 (기존 linkSkills 규칙)
+- `.claude/skills` 가 `.agents/skills` 링크면 한쪽만 (기존 skillDirs 규칙)
 - `.git` 디렉터리 · symlink · 특수 파일은 받지 않는다 (저장소 밖을 가리키는 링크 차단). 실행 비트는 유지
 
 ## 받기
@@ -72,12 +72,14 @@ by       이 스킬을 선언한 활성 plugin id
 ## 수명
 
 ```text
-plugin add <id>        선언된 스킬 중 잠금에 없는 것만 받는다. 있으면 by 에 id 추가
+plugin add <id>        선언된 스킬 중 잠금에 없는 것만 받는다. 있으면 by 에 id 추가. init --plugins 도 같다
 plugin remove <id>     by 에서 id 제거. by 가 비면 .gnam/skills/<name> · 링크 · 잠금 항목 삭제
-gnam link              받지 않는다. 링크만 복구 (clone 후 postinstall)
+gnam link · sync       받지 않는다. 링크만 복구 (clone 후 postinstall)
 ```
 
-- 미구현: 위 표의 동작
+- 잠금은 있는데 `.gnam/skills/<name>` 이 없으면 add 가 잠긴 commit 으로 다시 받고 sha256 이 다르면 거부
+- 선언의 source 가 잠금과 다르면 (plugin 이 출처를 바꿈) add 가 새 source 로 다시 받아 잠근다
+- 받기가 하나라도 실패하면 gnam.json 을 바꾸지 않고, 이번에 새로 받은 디렉터리를 지운다
 
 ## 명령
 
