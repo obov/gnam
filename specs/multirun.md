@@ -216,19 +216,16 @@ harness-execute 스킬 (adapter · system-prompt · claude-args.sh) 을 내장 p
 Codex     허용. transcript 측정이 Claude 전용이라 토큰 · 활동 시간 = na
 ```
 
-## 완료 알림 (awake, 선택)
+## 완료 알림 (선택, 외부 plugin)
 
-변형이 끝나면 조정자 세션이 깨어난다. 조정자는 polling (`herdr agent wait` · 주기 status) 대신 턴을 끝내고 기다린다.
-awake (Claude Code · Codex 세션 wake 서버, 자식 report → 부모 channel push) 가 있을 때만. 없으면 기존 wait 그대로.
+변형이 끝나면 조정자 세션을 깨우는 방식은 외부 plugin 이 제공한다 (예: 로컬 plugin gnam-plugin-agent-awake). gnam 은 자리만 둔다.
+plugin 이 없으면 harness 의 wait 그대로.
 
 ```text
-조건      조정자가 awake claude 로 실행됨 (환경변수 AWAKE_SESSION_ID 있음) + awake daemon 실행 중
-변형      harness adapter herdr-awake-claude: awake claude --parent <조정자 AWAKE_SESSION_ID> -- <claude-args> --session-id <start 의 session id> …
-          session id 는 그대로 쓰인다 (측정 키 유지)
-보고      variant 커밋 직후 awake report done "<variant hash> <한 줄 요약>". 막힘 = report blocked · needs_input
-조정자    report 마다 channel 로 깨어남 (구독 불필요). 깨어나면 status 로 확인, 남은 변형이 있으면 턴 종료
-멈춤 대비 wake.after <예상 시간> 로 진행 확인 예약
-Codex     해당 없음. herdr-codex 의 wait 그대로
+발견      plugin 의 AGENTS.md 조각이 '완료 알림' 스킬을 가리킨다
+변형      start 는 그 스킬이 정한 harness adapter (harness-execute 의 6 동작 형식)
+지시      roles/variant.md 의 {완료 보고} 줄 = 그 스킬이 주는 한 줄. 없으면 뺀다
+조정자    대기 · 깨어남 처리는 그 스킬. 깨어나면 status · sync 는 gnam-multirun 절차 그대로
 ```
 
 ## 범위 밖
