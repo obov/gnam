@@ -35,7 +35,8 @@
     "dist",
     "skills",
     "plugins",
-    "templates"
+    "templates",
+    "CHANGELOG.md"
   ],
   "engines": {
     "node": ">=20",

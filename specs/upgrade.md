@@ -19,8 +19,9 @@
 배포    CHANGELOG.md 를 패키지에 포함 (package.json files)
 ```
 
-- 미구현: CHANGELOG.md 를 패키지 files 에 포함
-- 미구현: 이전 항목 추출 = 두 버전 사이 (초과 · 이하) 의 절에서 '- 이전:' 줄을 오래된 버전부터
+- CHANGELOG.md 를 패키지 files 에 포함
+- 이전 항목 추출 = 두 버전 사이 (초과 · 이하) 의 절에서 '- 이전:' 줄을 오래된 버전부터, 같은 버전 안은 문서 순서
+- 버전 비교 = major.minor.patch 숫자, prerelease 는 같은 판의 정식보다 낮다
 
 ## gnam outdated
 
