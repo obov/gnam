@@ -24,7 +24,9 @@ description: 착수 가능한 plan 하나를 N 개 clone 에서 서로 다른 �
 3. start 커밋 (main) — 초안의 `?` 를 채워 `git commit --allow-empty -F <초안>`
 4. 변형 세션 — 변형마다 harness-execute: prepare (cwd = clone 경로) → start (start 출력의 session id · 모델 · effort) → 지시 파일 (roles/variant.md 템플릿) → prompt → wait (background)
    blocked 는 사용자에게 묻는다. 대신 답하지 않는다
+   awake 완료 알림 (아래 절) 조건이 맞으면 Claude 변형은 adapter herdr-awake-claude, wait 대신 턴 종료
 5. 진행 확인 — `npx gnam run multirun status <id>` · 주기적으로 `npx gnam run multirun sync <id>` (중간 기록 보존)
+   awake: report 로 깨어날 때마다 status · sync. 남은 변형이 있으면 턴 종료
 6. 변형 전부 variant 커밋 (또는 중단) → 변형 세션 close (clone 은 남긴다)
 7. 요약 — `npx gnam run multirun open <id> vN` (변형마다) → 요약 세션 (harness 세션 또는 Claude Code subagent) 에 roles/summarizer.md 지시
    → report 본문 받기 → 조정자가 측정 키 확인 후 `multirun.<topic>.report:` 빈 커밋 (main)
@@ -46,6 +48,21 @@ description: 착수 가능한 plan 하나를 N 개 clone 에서 서로 다른 �
 multi-agent 설치돼 있으면 변형 지시에 사용 권장 (의존은 아님)
 Codex      허용. transcript 측정이 Claude 전용이라 active_min · out 등 = na
 결정       report 는 추천만 (Decision: 대기). 고르는 것은 사용자
+```
+
+## 완료 알림 (awake)
+
+변형이 끝나면 조정자가 깨어난다. polling 없음. 규칙 원본: specs/multirun.md '완료 알림'.
+
+```text
+조건      test -n "$AWAKE_SESSION_ID" (조정자가 awake claude 로 실행됨) + awake daemon 실행 중. 아니면 기존 wait
+변형      Claude = harness adapter herdr-awake-claude (--parent $AWAKE_SESSION_ID, --session-id = start 출력값)
+          Codex = herdr-codex 의 wait 그대로
+지시      roles/variant.md 의 {awake} 줄을 넣는다 (variant 커밋 뒤 report)
+대기      변형 전부 prompt 후 awake execute command=wake.after (예상 시간, 멈춤 확인) → 턴 종료
+깨어남    'awake: Report from <session id>' → session id 로 변형 찾기 → status · sync
+          done = variant 커밋 확인. blocked · needs_input = read 후 사용자에게 묻는다
+          남은 변형이 있으면 턴 종료, 전부 끝나면 6 단계
 ```
 
 ## 상태 · 정리
