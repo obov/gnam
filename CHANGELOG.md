@@ -2,7 +2,10 @@
 
 ## 0.4.0
 
+- 내장 plugin `multirun`: 착수 가능한 plan 하나를 N 개 clone 에서 변형 agent 가 각자 구현. 변형 커밋은 원본 tag `multirun/<run-id>/vN/…` 로 보존, 요약 세션이 `multirun.<topic>.report` 로 비교, 결정 커밋 `Multirun: <report> <vN|combine|discard>`. `gnam run multirun start · sync · status · collect · open · close · abort`
 - 내장 plugin `harness`: harness-execute 스킬을 multi-agent 에서 분리. multi-agent 는 harness 를 요구
+- plugin 스킬 의존 (`skillDeps`): GitHub 스킬을 commit · 내용 해시로 잠가 `.gnam/skills/<name>/` 에 받아 링크 (`gnam.json` `skills`). `gnam skill list · update · verify`
+- `gnam outdated`: npm 최신 버전 · 업그레이드 명령 · 그 사이 이전 항목. 업그레이드 후 `gnam link` 가 건너온 버전의 이전 항목을 한 번 출력. CHANGELOG.md 를 패키지에 포함
 - 이전: multi-agent 를 쓰는 저장소는 npx gnam plugin add harness
 
 ## 0.3.2
