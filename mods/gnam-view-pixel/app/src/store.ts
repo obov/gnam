@@ -217,3 +217,24 @@ export class Controller {
     return false
   }
 }
+
+/** 독립 실행 (PIXEL_EMBED 없이, herdr 분할 pane) 의 기본 갱신 주기 */
+export const POLL_MS = 5_000
+
+export type Timer = { set: (fn: () => void, ms: number) => unknown; clear: (handle: unknown) => void }
+const realTimer: Timer = { set: (fn, ms) => setInterval(fn, ms), clear: h => clearInterval(h as ReturnType<typeof setInterval>) }
+
+/**
+ * 독립 실행의 주기 갱신: ms 마다 refresh (force 아님). 바뀐 게 없으면 git rev-parse 1회 · stat 만 하고
+ * gnam status 는 부르지 않는다. 진행 중인 읽기가 있으면 그것을 기다린다 (겹치지 않음). 반환 = 멈추기
+ */
+export function startPolling(c: Controller, ms: number = POLL_MS, timer: Timer = realTimer): () => void {
+  const handle = timer.set(() => void c.refresh(), Math.max(1_000, ms))
+  return () => timer.clear(handle)
+}
+
+/** GNAM_VIEW_POLL_MS (밀리초, 1000 이상) 또는 기본값 */
+export function pollMs(value: string | undefined): number {
+  const n = Number(value)
+  return Number.isFinite(n) && n >= 1_000 ? n : POLL_MS
+}

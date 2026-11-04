@@ -6,7 +6,7 @@ import net from 'node:net'
 import { createRoot } from '@zenbu-labs/pixel'
 
 import { Loader, type Exec, type Files } from './model.ts'
-import { Controller } from './store.ts'
+import { Controller, pollMs, startPolling } from './store.ts'
 import type { TerminalColors } from './theme.ts'
 import { App } from './view.tsx'
 
@@ -53,8 +53,10 @@ if (root.info.colors?.background || root.info.colors?.foreground) controller.set
 root.render(<App controller={controller} />)
 void controller.refresh()
 
-// bridge 제어 소켓: { type: 'refresh' } 이면 바뀐 경우에만 다시 읽기
+// bridge 제어 소켓: { type: 'refresh' } 이면 바뀐 경우에만 다시 읽기.
+// 제어 소켓이 없으면 독립 실행 (herdr 분할 pane 등): 주기적으로 확인해 바뀔 때만 다시 읽는다
 const control = process.env.GNAM_VIEW_CONTROL
+if (!control) startPolling(controller, pollMs(process.env.GNAM_VIEW_POLL_MS))
 if (control) {
   const sock = net.connect(control)
   let buf = ''
