@@ -91,7 +91,7 @@ trace.head        HEAD sha (없으면 null). 다음 --since 에 넘길 값
 trace.since       --since 로 준 rev 의 sha (없으면 null)
 trace.boundary    검사 경계 커밋 sha · subject (없으면 null)
 trace.requests    request: 커밋. sha · subject · refines · refinedBy · by (Request: 로 가리킨 커밋 sha) · status (open | started | refined)
-trace.topics      topic → { path · exists · unimplemented · open (각 line · text) · plans · chores }
+trace.topics      topic → { path · exists · summary (spec 첫 줄 설명, 없으면 null) · unimplemented · open (각 line · text) · plans · chores }
 trace.agent       Request: 없음 (<근거>) 커밋. sha · subject · reason
 trace.items       미해결 후보. kind (remaining | deferred | open | risk | blocking) · text · sha (출처 커밋)
 trace.decisions   사람 결정이 필요한 것. 근거별로 나눈다
@@ -102,7 +102,7 @@ trace.decisions   사람 결정이 필요한 것. 근거별로 나눈다
 plan 객체 (trace.topics.<topic>.plans, 오래된 것부터):
 
 ```text
-sha · subject · requests (Request: hash 목록, 없음이면 [])
+sha · subject · summary (본문 Summary: 사람용 한 줄, 없으면 null) · requests (Request: hash 목록, 없음이면 [])
 supersedes · supersededBy · dropped (Dropped: 줄)
 blocking    Blocking 항목 (없음이면 [])
 decisionsExpected · risks · open   본문 필드의 항목 (D · R 번호 유지)
@@ -111,6 +111,7 @@ status      superseded | done (모든 단계에 impl) | partial | not-started
 impls       sha · subject · step · deviation · decisions · remaining · deferred (본문 필드 원문, 없으면 null)
 ```
 
+- summary 두 키의 형식 · 검사: specs/human-summary.md
 - chores = 그 topic 의 spec.<topic>.chore 커밋 sha · subject · requests. topic 없는 chore · refactor 는 trace.topics."" 아래
 - Topics: 로 여러 topic 을 묶은 수집 plan 은 각 topic 의 plans 에 모두 나타난다
 - 본문 필드 = 줄 머리 `<이름>:` 부터 다음 필드 머리 전까지. 값은 앞뒤 공백을 뺀 원문
