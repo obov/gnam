@@ -45,3 +45,36 @@ test("views: gnam.json view 가 깨져도 commit-msg 는 통과, status problems
     repo.cleanup()
   }
 })
+
+test("views: plugin 섹션 view (id <plugin>-<섹션> · source) 는 프로젝트 탭 뒤, 내장 lore · multi-agent", async () => {
+  const repo = tempRepo({ format: 1, plugins: ["./demo", "@gnam/lore"], view: { tabs: [RISKS] } })
+  try {
+    mkdirSync(join(repo.root, "demo"), { recursive: true })
+    writeFileSync(
+      join(repo.root, "demo", "index.js"),
+      `export default { id: "demo", version: "0.1.0", status: { sections: {
+        jobs: { describe: "작업", collect: () => [{ name: "a", state: "ok" }], view: { title: "작업", view: "table", fields: { columns: ["name", "state"] } } },
+        bad: { describe: "깨진 view", collect: () => [], view: { title: "", view: "list" } },
+        plain: { describe: "view 없음", collect: () => 1 },
+      } } }\n`,
+    )
+    const tree = await collectStatus({ cwd: repo.root })
+    const views = tree["views"] as { id: string; source: string; owner: string }[]
+    expect(views.map((v) => [v.id, v.source, v.owner])).toEqual([
+      ["risks", "trace.items", "project"],
+      ["demo-jobs", "plugins.demo.sections.jobs", "demo"],
+      ["lore-entries", "plugins.lore.sections.entries", "lore"],
+    ])
+    const problems = (tree["problems"] as { message: string }[]).map((p) => p.message)
+    expect(problems).toContain("plugin demo 섹션 bad view: title = 1-24자 문자열")
+  } finally {
+    repo.cleanup()
+  }
+  const agents = tempRepo({ format: 1, plugins: ["@gnam/multi-agent", "@gnam/run", "@gnam/merge", "@gnam/harness"] })
+  try {
+    const tree = await collectStatus({ cwd: agents.root })
+    expect((tree["views"] as { id: string }[]).map((v) => v.id)).toEqual(["multi-agent-runs"])
+  } finally {
+    agents.cleanup()
+  }
+})

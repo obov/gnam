@@ -19,6 +19,7 @@ export default definePlugin({
         describe: "lore/README.md 인덱스 (파일 · 적용 조건 요약)",
         schema: { type: "array", items: { type: "object", properties: { file: { type: "string" }, summary: { type: "string" } } } },
         collect: (ctx) => loreEntries(ctx.cwd),
+        view: { title: "노하우", view: "list", fields: { title: "summary", meta: "file" }, icon: "lore" },
       },
     },
   },

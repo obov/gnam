@@ -20,7 +20,11 @@ export default definePlugin({
   },
   status: {
     sections: {
-      runs: { describe: "위임 상태 트리 (<git common dir>/gnam/runs, multi-agent status 와 같은 데이터)", collect: (ctx) => runsData(runsDir(ctx.cwd)) },
+      runs: {
+        describe: "위임 상태 트리 (<git common dir>/gnam/runs, multi-agent status 와 같은 데이터)",
+        collect: (ctx) => runsData(runsDir(ctx.cwd)),
+        view: { title: "위임", view: "list", fields: { title: "id", badge: "root.fields.status.0" }, icon: "agents" },
+      },
     },
     summary: (ctx) => runsSummary(runsDir(ctx.cwd)),
   },
