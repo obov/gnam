@@ -98,6 +98,8 @@ test("판이 섞인 history: format 1 plan 을 format 2 impl 이 따른다", () 
     repo.commit("src/a.ts", `feat(workspace): 구현\n\nIntent:\nx\n\nGnam: spec.workspace.impl\nPlan: ${plan.slice(0, 7)} 1`)
     const trace = collectTrace(repo.root) as unknown as { topics: Record<string, { plans: { steps: { impls: string[] }[] }[] }> }
     eq(trace.topics["workspace"]?.plans[0]?.steps[0]?.impls.length, 1)
+    const ranged = repo.gnam("verify", "--range", `${plan}^..HEAD`)
+    assert.equal(ranged.status, 0, ranged.out + ranged.err)
     const verify = repo.gnam("verify")
     assert.equal(verify.status, 0, verify.out + verify.err)
   } finally {

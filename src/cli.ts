@@ -68,11 +68,22 @@ async function verify(project: string, args: string[]): Promise<number> {
     ? lines(gitOrThrow(["rev-list", "--reverse", ...historyArgs(range, boundary)], project))
     : []
   const summaryRequired = range.includes("..") ? () => true : summaryRequirement(project, range)
+  // 커밋마다 그 시점 gnam.json 의 판으로 검사 (범위가 판 올림을 건너는 push)
+  const formatAt = (sha: string) => {
+    const shown = git(["show", `${sha}:gnam.json`], project)
+    if (!shown.ok) return config.format
+    try {
+      const value = (JSON.parse(shown.out) as { format?: unknown }).format
+      return typeof value === "number" ? value : config.format
+    } catch {
+      return config.format
+    }
+  }
   for (const sha of shas) {
     const input = commitInput(project, sha)
     const requireSummary = PLAN_SUBJECT.test(input.message) ? summaryRequired(sha) : true
     const violations = validateCommit(
-      { ...input, cwd: project, view: { kind: "commit", sha }, config, requireSummary, ...gitLookup(project, sha) },
+      { ...input, cwd: project, view: { kind: "commit", sha }, config: { ...config, format: formatAt(sha) }, requireSummary, ...gitLookup(project, sha) },
       plugins,
     )
     if (violations.length > 0) report.push(`${sha.slice(0, 7)} ${input.message.split("\n")[0]}\n\n${format(violations)}`)
