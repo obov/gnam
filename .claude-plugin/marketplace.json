@@ -1,0 +1,11 @@
+{
+  "name": "gnam",
+  "owner": { "name": "obov" },
+  "plugins": [
+    {
+      "name": "gnam-view",
+      "source": "./mods/gnam-view",
+      "description": "gnam spec 진행 · 결정 · 요청 · 커밋 · plugin 상태를 Claude Code pane 으로 표시"
+    }
+  ]
+}

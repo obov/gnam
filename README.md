@@ -153,6 +153,14 @@ npx gnam status gnam.version -C ../a -C ../b       # 여러 저장소
 트리 = schema · gnam · project · config · plugins · builtins · kinds · rules · install · problems · handoff · env · trace.
 형식 json · compact · ndjson · raw · env · text + plugin 형식. 코드에서는 `import { status } from "@obov/gnam/status"`.
 
+## Claude Code pane (gnam-view)
+
+spec 진행 · 결정 · 요청 · 커밋 · plugin 탭을 pane 으로 본다. 탭 추가 · 화면 설정은 pane 의 설정 탭. [mods/gnam-view](mods/gnam-view/README.md)
+
+```text
+/plugin install gnam-view --marketplace obov/gnam
+```
+
 ## 명령
 
 ```text

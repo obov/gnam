@@ -1,0 +1,18 @@
+{
+  "name": "gnam-view",
+  "version": "0.1.0",
+  "description": "gnam spec 진행 · 결정 · 요청 · 커밋 · plugin 상태를 아이콘 카드 pane 으로 표시",
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "icons": {
+      "type": "string",
+      "title": "아이콘",
+      "description": "nerd = Nerd Font 아이콘, plain = 일반 글리프 (Nerd Font 없는 터미널)",
+      "default": "nerd",
+      "options": [
+        "nerd",
+        "plain"
+      ]
+    }
+  }
+}
