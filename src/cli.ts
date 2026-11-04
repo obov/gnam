@@ -13,7 +13,7 @@ import { formatOutdated, outdated } from "./core/upgrade.ts"
 import { listSkills, updateSkills, verifySkills } from "./core/skills.ts"
 import { collectStatus, Context, problemsOf, summaryOf } from "./core/status.ts"
 import { TraceError } from "./core/trace.ts"
-import { format, type Violation } from "./core/violation.ts"
+import { format, isError, type Violation } from "./core/violation.ts"
 
 const USAGE = `gnam — Git-Native Agent Memory
 
@@ -50,7 +50,7 @@ async function commitMsg(project: string, file: string | undefined): Promise<num
   )
   if (violations.length === 0) return 0
   console.error(format(violations))
-  return 1
+  return violations.some(isError) ? 1 : 0
 }
 
 async function verify(project: string, args: string[]): Promise<number> {
@@ -62,6 +62,7 @@ async function verify(project: string, args: string[]): Promise<number> {
     args[0] === "--range" ? (args[1] ?? "") : args[0] === "--push" ? pushRange(args[1] ?? "", args[2] ?? "", exists) : "HEAD"
   if (range === "") throw new Error("사용: gnam verify [--range A..B | --push BEFORE SHA]")
   const report: string[] = []
+  let failed = false
   const boundary = range.includes("..") ? null : boundaryOf(project, range)
   const shas = git(["rev-parse", "-q", "--verify", "HEAD"], project).ok
     ? lines(gitOrThrow(["rev-list", "--reverse", ...historyArgs(range, boundary)], project))
@@ -75,15 +76,15 @@ async function verify(project: string, args: string[]): Promise<number> {
       plugins,
     )
     if (violations.length > 0) report.push(`${sha.slice(0, 7)} ${input.message.split("\n")[0]}\n\n${format(violations)}`)
+    if (violations.some(isError)) failed = true
   }
   const files = nulList(gitOrThrow(["ls-files", "-z", "--cached", "--others", "--exclude-standard"], project))
   const fileViolations: Violation[] = plugins.flatMap((p) => p.verify?.(project, files, config) ?? [])
   if (fileViolations.length > 0) report.push(format(fileViolations))
-  if (report.length > 0) {
-    console.error(report.join("\n\n===\n\n"))
-    return 1
-  }
-  console.log(`gnam verify: 커밋 ${shas.length}개 · plugin ${plugins.length}개 통과`)
+  if (fileViolations.some(isError)) failed = true
+  if (report.length > 0) console.error(report.join("\n\n===\n\n"))
+  if (failed) return 1
+  console.log(`gnam verify: 커밋 ${shas.length}개 · plugin ${plugins.length}개 통과${report.length > 0 ? " (경고 있음)" : ""}`)
   return 0
 }
 

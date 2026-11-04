@@ -152,3 +152,37 @@ test("historyArgs: 범위는 그대로, 전체 history 는 경계의 부모를 �
   eq(historyArgs("b", null), ["b"])
   eq(historyArgs("b", "c"), ["b", "--not", "c^@"])
 })
+
+test("위반 등급: warn 만 있으면 commit-msg · verify 통과 + (warn) 출력, error 섞이면 실패", async () => {
+  const { mkdirSync, writeFileSync } = await import("node:fs")
+  const { join } = await import("node:path")
+  const { tempRepo } = await import("./helpers.ts")
+  const repo = tempRepo()
+  try {
+    mkdirSync(join(repo.root, "p"), { recursive: true })
+    writeFileSync(
+      join(repo.root, "p/index.js"),
+      `const v = (rule, level) => ({ rule, why: "w", current: "c", fix: "f", level })
+export default { id: "lv", version: "0.1.0",
+  everyCommit: (ctx) => ctx.subject.includes("err") ? [v("lv/a", "warn"), v("lv/b")] : [v("lv/a", "warn")],
+  verify: () => [v("lv/file", "warn")] }\n`,
+    )
+    assert.equal(repo.gnam("plugin", "add", "./p").status, 0)
+    const file = join(repo.root, "msg")
+    writeFileSync(file, "chore: a")
+    const warn = repo.gnam("commit-msg", file)
+    assert.equal(warn.status, 0)
+    assert.match(warn.err, /GNAM\/lv\/a \(warn\)/)
+    writeFileSync(file, "chore: err")
+    const mixed = repo.gnam("commit-msg", file)
+    assert.equal(mixed.status, 1)
+    assert.match(mixed.err, /GNAM\/lv\/b\n/)
+    repo.commit("a.txt", "chore: a")
+    const verify = repo.gnam("verify")
+    assert.equal(verify.status, 0, verify.err)
+    assert.match(verify.err, /GNAM\/lv\/file \(warn\)/)
+    assert.match(verify.out, /경고 있음/)
+  } finally {
+    repo.cleanup()
+  }
+})
