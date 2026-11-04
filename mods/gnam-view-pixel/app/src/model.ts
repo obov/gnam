@@ -39,6 +39,10 @@ export type Commit = {
   /** plan · impl · chore · merge · run.start … (spec 무관이면 null) */
   kind: string | null
   files: string[]
+  /** Gnam trailer 값 (format 2, 첫 값) */
+  gnam: string | null
+  /** 커밋 종류의 주인 (status kinds: core · plugin id), 어느 종류에도 안 맞으면 other */
+  owner: string
 }
 
 export type Line = { line: number; text: string }
@@ -52,6 +56,8 @@ export type Topic = {
   problem: string | null
   /** spec 첫 줄 설명 (해결하는 기능) */
   summary: string | null
+  /** spec 제목 · 문제 줄 다음 첫 문단 (설명) */
+  detail: string | null
   /** 최근 (대체 안 된) plan 의 Summary */
   planSummary: string | null
   /** 목록 한 줄: planSummary → summary → 최근 plan 제목 */
@@ -71,22 +77,82 @@ export type Topic = {
   open: Line[]
   unimplemented: Line[]
   blocking: string[]
+  /** 최근 plan 은 끝났지만 미구현 · 미결 · 막힘이 남음 → '지금' 묶음, '다음 계획 필요' */
+  needsPlan: boolean
+  /** 정리 커밋 (spec.<topic>.chore) 수 */
+  chores: number
   /** 마지막 커밋 시각 */
   lastTime: number | null
 }
 
 export type Decision = { kind: 'blocking' | 'open' | 'made' | 'expected'; topic: string | null; where: string; text: string }
 export type Item = { kind: string; text: string; sha: string }
+/** trace.requests: open · started · refined, by = 이 요청을 가리킨 커밋 */
+export type Request = { sha: string; subject: string; status: string; by: number }
+/** status problems: source = config · install · plugin … */
+export type Problem = { source: string | null; text: string }
 
 export type Purpose = { title: string | null; tagline: string | null; text: string | null; from: string | null }
 
+export type SectionRow = { name: string; lines: string[] }
+export type PluginInfo = {
+  id: string
+  version: string
+  kind: string
+  commands: { name: string; describe: string }[]
+  skills: string[]
+  /** status 섹션을 몇 줄로 요약 (트리) */
+  sections: SectionRow[]
+  error: string | null
+}
+
+/** 탭 정의 (status views, specs/view.md) */
+export type ViewDef = {
+  id: string
+  title: string
+  source: string
+  where: Record<string, string | number | boolean | null>
+  view: 'list' | 'table' | 'progress'
+  fields: Record<string, string | string[]>
+  icon: string | null
+  /** project (gnam.json) | <plugin id> */
+  owner: string
+}
+
+/** 설정 · 설치 상태 (읽기 전용) */
+export type Setup = {
+  /** gnam 실행 출처 (package · checkout …) */
+  source: string
+  format: number
+  /** 꺼진 내장 plugin */
+  inactive: string[]
+  /** gnam.json 의 format · plugins 밖 키 */
+  extraConfig: string[]
+  hooksOk: boolean
+  hooksPath: string | null
+  hooksExpected: string | null
+  skills: { dir: string; name: string; ok: boolean }[]
+  agentsMd: { exists: boolean; inSync: boolean }
+  claudeMd: { exists: boolean; importsAgents: boolean }
+  /** 커밋 종류 (status kinds) */
+  kinds: { label: string; owner: string }[]
+}
+
 export type Model = {
   project: string
+  setup: Setup
+  /** 켜진 plugin (status plugins) */
+  plugins: PluginInfo[]
+  /** 사용자 정의 탭 (프로젝트 먼저, 그다음 plugin) */
+  views: ViewDef[]
+  /** view id → source 값 (없으면 undefined: plugin 꺼짐 · 경로 바뀜) */
+  viewData: Record<string, unknown>
   branch: string | null
   head: string | null
   gnamVersion: string | null
   purpose: Purpose
-  counts: { topics: number; now: number; next: number; done: number; stepsDone: number; stepsTotal: number; plans: number; commits: number }
+  /** next = 시작 전 plan, none = plan 없음 (둘 다 '다음' 묶음) */
+  counts: { topics: number; now: number; needsPlan: number; next: number; none: number; done: number; stepsDone: number; stepsTotal: number; plans: number; commits: number }
   now: string[]
   next: string[]
   done: string[]
@@ -98,8 +164,31 @@ export type Model = {
   history: Plan[]
   /** 최근 커밋 → 오래된 것 */
   commits: Commit[]
+  /** 커밋 종류 주인 (status kinds 순서: core 먼저) */
+  owners: string[]
   items: Item[]
-  problems: string[]
+  problems: Problem[]
+  /** 인계 메모 파일 경로 (변경 감지용, status handoff.path) */
+  handoffPath: string | null
+  /** 인계 메모가 있음 (.git/gnam/handoff.md) */
+  hasHandoff: boolean
+  requests: Request[]
+  /** 요청 탭 · 신호를 보일지: 요청이 있거나 request plugin 이 켜짐 */
+  hasRequests: boolean
+}
+
+/** 사람이 처리할 신호 (첫 화면 경고 묶음) */
+export function signals(m: Model): { decide: number; blocking: number; open: number; requests: number; problems: number; handoff: boolean } {
+  const blocking = m.decisions.filter(d => d.kind === 'blocking').length
+  const open = m.decisions.filter(d => d.kind === 'open').length
+  return {
+    decide: blocking + open,
+    blocking,
+    open,
+    requests: m.hasRequests ? m.requests.filter(r => r.status !== 'refined').length : 0,
+    problems: m.problems.length,
+    handoff: m.hasHandoff,
+  }
 }
 
 type Json = Record<string, any>
@@ -135,7 +224,7 @@ export function parseLog(text: string): Commit[] {
     const [sha, ct, subject, trailer] = (head ?? '').split('\x1f')
     if (!sha || !subject) continue
     const { topic, kind } = gnamKind(subject, str(trailer))
-    out.push({ sha, subject, time: Number(ct) || 0, topic, kind, files: rest.map(l => l.trim()).filter(Boolean) })
+    out.push({ sha, subject, time: Number(ct) || 0, topic, kind, files: rest.map(l => l.trim()).filter(Boolean), gnam: str(trailer)?.split(',')[0]?.trim() ?? null, owner: 'other' })
   }
   return out
 }
@@ -182,6 +271,109 @@ export function parsePurpose(readme: string | null, from: string): Purpose {
   return { title, tagline, text, from }
 }
 
+/** spec 본문: 첫 '# ' 제목 · '문제:' 줄 다음 첫 문단 (빈 줄 · 제목 · 코드 · 목록 · 표 · '미구현:' 전까지) 을 한 줄로 */
+export function specDetail(text: string | null): string | null {
+  if (!text) return null
+  const rows = text.split('\n')
+  const h1 = rows.findIndex(l => /^#\s/.test(l))
+  const out: string[] = []
+  let fence = false
+  for (const l of rows.slice(h1 + 1)) {
+    const t = l.trim()
+    if (t.startsWith('```')) fence = !fence
+    if (fence || t.startsWith('```')) {
+      if (out.length) break
+      continue
+    }
+    const stop = t === '' || /^(#|```|[-*|>]\s|\d+\.\s|<)/.test(t) || /^(문제|미구현|미결|Problem):/.test(t)
+    if (stop) {
+      if (out.length) break
+      continue
+    }
+    out.push(t)
+  }
+  return out.length ? out.join(' ').replace(/\*\*|__|`/g, '') : null
+}
+
+/** 점 경로 (숫자 = 배열 인덱스). 없으면 undefined */
+export function getPath(value: unknown, path: string): unknown {
+  let cur: unknown = value
+  for (const key of path.split('.').filter(Boolean)) {
+    if (cur === null || typeof cur !== 'object') return undefined
+    cur = (cur as Json)[key]
+  }
+  return cur
+}
+
+/** 원소 목록: 배열은 그대로, 객체는 { key, ...값 } (값이 스칼라면 { key, value }) */
+export function rowsOf(data: unknown): unknown[] {
+  if (Array.isArray(data)) return data
+  if (data !== null && typeof data === 'object')
+    return Object.entries(data as Json).map(([key, v]) => (v !== null && typeof v === 'object' && !Array.isArray(v) ? { key, ...(v as Json) } : { key, value: v }))
+  return []
+}
+
+/** gnam status --where 와 같은 비교: JSON 스칼라의 문자열 표현 */
+export function applyWhere(rows: unknown[], where: ViewDef['where']): unknown[] {
+  const entries = Object.entries(where)
+  if (entries.length === 0) return rows
+  return rows.filter(row => entries.every(([k, v]) => String(getPath(row, k) ?? null) === String(v)))
+}
+
+/** 값 한 줄: 스칼라는 첫 줄, 배열은 'N개', 객체는 대표 문자열 키 */
+export function show(x: unknown): string {
+  if (x === null || x === undefined) return ''
+  if (typeof x !== 'object') return String(x).split('\n')[0] ?? ''
+  if (Array.isArray(x)) return `${x.length}개`
+  const o = x as Json
+  const head = ['title', 'subject', 'summary', 'text', 'name', 'id', 'file', 'key'].find(k => typeof o[k] === 'string')
+  return head ? String(o[head]) : `{${Object.keys(o).length}}`
+}
+
+/** plugin 섹션 원소 한 줄 (모양과 무관) */
+function oneLine(x: unknown): string {
+  if (x === null || x === undefined) return '-'
+  if (typeof x !== 'object') return String(x)
+  if (Array.isArray(x)) return `${x.length}개`
+  const o = x as Json
+  const head = ['title', 'subject', 'summary', 'text', 'name', 'id', 'file', 'topic'].find(k => typeof o[k] === 'string')
+  const rest = Object.entries(o)
+    .filter(([k, v]) => k !== head && (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') && String(v).length < 40)
+    .slice(0, 3)
+    .map(([k, v]) => `${k}=${v}`)
+  return [head ? String(o[head]) : null, ...rest].filter(Boolean).join(' · ') || `{${Object.keys(o).length}}`
+}
+
+function sectionRows(sections: unknown): SectionRow[] {
+  if (sections === null || typeof sections !== 'object') return []
+  return Object.entries(sections as Json).map(([name, v]) => {
+    if (Array.isArray(v)) return { name, lines: [`${v.length}개`, ...v.slice(0, 12).map(oneLine)] }
+    if (v !== null && typeof v === 'object') return { name, lines: Object.entries(v as Json).slice(0, 12).map(([k, x]) => `${k}: ${oneLine(x)}`) }
+    return { name, lines: [oneLine(v)] }
+  })
+}
+
+const VIEW_KINDS = ['list', 'table', 'progress']
+
+/** status views, 없으면 (gnam 0.4 이하) gnam.json view.tabs 원문을 느슨하게 */
+function viewDefs(s: Json): ViewDef[] {
+  const norm = (t: Json, owner: string): ViewDef | null =>
+    t && typeof t.id === 'string' && typeof t.title === 'string' && typeof t.source === 'string'
+      ? {
+          id: t.id,
+          title: t.title,
+          source: t.source,
+          where: t.where && typeof t.where === 'object' ? t.where : {},
+          view: VIEW_KINDS.includes(t.view) ? t.view : 'list',
+          fields: t.fields && typeof t.fields === 'object' ? t.fields : {},
+          icon: typeof t.icon === 'string' ? t.icon : null,
+          owner: typeof t.owner === 'string' ? t.owner : owner,
+        }
+      : null
+  const list = Array.isArray(s.views) ? s.views : arr(s.config?.raw?.view?.tabs)
+  return list.map((t: Json) => norm(t, 'project')).filter((x: ViewDef | null): x is ViewDef => x !== null)
+}
+
 const DECISION_LINE = /^\s*[-*]?\s*(D\d+\s*[:.].*)$/
 
 function decisionLines(text: unknown): string[] {
@@ -220,12 +412,28 @@ export type Raw = {
   readme: string | null
   readmePath: string
   log: string
+  /** package.json description (README 첫 문단이 없을 때 목적) */
+  pkgDescription?: string | null
+  /** topic → spec 파일 내용 */
+  specs?: Record<string, string | null>
 }
 
 export function buildModel(raw: Raw): Model {
   const s = raw.status
   const trace: Json = s.trace ?? {}
-  const commits = parseLog(raw.log)
+  // 커밋 종류의 주인: status kinds 의 제목 · trailer 정규식 (format 1 · 2)
+  const kindRules = arr(s.kinds).flatMap(k => {
+    try {
+      return [{ subject: k.subject ? new RegExp(String(k.subject)) : null, trailer: k.trailer ? new RegExp(String(k.trailer)) : null, owner: String(k.owner ?? 'core') }]
+    } catch {
+      return []
+    }
+  })
+  const commits = parseLog(raw.log).map(c => ({
+    ...c,
+    owner: kindRules.find(k => k.subject?.test(c.subject) || (c.gnam !== null && k.trailer?.test(`Gnam: ${c.gnam}`)))?.owner ?? 'other',
+  }))
+  const owners = [...new Set(kindRules.map(k => k.owner))]
   const times = new Map(commits.map(c => [c.sha, c.time]))
   const builtins = new Map(arr(s.builtins).map(b => [String(b.id), b.active !== false]))
   const blockingAll = arr(trace.decisions?.blocking)
@@ -233,7 +441,8 @@ export function buildModel(raw: Raw): Model {
   const topics: Record<string, Topic> = {}
   const orphans: string[] = []
   for (const [name, t] of Object.entries((trace.topics ?? {}) as Record<string, Json>)) {
-    if (name === '') continue
+    // '' = spec 없는 chore 묶음, readme = specs/README.md (spec 아님)
+    if (name === '' || name.toLowerCase() === 'readme') continue
     const plans = arr(t.plans).map(p => toPlan(name, p, times))
     const live = [...plans].reverse().find(p => p.status !== 'superseded') ?? null
     const status = live?.status ?? 'none'
@@ -246,13 +455,18 @@ export function buildModel(raw: Raw): Model {
     const planSummary = live?.summary ?? null
     const exists = t.exists !== false
     const plugin = builtins.has(name) ? name : null
+    const unimplemented = lines(t.unimplemented)
+    const open = lines(t.open)
+    const blocking = blockingAll.filter(b => b.topic === name).map(b => `${b.id ? `${b.id}. ` : ''}${String(b.text ?? '')}`)
+    const needsPlan = status === 'done' && unimplemented.length + open.length + blocking.length > 0
     topics[name] = {
       name,
       specPath: String(t.path ?? `specs/${name}.md`),
       exists,
-      group: GROUP_OF[status] ?? 'next',
+      group: needsPlan ? 'now' : (GROUP_OF[status] ?? 'next'),
       problem: 'problem' in t ? str(t.problem) : null,
       summary,
+      detail: specDetail(raw.specs?.[name] ?? null),
       planSummary,
       headline: planSummary ?? summary ?? live?.title ?? '',
       status,
@@ -263,9 +477,11 @@ export function buildModel(raw: Raw): Model {
       files,
       pluginActive: plugin ? builtins.get(plugin) === true : true,
       plugin,
-      open: lines(t.open),
-      unimplemented: lines(t.unimplemented),
-      blocking: blockingAll.filter(b => b.topic === name).map(b => `${b.id ? `${b.id}. ` : ''}${String(b.text ?? '')}`),
+      open,
+      unimplemented,
+      blocking,
+      needsPlan,
+      chores: arr(t.chores).length,
       lastTime: Math.max(0, ...mine.map(c => c.time), ...plans.map(p => p.time ?? 0)) || null,
     }
     if (!exists) orphans.push(name)
@@ -273,7 +489,11 @@ export function buildModel(raw: Raw): Model {
 
   const live = Object.values(topics).filter(t => t.exists)
   const recent = (a: Topic, b: Topic) => (b.lastTime ?? 0) - (a.lastTime ?? 0) || a.name.localeCompare(b.name)
-  const now = live.filter(t => t.group === 'now').sort(recent).map(t => t.name)
+  // 지금 = 진행 중 (먼저) → 다음 계획 필요 (D4)
+  const now = live
+    .filter(t => t.group === 'now')
+    .sort((a, b) => Number(a.needsPlan) - Number(b.needsPlan) || recent(a, b))
+    .map(t => t.name)
   const next = live.filter(t => t.group === 'next').sort(recent).map(t => t.name)
   const done = live.filter(t => t.group === 'done').sort(recent).map(t => t.name)
 
@@ -282,10 +502,11 @@ export function buildModel(raw: Raw): Model {
     .sort((a, b) => (a.time ?? 0) - (b.time ?? 0) || a.topic.localeCompare(b.topic))
 
   const decisions: Decision[] = []
-  for (const b of blockingAll) decisions.push({ kind: 'blocking', topic: str(b.topic), where: str(b.sha)?.slice(0, 7) ?? str(b.topic) ?? '', text: `${b.id ? `${b.id}. ` : ''}${String(b.text ?? '')}` })
+  // trace.decisions.blocking = { topic, plan, id, text } (plan = plan 커밋 sha)
+  for (const b of blockingAll) decisions.push({ kind: 'blocking', topic: str(b.topic), where: str(b.plan)?.slice(0, 7) ?? str(b.topic) ?? '', text: `${b.id ? `${b.id}. ` : ''}${String(b.text ?? '')}` })
   for (const o of arr(trace.decisions?.open)) decisions.push({ kind: 'open', topic: null, where: `${o.path ?? ''}${o.line ? `:${o.line}` : ''}`, text: String(o.text ?? '') })
   // 진행 중 · 시작 전 plan 이 아직 정할 것 (Decisions expected)
-  for (const name of [...now, ...next]) {
+  for (const name of [...now, ...next].filter(n => !topics[n]!.needsPlan)) {
     const p = [...topics[name]!.plans].reverse().find(x => x.status !== 'superseded')
     for (const d of p?.expected ?? []) decisions.push({ kind: 'expected', topic: name, where: p!.sha.slice(0, 7), text: d })
   }
@@ -293,19 +514,58 @@ export function buildModel(raw: Raw): Model {
     for (const d of p.decisions) decisions.push({ kind: 'made', topic: p.topic, where: p.sha.slice(0, 7), text: d })
   }
 
-  const items = arr(trace.items).map(i => ({ kind: String(i.kind ?? 'item'), text: String(i.text ?? ''), sha: String(i.sha ?? '') }))
-  const stepsLive = [...now, ...next].map(n => topics[n]!.progress)
+  // trace.items 는 오래된 것 → 최근. 화면은 최근 순
+  const items = arr(trace.items)
+    .map(i => ({ kind: String(i.kind ?? 'item'), text: String(i.text ?? ''), sha: String(i.sha ?? '') }))
+    .reverse()
+  // 남은 단계는 진행 중 · 시작 전 plan 만 (다음 계획 필요 topic 의 plan 은 끝남)
+  const requests: Request[] = arr(trace.requests).map(r => ({ sha: String(r.sha ?? ''), subject: stripPrefix(String(r.subject ?? '')), status: String(r.status ?? 'open'), by: Array.isArray(r.by) ? r.by.length : 0 }))
+  const stepsLive = [...now, ...next].filter(n => !topics[n]!.needsPlan).map(n => topics[n]!.progress)
+
+  const views = viewDefs(s)
+  let purpose = parsePurpose(raw.readme, raw.readmePath)
+  if (!purpose.text && raw.pkgDescription) purpose = { ...purpose, text: raw.pkgDescription, from: 'package.json' }
+
+  const raw0: Json = s.config?.raw ?? {}
+  const hooks: Json = s.install?.hooks ?? {}
+  const setup: Setup = {
+    source: String(s.gnam?.source ?? '?'),
+    format: Number(raw0.format ?? s.gnam?.format ?? 0),
+    inactive: arr(s.builtins).filter(b => b.active === false).map(b => String(b.id)),
+    extraConfig: Object.keys(raw0).filter(k => k !== 'format' && k !== 'plugins'),
+    hooksOk: hooks.hooksPath === hooks.expected && hooks.commitMsg === true,
+    hooksPath: str(hooks.hooksPath),
+    hooksExpected: str(hooks.expected),
+    skills: arr(s.install?.skills).map(k => ({ dir: String(k.dir ?? ''), name: String(k.name ?? ''), ok: k.ok === true })),
+    agentsMd: { exists: s.install?.agentsMd?.exists === true, inSync: s.install?.agentsMd?.inSync === true },
+    claudeMd: { exists: s.install?.claudeMd?.exists === true, importsAgents: s.install?.claudeMd?.importsAgents === true },
+    kinds: arr(s.kinds).map(k => ({ label: String(k.label ?? ''), owner: String(k.owner ?? '') })),
+  }
 
   return {
+    setup,
+    plugins: Object.entries((s.plugins ?? {}) as Record<string, Json>).map(([id, p]) => ({
+      id,
+      version: String(p?.version ?? '?'),
+      kind: String(p?.kind ?? '?'),
+      commands: arr(p?.commands).map(c => ({ name: String(c.name ?? ''), describe: String(c.describe ?? '') })),
+      skills: strs(p?.skills).length ? strs(p?.skills) : arr(p?.skills).map(x => String(x.name ?? x.id ?? '')),
+      sections: sectionRows(p?.sections),
+      error: str(p?.error),
+    })),
+    views,
+    viewData: Object.fromEntries(views.map(v => [v.id, getPath(s, v.source)])),
     project: (typeof s.project === 'string' ? s.project : raw.cwd).split('/').filter(Boolean).at(-1) ?? raw.cwd,
     branch: str(s.env?.branch),
     head: str(trace.head),
     gnamVersion: str(s.gnam?.version),
-    purpose: parsePurpose(raw.readme, raw.readmePath),
+    purpose,
     counts: {
       topics: live.length,
-      now: now.length,
-      next: next.length,
+      now: now.filter(n => !topics[n]!.needsPlan).length,
+      needsPlan: now.filter(n => topics[n]!.needsPlan).length,
+      next: next.filter(n => topics[n]!.status !== 'none').length,
+      none: next.filter(n => topics[n]!.status === 'none').length,
       done: done.length,
       stepsDone: stepsLive.reduce((n, p) => n + p.done, 0),
       stepsTotal: stepsLive.reduce((n, p) => n + p.total, 0),
@@ -320,8 +580,13 @@ export function buildModel(raw: Raw): Model {
     decisions,
     history,
     commits,
+    owners,
     items,
-    problems: arr(s.problems).map(p => (typeof p === 'string' ? p : String(p.message ?? JSON.stringify(p)))),
+    problems: arr(s.problems).map(p => (typeof p === 'string' ? { source: null, text: p } : { source: str(p.source), text: String(p.message ?? JSON.stringify(p)) })),
+    handoffPath: str(s.handoff?.path),
+    hasHandoff: s.handoff?.exists === true,
+    requests,
+    hasRequests: requests.length > 0 || builtins.get('request') === true || (s.plugins !== null && typeof s.plugins === 'object' && 'request' in s.plugins),
   }
 }
 
@@ -355,10 +620,14 @@ export class Loader {
     private readonly files: Files,
   ) {}
 
-  /** HEAD · gnam.json · specs/*.md 수정 시각 */
+  /** 인계 메모 경로 (마지막 status 의 handoff.path). 첫 읽기 전에는 모른다 (첫 읽기는 늘 읽음) */
+  private handoffPath: string | null = null
+
+  /** HEAD · gnam.json · README · 인계 메모 · specs/*.md 수정 시각 */
   async signature(): Promise<string> {
     const head = await this.exec(['git', 'rev-parse', 'HEAD'], this.cwd).catch(() => null)
     const parts = [head?.code === 0 ? head.stdout.trim() : 'no-head', String(await this.files.mtime(`${this.cwd}/gnam.json`))]
+    for (const f of [`${this.cwd}/README.md`, `${this.cwd}/readme.md`, `${this.cwd}/package.json`, this.handoffPath]) if (f) parts.push(String(await this.files.mtime(f)))
     const specs = (await this.files.list(`${this.cwd}/specs`)) ?? []
     for (const f of specs.filter(f => f.endsWith('.md')).sort()) parts.push(`${f}@${await this.files.mtime(`${this.cwd}/specs/${f}`)}`)
     return parts.join('|')
@@ -398,8 +667,19 @@ export class Loader {
       readmePath = 'readme.md'
       readme = await this.files.read(`${this.cwd}/readme.md`)
     }
-    const model = buildModel({ cwd: this.cwd, status, readme, readmePath, log: log.code === 0 ? log.stdout : '' })
-    this.last = sig
+    let pkgDescription: string | null = null
+    if (!parsePurpose(readme, readmePath).text) {
+      try {
+        pkgDescription = str(JSON.parse((await this.files.read(`${this.cwd}/package.json`)) ?? '{}').description)
+      } catch {}
+    }
+    const specs: Record<string, string | null> = {}
+    for (const [name, t] of Object.entries((status.trace.topics ?? {}) as Record<string, Json>))
+      if (name && t?.exists !== false) specs[name] = await this.files.read(`${this.cwd}/${String(t.path ?? `specs/${name}.md`)}`)
+    const model = buildModel({ cwd: this.cwd, status, readme, readmePath, log: log.code === 0 ? log.stdout : '', pkgDescription, specs })
+    this.handoffPath = model.handoffPath
+    // 인계 메모 경로를 이제 알았으면 그 수정 시각까지 넣은 서명으로 기억 (다음 비교가 같은 모양)
+    this.last = model.handoffPath ? await this.signature() : sig
     return model
   }
 }

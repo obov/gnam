@@ -1,15 +1,97 @@
 // 화면 상태 · 키 처리 · 갱신. React 밖의 작은 store (useSyncExternalStore 로 읽는다).
-import type { Loader, Model } from './model.ts'
+import { applyWhere, rowsOf, type Commit, type Item, type Loader, type Model, type Request, type ViewDef } from './model.ts'
 import { makeTheme, type TerminalColors, type Theme } from './theme.ts'
 
-export const TABS = [
+export type TabId = string
+export type Tab = { id: TabId; label: string }
+
+/** 고정 탭 (요청은 요청이 있거나 request plugin 이 켜졌을 때만) */
+export const TABS: Tab[] = [
   { id: 'overview', label: '개요' },
   { id: 'decisions', label: '결정' },
+  { id: 'requests', label: '요청' },
   { id: 'history', label: '이력' },
   { id: 'commits', label: '커밋' },
   { id: 'items', label: '항목' },
-] as const
-export type TabId = (typeof TABS)[number]['id']
+]
+
+/**
+ * 이 모델에서 보이는 탭 (순서 = 숫자 키 1-9, 10번째부터 Tab · ←/→):
+ * 고정 탭 → 사용자 정의 view (프로젝트 · plugin) → plugin (켜진 plugin 이 있을 때) → 설정
+ */
+export function tabsOf(m: Model | null): Tab[] {
+  return [
+    ...TABS.filter(t => t.id !== 'requests' || m?.hasRequests === true),
+    ...(m?.views ?? []).map(v => ({ id: `view:${v.id}`, label: v.title })),
+    ...(m?.plugins.length ? [{ id: 'plugins', label: 'plugin' }] : []),
+    { id: 'settings', label: '설정' },
+  ]
+}
+
+/** 설정 탭의 행 (j/k 로 스크롤): 설치 5 · 설정 문제 · plugin · 커밋 종류 */
+export const INSTALL_ROWS = 5
+export const settingsRowCount = (m: Model): number => INSTALL_ROWS + m.problems.length + m.plugins.length + m.setup.kinds.length
+
+/** view 탭에 그리는 최대 행 */
+export const VIEW_ROWS = 200
+
+export function viewOf(m: Model | null, tab: TabId): ViewDef | null {
+  return tab.startsWith('view:') ? (m?.views.find(v => `view:${v.id}` === tab) ?? null) : null
+}
+
+/** view 의 행 (where 적용). data 가 없으면 null */
+export function viewRows(m: Model, def: ViewDef): { all: number; rows: unknown[] } | null {
+  const data = m.viewData[def.id]
+  if (data === undefined) return null
+  const all = rowsOf(data)
+  return { all: all.length, rows: applyWhere(all, def.where) }
+}
+
+/** 요청 상태 (순서 = 필터 순환) */
+export const REQUEST_STATUSES = ['open', 'started', 'refined']
+
+/** 필터 키 → 고를 수 있는 값 ('all' 먼저) */
+export function filterValues(s: State, key: string): string[] {
+  const m = s.model
+  if (!m) return ['all']
+  switch (key) {
+    case 'requests':
+      return ['all', ...REQUEST_STATUSES]
+    case 'items':
+      return ['all', ...new Set(m.items.map(i => i.kind))]
+    case 'commits.kind':
+      return ['all', ...m.owners.filter(o => m.commits.some(c => c.owner === o)), ...(m.commits.some(c => c.owner === 'other') ? ['other'] : [])]
+    case 'commits.topic':
+      return ['all', ...new Set(m.commits.map(c => c.topic).filter((x): x is string => x !== null))]
+  }
+  return ['all']
+}
+
+export const filterOf = (s: State, key: string): string => {
+  const v = s.filter[key] ?? 'all'
+  return filterValues(s, key).includes(v) ? v : 'all'
+}
+
+export function requestRows(s: State): Request[] {
+  const f = filterOf(s, 'requests')
+  return (s.model?.requests ?? []).filter(r => f === 'all' || r.status === f)
+}
+
+export function itemRows(s: State): Item[] {
+  const f = filterOf(s, 'items')
+  return (s.model?.items ?? []).filter(i => f === 'all' || i.kind === f)
+}
+
+/** 커밋 (종류 · topic 필터 적용) */
+export function commitRows(s: State): Commit[] {
+  const k = filterOf(s, 'commits.kind')
+  const t = filterOf(s, 'commits.topic')
+  return (s.model?.commits ?? []).filter(c => (k === 'all' || c.owner === k) && (t === 'all' || c.topic === t))
+}
+
+/** 탭에서 f 가 바꾸는 필터 (커밋 탭의 t = topic) */
+const MAIN_FILTER: Record<string, string> = { requests: 'requests', items: 'items', commits: 'commits.kind' }
+export const hasFilter = (tab: TabId) => tab in MAIN_FILTER
 
 /** 커밋 탭에 그리는 최근 커밋 수 (나머지는 개수만) */
 export const COMMIT_ROWS = 300
@@ -20,11 +102,16 @@ export type State = {
   error: string | null
   isLoading: boolean
   tab: TabId
+  /** 탭마다 선택 행 (없으면 0) */
   cursor: Record<TabId, number>
   /** 펼친 topic (1단: 하나만) */
   expanded: string | null
   theme: Theme
   loadedAt: number
+  /** 화면 폭 (px, 모르면 0). 문단 말줄임 추정에 쓴다 */
+  width: number
+  /** 탭 필터 (키 → 값, 없으면 all) */
+  filter: Record<string, string>
 }
 
 export type Key = { key: string; mods?: { shift?: boolean; ctrl?: boolean; alt?: boolean; super?: boolean } }
@@ -32,6 +119,8 @@ export type Key = { key: string; mods?: { shift?: boolean; ctrl?: boolean; alt?:
 export function overviewRows(m: Model | null): string[] {
   return m ? [...m.now, ...m.next, ...m.done] : []
 }
+
+export const cursorOf = (s: State, tab: TabId = s.tab): number => s.cursor[tab] ?? 0
 
 export function rowCount(s: State, tab: TabId = s.tab): number {
   const m = s.model
@@ -44,10 +133,19 @@ export function rowCount(s: State, tab: TabId = s.tab): number {
     case 'history':
       return m.history.length
     case 'commits':
-      return Math.min(m.commits.length, COMMIT_ROWS)
+      return Math.min(commitRows(s).length, COMMIT_ROWS)
     case 'items':
-      return m.items.length
+      return itemRows(s).length
+    case 'requests':
+      return requestRows(s).length
+    case 'plugins':
+      return m.plugins.length
+    case 'settings':
+      return settingsRowCount(m)
   }
+  const def = viewOf(m, tab)
+  if (def) return Math.min(VIEW_ROWS, viewRows(m, def)?.rows.length ?? 0)
+  return 0
 }
 
 export class Controller {
@@ -67,10 +165,12 @@ export class Controller {
       error: null,
       isLoading: false,
       tab: 'overview',
-      cursor: { overview: 0, decisions: 0, history: 0, commits: 0, items: 0 },
+      cursor: {},
       expanded: null,
       theme: makeTheme(null, this.basePx, themePref),
       loadedAt: 0,
+      width: 0,
+      filter: {},
     }
   }
 
@@ -97,6 +197,10 @@ export class Controller {
     this.set({ theme: makeTheme(this.colors, px, this.themePref) })
   }
 
+  setWidth(px: number): void {
+    if (px > 0 && px !== this.state.width) this.set({ width: px })
+  }
+
   /** 다시 읽기. force 가 아니면 HEAD · gnam.json · specs/ 가 그대로일 때 아무것도 안 함. 실패는 기존 화면 유지 */
   refresh(force = false): Promise<void> {
     if (this.pending) return this.pending
@@ -120,25 +224,28 @@ export class Controller {
     const draft = { ...s, model }
     const cursor = { ...s.cursor }
     // 선택한 topic 을 이름으로 유지
-    const prevName = overviewRows(s.model)[s.cursor.overview]
+    const prevName = overviewRows(s.model)[cursorOf(s, 'overview')]
     const rows = overviewRows(model)
     const at = prevName ? rows.indexOf(prevName) : -1
-    cursor.overview = at >= 0 ? at : Math.min(s.cursor.overview, Math.max(0, rows.length - 1))
-    for (const t of TABS) if (t.id !== 'overview') cursor[t.id] = Math.min(cursor[t.id], Math.max(0, rowCount(draft, t.id) - 1))
+    cursor.overview = at >= 0 ? at : Math.min(cursorOf(s, 'overview'), Math.max(0, rows.length - 1))
+    for (const id of Object.keys(cursor)) if (id !== 'overview') cursor[id] = Math.min(cursor[id] ?? 0, Math.max(0, rowCount(draft, id) - 1))
     const expanded = s.expanded && model.topics[s.expanded] ? s.expanded : null
-    this.set({ model, cursor, expanded, error: null, isLoading: false, loadedAt: this.now() })
+    // 보던 탭이 사라졌으면 (plugin 꺼짐 등) 개요로
+    const tab = tabsOf(model).some(t => t.id === s.tab) ? s.tab : 'overview'
+    this.set({ model, cursor, expanded, tab, error: null, isLoading: false, loadedAt: this.now() })
   }
 
+  /** 없는 탭 (요청 0 + plugin 꺼짐 등) 은 무시 */
   setTab(tab: TabId): void {
-    if (tab !== this.state.tab) this.set({ tab })
+    if (tab !== this.state.tab && tabsOf(this.state.model).some(t => t.id === tab)) this.set({ tab })
   }
 
   move(by: number): void {
     const s = this.state
     const n = rowCount(s)
     if (n === 0) return
-    const next = Math.max(0, Math.min(n - 1, s.cursor[s.tab] + by))
-    if (next !== s.cursor[s.tab]) this.set({ cursor: { ...s.cursor, [s.tab]: next } })
+    const next = Math.max(0, Math.min(n - 1, cursorOf(s) + by))
+    if (next !== cursorOf(s)) this.set({ cursor: { ...s.cursor, [s.tab]: next } })
   }
 
   moveTo(index: number): void {
@@ -148,11 +255,25 @@ export class Controller {
     this.set({ cursor: { ...s.cursor, [s.tab]: Math.max(0, Math.min(n - 1, index)) } })
   }
 
+  /** 필터 바꾸기. 그 필터를 쓰는 탭의 선택은 맨 위로 */
+  setFilter(key: string, value: string, tab: TabId = this.state.tab): void {
+    const s = this.state
+    if ((s.filter[key] ?? 'all') === value) return
+    this.set({ filter: { ...s.filter, [key]: value }, cursor: { ...s.cursor, [tab]: 0 } })
+  }
+
+  /** 필터를 다음 (by = -1 이면 이전) 값으로 (끝 다음은 all) */
+  cycleFilter(key: string, by = 1): void {
+    const values = filterValues(this.state, key)
+    const at = values.indexOf(filterOf(this.state, key))
+    this.setFilter(key, values[(at + by + values.length) % values.length]!)
+  }
+
   /** 개요 탭에서 topic 펼침 · 접기 (1단: 다른 topic 은 접힘) */
   toggle(name?: string): void {
     const s = this.state
     const rows = overviewRows(s.model)
-    const target = name ?? rows[s.cursor.overview]
+    const target = name ?? rows[cursorOf(s, 'overview')]
     if (!target) return
     const at = rows.indexOf(target)
     this.set({ expanded: s.expanded === target ? null : target, cursor: at >= 0 ? { ...s.cursor, overview: at } : s.cursor })
@@ -163,7 +284,8 @@ export class Controller {
     const k = e.key.toLowerCase()
     const shift = e.mods?.shift === true
     if (e.mods?.ctrl || e.mods?.super || e.mods?.alt) return false
-    const tabIndex = TABS.findIndex(t => t.id === this.state.tab)
+    const tabs = tabsOf(this.state.model)
+    const tabIndex = Math.max(0, tabs.findIndex(t => t.id === this.state.tab))
     switch (k) {
       case 'j':
       case 'down':
@@ -195,22 +317,33 @@ export class Controller {
         if (this.state.expanded) this.set({ expanded: null })
         return true
       case 'tab':
-        this.setTab(TABS[(tabIndex + (shift ? TABS.length - 1 : 1)) % TABS.length]!.id)
+        this.setTab(tabs[(tabIndex + (shift ? tabs.length - 1 : 1)) % tabs.length]!.id)
         return true
       case 'right':
       case 'l':
-        this.setTab(TABS[Math.min(TABS.length - 1, tabIndex + 1)]!.id)
+        this.setTab(tabs[Math.min(tabs.length - 1, tabIndex + 1)]!.id)
         return true
       case 'left':
       case 'h':
-        this.setTab(TABS[Math.max(0, tabIndex - 1)]!.id)
+        this.setTab(tabs[Math.max(0, tabIndex - 1)]!.id)
         return true
       case 'r':
         void this.refresh(true)
         return true
+      case 'f': {
+        const key = MAIN_FILTER[this.state.tab]
+        if (key) this.cycleFilter(key)
+        return true
+      }
+      case 't':
+        if (this.state.tab === 'commits') {
+          if (shift) this.cycleFilter('commits.topic', -1)
+          else this.cycleFilter('commits.topic')
+        }
+        return true
     }
     if (/^[1-9]$/.test(k)) {
-      const t = TABS[Number(k) - 1]
+      const t = tabs[Number(k) - 1]
       if (t) this.setTab(t.id)
       return true
     }

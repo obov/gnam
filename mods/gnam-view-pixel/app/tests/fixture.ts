@@ -24,22 +24,54 @@ export const STATUS = {
   schema: 1,
   gnam: { version: '0.8.0', root: '/repo', source: 'package', format: 2 },
   project: '/repo',
+  plugins: {
+    run: {
+      kind: 'builtin',
+      version: '0.1.0',
+      commands: [{ name: 'stats', describe: 'table | health  run 커밋 집계', json: false }],
+      skills: ['gnam-run'],
+      sections: { goals: [{ name: '측정', done: 1, total: 2 }, { name: '집계', done: 3, total: 3 }] },
+    },
+  },
+  kinds: [
+    { label: 'chore: …', subject: '^chore: \\S', trailer: null, owner: 'core' },
+    { label: 'spec.<topic>.plan: …', subject: '^spec\\.([A-Za-z0-9_-]+)\\.plan: \\S', trailer: '^Gnam: spec\\.([A-Za-z0-9_-]+)\\.plan$', owner: 'core' },
+    { label: 'spec.<topic>.impl: …', subject: '^spec\\.([A-Za-z0-9_-]+)\\.impl: \\S', trailer: '^Gnam: spec\\.([A-Za-z0-9_-]+)\\.impl$', owner: 'core' },
+    { label: 'run.<topic>.<start|end|policy>: …', subject: '^run\\.([A-Za-z0-9_-]+)\\.(start|end|policy): \\S', trailer: '^Gnam: run\\.([A-Za-z0-9_-]+)\\.(start|end|policy)$', owner: 'run' },
+  ],
+  views: [
+    { id: 'risks', title: '위험', source: 'trace.items', where: { kind: 'risk' }, view: 'list', fields: { title: 'text', badge: 'kind', meta: 'sha' }, icon: null, owner: 'project' },
+    { id: 'builtins', title: '내장', source: 'builtins', where: {}, view: 'table', fields: { columns: ['id', 'active'] }, icon: null, owner: 'project' },
+    { id: 'run-goals', title: '목표', source: 'plugins.run.sections.goals', where: {}, view: 'progress', fields: { title: 'name' }, icon: null, owner: 'run' },
+    { id: 'gone', title: '사라짐', source: 'plugins.lore.sections.entries', where: {}, view: 'list', fields: {}, icon: null, owner: 'lore' },
+  ],
   builtins: [
     { id: 'lore', active: false, requires: [] },
     { id: 'run', active: true, requires: [] },
   ],
+  config: { raw: { format: 2, plugins: ['@gnam/run'], view: { tabs: [] } } },
+  install: {
+    hooks: { hooksPath: '.githooks', expected: '.githooks', commitMsg: true },
+    skills: [
+      { dir: '.agents/skills', name: 'gnam', target: '../../skills/gnam', ok: true },
+      { dir: '.claude/skills', name: 'gnam-run', target: '../../x', ok: false },
+    ],
+    agentsMd: { exists: true, inSync: false },
+    claudeMd: { exists: true, importsAgents: true },
+  },
   problems: [],
+  handoff: { path: '/repo/.git/gnam/handoff.md', exists: false, content: null, modifiedAt: null },
   env: { branch: 'main' },
   trace: {
     head: 'h1',
-    requests: [],
+    requests: [{ sha: 'r1req0000', subject: 'request: 목록을 빨리', refines: null, refinedBy: [], by: ['i2api000'], status: 'started' }],
     items: [
       { kind: 'risk', text: '토큰 만료', sha: 'aaaaaaa1' },
       { kind: 'remaining', text: '실측 남음\n두 번째 줄', sha: 'bbbbbbb2' },
       { kind: 'open', text: '보존 기간', sha: 'ccccccc3' },
     ],
     decisions: {
-      blocking: [{ topic: 'api', id: 'B1', text: '인증 방식 미정', sha: 'p2api000' }],
+      blocking: [{ topic: 'api', id: 'B1', text: '인증 방식 미정', plan: 'p2api000' }],
       open: [{ path: 'specs/api.md', line: 3, text: '보존 기간' }],
     },
     topics: {
@@ -58,7 +90,7 @@ export const STATUS = {
             decisionsExpected: ['D1. 캐시 위치', 'D2. 페이지 크기'],
           }),
         ],
-        chores: [],
+        chores: [{ sha: 'c1api000', subject: 'spec.api.chore: 오타', requests: [] }],
       },
       web: {
         path: 'specs/web.md',
@@ -90,7 +122,7 @@ export const STATUS = {
         exists: true,
         summary: null,
         problem: null,
-        unimplemented: [],
+        unimplemented: [{ line: 9, text: '압축 형식' }],
         open: [],
         plans: [plan('p5exp000', 'spec.export.plan: 내보내기 기본', 'done', 1, 1)],
         chores: [],
@@ -105,6 +137,17 @@ export const STATUS = {
         plans: [plan('p6lore00', 'spec.lore.plan: lore', 'done', 3, 3, { summary: '팀 노하우를 커밋으로 남긴다' })],
         chores: [],
       },
+      docs: {
+        path: 'specs/docs.md',
+        exists: true,
+        summary: '사용 설명서',
+        problem: null,
+        unimplemented: [],
+        open: [],
+        plans: [],
+        chores: [],
+      },
+      README: { path: 'specs/README.md', exists: true, summary: null, unimplemented: [], open: [], plans: [], chores: [] },
       gone: {
         path: 'specs/gone.md',
         exists: false,
@@ -117,6 +160,13 @@ export const STATUS = {
       '': { path: 'specs/.md', exists: false, summary: null, unimplemented: [], open: [], plans: [], chores: [{ sha: 'c0', subject: 'chore: x' }] },
     },
   },
+}
+
+/** STATUS 복사본을 고친 것 */
+export function variant(fn: (s: any) => void): typeof STATUS {
+  const s = JSON.parse(JSON.stringify(STATUS))
+  fn(s)
+  return s
 }
 
 /** problem 키가 없는 gnam (구버전) */
@@ -134,6 +184,7 @@ export const LOG = [
   row('p2api000', 200, 'docs(api): 목록 한 번에', 'spec.api.plan', []),
   row('p3web000', 300, 'docs(web): 웹 첫 화면', 'spec.web.plan', []),
   row('cchore01', 350, 'chore: 의존성', '', ['package.json']),
+  row('rrun0001', 360, 'chore(sync): 위임 시작', 'run.sync.start', []),
   row('i4sync00', 400, 'feat(sync): 동기화', 'spec.sync.impl', ['src/sync.ts', 'src/api.ts']),
   row('p4sync00', 500, 'docs(sync): 동기화', 'spec.sync.plan', ['specs/sync.md']),
   row('p6lore00', 600, 'spec.lore.plan: lore', '', ['specs/lore.md']),
@@ -152,15 +203,31 @@ npm i
 \`\`\`
 `
 
+export const API_SPEC = `# api — 앱이 쓰는 외부 API
+
+문제: 앱마다 API 를 따로 불러 느리다
+
+목록 · 상세를 한 번에 받는 묶음 API.
+앱은 화면마다 한 번만 부른다.
+
+미결: 보존 기간
+
+## 판
+`
+
 export type FakeRepo = {
   head: string
   status: unknown
   fail: boolean
   calls: string[][]
+  /** 경로 → 수정 시각 (gnam.json · specs/ 밖) */
+  mtimes: Record<string, number>
+  /** 경로 → 내용 (null = 없음) */
+  files: Record<string, string | null>
 }
 
 export function fakeRepo(): { repo: FakeRepo; loader: Loader } {
-  const repo: FakeRepo = { head: 'h1', status: STATUS, fail: false, calls: [] }
+  const repo: FakeRepo = { head: 'h1', status: STATUS, fail: false, calls: [], mtimes: { '/repo/README.md': 1 }, files: { '/repo/README.md': README, '/repo/package.json': '{"name":"repo","description":"할 일 앱과 서버"}', '/repo/specs/api.md': API_SPEC } }
   const exec = async (argv: string[]): Promise<ExecResult> => {
     repo.calls.push(argv)
     if (argv[0] === 'git' && argv[1] === 'rev-parse') return { code: 0, stdout: `${repo.head}\n`, stderr: '' }
@@ -175,9 +242,9 @@ export function fakeRepo(): { repo: FakeRepo; loader: Loader } {
     return { code: 127, stdout: '', stderr: 'unknown' }
   }
   const files: Files = {
-    read: async p => (p === '/repo/README.md' ? README : p === '/repo/package.json' ? '{"name":"repo"}' : null),
-    mtime: async p => (p === '/repo/gnam.json' || p.startsWith('/repo/specs/') ? 1 : null),
-    list: async d => (d === '/repo/specs' ? ['api.md', 'web.md', 'sync.md', 'export.md', 'lore.md'] : null),
+    read: async p => repo.files[p] ?? null,
+    mtime: async p => (p === '/repo/gnam.json' || p.startsWith('/repo/specs/') ? 1 : (repo.mtimes[p] ?? null)),
+    list: async d => (d === '/repo/specs' ? ['api.md', 'web.md', 'sync.md', 'export.md', 'lore.md', 'docs.md', 'README.md'] : null),
   }
   return { repo, loader: new Loader('/repo', exec, files) }
 }

@@ -1,9 +1,9 @@
 // 화면. 첫 화면 = 목적 → 진행 → 지금 → 다음 → 구현된 기능, topic 펼침 = 문제 → 해결 → 이력 → 세부.
-import { useEffect, useRef, useSyncExternalStore, type ReactNode } from 'react'
+import { Fragment, useEffect, useRef, useSyncExternalStore, type ReactNode } from 'react'
 
-import type { Commit, Decision, Item, Model, Plan, Topic } from './model.ts'
+import { getPath, show, signals, type Commit, type Decision, type Item, type Model, type Plan, type Topic, type ViewDef } from './model.ts'
 import { Box, Text, type Color, type NodeHandle, type Style } from './pixel.ts'
-import { COMMIT_ROWS, TABS, overviewRows, type Controller, type State, type TabId } from './store.ts'
+import { COMMIT_ROWS, REQUEST_STATUSES, VIEW_ROWS, commitRows, cursorOf, filterOf, filterValues, hasFilter, itemRows, overviewRows, requestRows, tabsOf, viewOf, viewRows, type Controller, type State } from './store.ts'
 import type { Rgba, Theme } from './theme.ts'
 
 const SANS = ['sans-serif']
@@ -91,6 +91,26 @@ export function ago(time: number | null, now: number): string {
 
 const short = (sha: string) => sha.slice(0, 7)
 
+/** 글자 폭 추정 (em): 한글 · CJK 0.92, 공백 0.28, 그 밖 0.52 */
+const charEm = (ch: string) => (/[\u1100-\u11ff\u2e80-\ua4cf\uac00-\ud7a3\uf900-\ufaff\uff00-\uffef]/.test(ch) ? 0.92 : ch === ' ' ? 0.28 : 0.52)
+
+/**
+ * 폭 width (px) 에 fontSize 로 lines 줄을 넘을 것 같으면 잘라 '…'. width 를 모르면 (0) 그대로.
+ * 줄바꿈 손실을 감안해 줄마다 95% 만 쓴다고 본다
+ */
+export function clampText(text: string, fontSize: number, width: number, lines: number): string {
+  if (width <= 0) return text
+  const budget = (width / fontSize) * 0.95 * lines
+  let used = 0
+  let i = 0
+  for (const ch of text) {
+    used += charEm(ch)
+    if (used > budget) return `${[...text].slice(0, Math.max(0, i - 1)).join('').trimEnd()}…`
+    i++
+  }
+  return text
+}
+
 function statusLook(th: Theme, status: string): { text: string; fg: Rgba; bg: Rgba } {
   switch (status) {
     case 'done':
@@ -102,7 +122,7 @@ function statusLook(th: Theme, status: string): { text: string; fg: Rgba; bg: Rg
     case 'superseded':
       return { text: '대체됨', fg: th.faint, bg: th.card }
     case 'none':
-      return { text: '계획 없음', fg: th.muted, bg: th.card }
+      return { text: 'plan 없음', fg: th.muted, bg: th.card }
     default:
       return { text: status, fg: th.muted, bg: th.card }
   }
@@ -126,8 +146,10 @@ function SectionHead({ th, title, count, id, note }: { th: Theme; title: string;
 
 // ---------- 개요 ----------
 
-function Purpose({ th, m }: { th: Theme; m: Model }) {
+function Purpose({ th, m, width }: { th: Theme; m: Model; width: number }) {
   const p = m.purpose
+  // 본문 폭 = 화면 - 좌우 여백 - 스크롤 여백
+  const textWidth = width > 0 ? width - th.space * 7 - 4 : 0
   return (
     <Box style={{ flexDirection: 'column', gap: th.space * 0.75 }}>
       <SectionHead th={th} title="목적" id="section:purpose" note={p.from ?? undefined} />
@@ -137,11 +159,10 @@ function Purpose({ th, m }: { th: Theme; m: Model }) {
         </T>
       ) : null}
       {p.text ? (
-        <Box style={{ maxHeight: Math.round(th.size.body * 2.9), overflow: 'hidden' }}>
-          <T th={th} color={th.muted} block>
-            {p.text}
-          </T>
-        </Box>
+        // 두 줄까지, 넘치면 끝에 '…'
+        <T th={th} color={th.muted} block id="purpose-text" style={{ maxHeight: Math.round(th.size.body * 2.4), overflow: 'hidden' }}>
+          {clampText(p.text, th.size.body, textWidth, 2)}
+        </T>
       ) : (
         <T th={th} color={th.faint}>
           README 첫 문단 없음
@@ -153,20 +174,63 @@ function Purpose({ th, m }: { th: Theme; m: Model }) {
 
 function Progress({ th, m }: { th: Theme; m: Model }) {
   const c = m.counts
-  const parts = [`spec ${c.topics}개`, `진행 중 ${c.now}`, `시작 전 ${c.next}`, `끝남 ${c.done}`]
+  const parts = [`spec ${c.topics}개`, `진행 중 ${c.now}`, ...(c.needsPlan > 0 ? [`다음 계획 필요 ${c.needsPlan}`] : []), `시작 전 ${c.next}`, ...(c.none > 0 ? [`plan 없음 ${c.none}`] : []), `끝남 ${c.done}`]
   if (c.stepsTotal > 0) parts.push(`지금 · 다음 단계 ${c.stepsDone}/${c.stepsTotal}`)
-  const seg = (n: number, color: Rgba, key: string) => (n > 0 ? <Box key={key} style={{ flexGrow: n, flexBasis: 0, height: th.space * 0.8, background: color, cornerRadius: th.space * 0.4 }} /> : null)
+  const seg = (n: number, color: Rgba, key: string) => (n > 0 ? <Box key={key} id={`progress-seg:${key}`} style={{ flexGrow: n, flexBasis: 0, height: th.space * 0.8, background: color, cornerRadius: th.space * 0.4 }} /> : null)
   return (
     <Box style={{ flexDirection: 'column', gap: th.space }}>
       <SectionHead th={th} title="진행" id="section:progress" />
       <T th={th} line id="progress-line">
         {parts.join(' · ')}
       </T>
-      <Box style={{ flexDirection: 'row', gap: 3, width: '100%' }}>
+      <Box id="section:progress-bar" style={{ flexDirection: 'row', gap: 3, width: '100%' }}>
         {seg(c.now, th.accent, 'now')}
+        {seg(c.needsPlan, th.orange, 'needs-plan')}
         {seg(c.next, th.yellow, 'next')}
+        {seg(c.none, th.hairline, 'none')}
         {seg(c.done, th.green, 'done')}
       </Box>
+    </Box>
+  )
+}
+
+/**
+ * 사람이 할 일 · 설정 신호 (진행 줄 아래). 있는 것만 한 줄씩 (누르면 해당 탭),
+ * 0 인 것은 흐린 한 줄로 접는다: '사람이 할 일 없음 · 설정 정상'
+ */
+function Signals({ th, m, c }: { th: Theme; m: Model; c: Controller }) {
+  const g = signals(m)
+  type Row = { id: string; dot: Rgba; label: string; detail: string; tab: string }
+  const rows: Row[] = []
+  if (g.decide > 0)
+    rows.push({ id: 'decide', dot: g.blocking > 0 ? th.red : th.yellow, label: `결정할 것 ${g.decide}`, detail: [g.blocking ? `막힘 ${g.blocking}` : '', g.open ? `미결 ${g.open}` : ''].filter(Boolean).join(' · '), tab: 'decisions' })
+  if (g.requests > 0) rows.push({ id: 'requests', dot: th.yellow, label: `처리 중인 요청 ${g.requests}`, detail: m.requests.filter(r => r.status !== 'refined').map(r => r.subject).join(' · '), tab: 'requests' })
+  if (g.problems > 0) rows.push({ id: 'problems', dot: th.red, label: `설정 문제 ${g.problems}`, detail: m.problems.map(p => p.text).join(' · '), tab: 'settings' })
+  if (g.handoff) rows.push({ id: 'handoff', dot: th.accent, label: '인계 메모 있음', detail: m.handoffPath?.replace(/^.*\/(\.git\/)/, '$1') ?? '', tab: 'settings' })
+  const ok = [g.decide === 0 && g.requests === 0 ? '사람이 할 일 없음' : '', g.problems === 0 ? '설정 정상' : ''].filter(Boolean).join(' · ')
+  return (
+    <Box id="section:signals" style={{ flexDirection: 'column', gap: 2, margin: { top: th.space * 1.5, bottom: 0, left: 0, right: 0 } }}>
+      {rows.map(r => (
+        <Box
+          key={r.id}
+          id={`signal:${r.id}`}
+          onClick={() => c.setTab(r.tab)}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: th.space, width: '100%', cornerRadius: th.radius * 0.6, padding: { top: 2, bottom: 2, left: 0, right: th.space }, hoverBackground: th.card, pointerShape: 'pointer' }}
+        >
+          <Box style={{ width: th.space, height: th.space, cornerRadius: th.space / 2, background: r.dot, flexShrink: 0 }} />
+          <T th={th} size="small" bold line>
+            {r.label}
+          </T>
+          <T th={th} size="small" color={th.muted} line grow>
+            {r.detail}
+          </T>
+        </Box>
+      ))}
+      {ok ? (
+        <T th={th} size="small" color={th.faint} line id="signal:ok">
+          {ok}
+        </T>
+      ) : null}
     </Box>
   )
 }
@@ -262,6 +326,11 @@ function TopicDetail({ th, t, now }: { th: Theme; t: Topic; now: number }) {
         <T th={th} bold block>
           {t.summary ?? '(spec 첫 줄 설명 없음)'}
         </T>
+        {t.detail ? (
+          <T th={th} color={th.muted} block id="topic-detail">
+            {t.detail}
+          </T>
+        ) : null}
         {t.planSummary ? (
           <T th={th} color={th.muted} block>
             {`최근 plan · ${t.planSummary}`}
@@ -304,7 +373,7 @@ function TopicDetail({ th, t, now }: { th: Theme; t: Topic; now: number }) {
               ))}
             </Box>
           ))}
-        <SubHead th={th} text={`커밋 ${t.commits.length}`} />
+        <SubHead th={th} text={`커밋 ${t.commits.length}${t.chores ? ` · 정리 커밋 ${t.chores}` : ''}`} />
         {t.commits.map(c => (
           <CommitLine key={c.sha} th={th} c={c} now={now} />
         ))}
@@ -327,7 +396,13 @@ function TopicDetail({ th, t, now }: { th: Theme; t: Topic; now: number }) {
 function TopicRow({ th, t, index, selected, expanded, nameWidth, now, onClick }: { th: Theme; t: Topic; index: number; selected: boolean; expanded: boolean; nameWidth: number; now: number; onClick: () => void }) {
   const ref = useScrollIntoView(selected, index, expanded)
   const off = !t.pluginActive
-  const dot = t.group === 'now' ? th.accent : t.group === 'next' ? th.yellow : th.green
+  const dot = t.status === 'none' ? th.faint : t.needsPlan ? th.orange : t.group === 'now' ? th.accent : t.group === 'next' ? th.yellow : th.green
+  // 남은 일 칩: 막힘만 색 (상태), 미구현 · 미결은 개수만
+  const signals: [string, Rgba, Rgba][] = [
+    ...(t.blocking.length ? [[`막힘 ${t.blocking.length}`, th.red, th.redSoft] as [string, Rgba, Rgba]] : []),
+    ...(t.unimplemented.length ? [[`미구현 ${t.unimplemented.length}`, th.muted, th.bg] as [string, Rgba, Rgba]] : []),
+    ...(t.open.length ? [[`미결 ${t.open.length}`, th.muted, th.bg] as [string, Rgba, Rgba]] : []),
+  ]
   const nameColor = off ? th.faint : th.fg
   return (
     <Box
@@ -352,6 +427,11 @@ function TopicRow({ th, t, index, selected, expanded, nameWidth, now, onClick }:
         <T th={th} color={off ? th.faint : th.muted} line grow>
           {t.headline || t.summary || ''}
         </T>
+        {signals.map(([text, fg, bg]) => (
+          <Chip key={text} th={th} text={text} fg={fg} bg={bg} />
+        ))}
+        {t.needsPlan ? <Chip th={th} text="다음 계획 필요" fg={th.orange} bg={th.orangeSoft} /> : null}
+        {t.status === 'none' ? <Chip th={th} text="plan 없음" fg={th.muted} bg={th.bg} /> : null}
         {off ? <Chip th={th} text="plugin 꺼짐" fg={th.faint} bg={th.bg} /> : null}
         {t.progress.total > 0 ? <Bar th={th} done={t.progress.done} total={t.progress.total} width={th.size.body * 3.5} color={off ? th.faint : dot} /> : null}
         <Box style={{ width: th.size.small * 3.4, flexShrink: 0, flexDirection: 'row', justifyContent: 'end' }}>
@@ -382,7 +462,7 @@ function TopicSection({ th, s, c, names, title, id, start, nameWidth, now }: { t
             t={m.topics[n]!}
             index={start + i}
             nameWidth={nameWidth}
-            selected={s.tab === 'overview' && s.cursor.overview === start + i}
+            selected={s.tab === 'overview' && cursorOf(s) === start + i}
             expanded={s.expanded === n}
             now={now}
             onClick={() => c.toggle(n)}
@@ -400,8 +480,9 @@ function Overview({ th, s, c, now }: { th: Theme; s: State; c: Controller; now: 
   const nameWidth = Math.ceil(longest * th.size.body * 0.62)
   return (
     <Box style={{ flexDirection: 'column' }}>
-      <Purpose th={th} m={m} />
+      <Purpose th={th} m={m} width={s.width} />
       <Progress th={th} m={m} />
+      <Signals th={th} m={m} c={c} />
       <TopicSection th={th} s={s} c={c} names={m.now} title="지금" id="section:now" start={0} nameWidth={nameWidth} now={now} />
       <TopicSection th={th} s={s} c={c} names={m.next} title="다음" id="section:next" start={m.now.length} nameWidth={nameWidth} now={now} />
       <TopicSection th={th} s={s} c={c} names={m.done} title="구현된 기능" id="section:done" start={m.now.length + m.next.length} nameWidth={nameWidth} now={now} />
@@ -463,7 +544,7 @@ function Decisions({ th, s, c }: { th: Theme; s: State; c: Controller }) {
               rows.map(d => {
                 const i = index++
                 return (
-                  <ListRow key={i} th={th} index={i} id={`row:decision:${i}`} selected={s.tab === 'decisions' && s.cursor.decisions === i} onClick={() => c.moveTo(i)}>
+                  <ListRow key={i} th={th} index={i} id={`row:decision:${i}`} selected={s.tab === 'decisions' && cursorOf(s) === i} onClick={() => c.moveTo(i)}>
                     <Box style={{ flexDirection: 'row', gap: th.space, alignItems: 'center', width: '100%' }}>
                       {d.topic ? <Chip th={th} text={d.topic} fg={g.kind === 'blocking' ? th.red : th.muted} bg={g.kind === 'blocking' ? th.redSoft : th.card} /> : null}
                       <T th={th} size="small" color={g.kind === 'blocking' ? th.red : th.fg} grow>
@@ -491,7 +572,7 @@ function History({ th, s, c, now }: { th: Theme; s: State; c: Controller; now: n
     <Box style={{ flexDirection: 'column', gap: 2 }}>
       <SectionHead th={th} title="plan 이력 (최근 → 과거)" count={rows.length} id="history:head" note="Summary 우선, 없으면 커밋 제목" />
       {rows.map((p, i) => (
-        <ListRow key={p.sha} th={th} index={i} id={`row:plan:${p.sha}`} selected={s.tab === 'history' && s.cursor.history === i} onClick={() => c.moveTo(i)}>
+        <ListRow key={p.sha} th={th} index={i} id={`row:plan:${p.sha}`} selected={s.tab === 'history' && cursorOf(s) === i} onClick={() => c.moveTo(i)}>
           <PlanLine th={th} p={p} now={now} showTopic />
           {p.status === 'superseded' && p.supersededBy ? (
             <T th={th} size="tiny" color={th.faint} style={{ margin: { top: 0, bottom: 0, left: th.size.tiny * 5.2 + th.space, right: 0 } }}>
@@ -504,15 +585,89 @@ function History({ th, s, c, now }: { th: Theme; s: State; c: Controller; now: n
   )
 }
 
+export const DAYS = 14
+
+/** 최근 DAYS 일 (오늘이 마지막 칸) 날마다 개수 */
+export function perDay(times: number[], nowMs: number): number[] {
+  const now = nowMs / 1000
+  const out = Array.from({ length: DAYS }, () => 0)
+  for (const t of times) {
+    const d = Math.floor((now - t) / 86400)
+    if (d >= 0 && d < DAYS) out[DAYS - 1 - d]! += 1
+  }
+  return out
+}
+
+/** 날마다 막대 (높이 = 개수 비율, 0 은 점) */
+function DayBars({ th, values, id, note }: { th: Theme; values: number[]; id: string; note: string }) {
+  const max = Math.max(1, ...values)
+  const h = th.size.body * 2.2
+  const w = th.size.body * 0.9
+  return (
+    <Box style={{ flexDirection: 'row', alignItems: 'end', gap: th.space * 1.5, margin: { top: th.space * 1.5, bottom: 0, left: 0, right: 0 } }}>
+      <T th={th} size="small" color={th.muted} bold line style={{ width: th.size.small * 5 }}>
+        {`${DAYS}일`}
+      </T>
+      <Box id={id} style={{ flexDirection: 'row', alignItems: 'end', gap: Math.max(2, Math.round(th.space * 0.4)), height: h }}>
+        {values.map((v, k) => (
+          <Box key={k} id={`${id}:${k}`} style={{ width: w, height: v === 0 ? 2 : Math.max(3, Math.round((h * v) / max)), background: v === 0 ? th.hairline : th.accent, cornerRadius: 2 }} />
+        ))}
+      </Box>
+      <T th={th} size="tiny" color={th.faint} line>
+        {note}
+      </T>
+    </Box>
+  )
+}
+
+/** 커밋 종류 주인 색: core 흐림, plugin 은 차례로, other 가는 선 */
+function ownerColor(th: Theme, owners: string[], o: string): Rgba {
+  if (o === 'core') return th.muted
+  if (o === 'other') return th.hairline
+  const palette = [th.accent, th.green, th.yellow, th.orange, th.red]
+  return palette[Math.max(0, owners.filter(x => x !== 'core').indexOf(o)) % palette.length]!
+}
+
 function Commits({ th, s, c, now }: { th: Theme; s: State; c: Controller; now: number }) {
   const m = s.model!
-  const rows = m.commits.slice(0, COMMIT_ROWS)
-  const rest = m.commits.length - rows.length
+  const shown = commitRows(s)
+  const rows = shown.slice(0, COMMIT_ROWS)
+  const rest = shown.length - rows.length
+  const kinds = filterValues(s, 'commits.kind').slice(1)
+  const kindN = (v: string) => (v === 'all' ? m.commits.length : m.commits.filter(x => x.owner === v).length)
+  const topic = filterOf(s, 'commits.topic')
+  const topics = filterValues(s, 'commits.topic')
+  const days = perDay(shown.map(x => x.time), now)
+  const step = (by: number) => c.cycleFilter('commits.topic', by)
+  const arrow = (label: string, by: number, id: string) => (
+    <Box id={id} onClick={() => step(by)} style={{ padding: { top: 1, bottom: 1, left: th.space * 0.6, right: th.space * 0.6 }, cornerRadius: th.size.tiny, hoverBackground: th.card, pointerShape: 'pointer', flexShrink: 0 }}>
+      <T th={th} size="tiny" color={th.muted} line>
+        {label}
+      </T>
+    </Box>
+  )
   return (
     <Box style={{ flexDirection: 'column', gap: 2 }}>
-      <SectionHead th={th} title="최근 커밋" count={m.commits.length} id="commits:head" />
+      <Dist th={th} id="commits:dist" title="종류" segs={kinds.map(o => ({ key: o, label: o, n: kindN(o), color: ownerColor(th, m.owners, o) }))} />
+      <DayBars th={th} values={days} id="commits:days" note={`선택한 커밋 중 ${days.reduce((a, x) => a + x, 0)}개`} />
+      <Box style={{ flexDirection: 'column', gap: th.space * 0.6, margin: { top: th.space * 1.5, bottom: 0, left: 0, right: 0 } }}>
+        <Filter th={th} s={s} c={c} fkey="commits.kind" label="종류 f" count={kindN} />
+        <Box id="filter:commits.topic" style={{ flexDirection: 'row', alignItems: 'center', gap: th.space * 0.6 }}>
+          <T th={th} size="tiny" color={th.faint} line style={{ width: th.size.tiny * 3.2 }}>
+            topic t
+          </T>
+          {arrow('‹', -1, 'filter:commits.topic:prev')}
+          <Box style={{ background: topic === 'all' ? th.bg : th.accentSoft, cornerRadius: th.size.tiny, padding: { top: 1, bottom: 1, left: th.space, right: th.space }, flexShrink: 0 }}>
+            <T th={th} size="tiny" color={topic === 'all' ? th.muted : th.accent} bold={topic !== 'all'} line id="filter:commits.topic:value">
+              {topic === 'all' ? `전체 (topic ${topics.length - 1}개)` : `${topic} ${m.commits.filter(x => x.topic === topic).length}`}
+            </T>
+          </Box>
+          {arrow('›', 1, 'filter:commits.topic:next')}
+        </Box>
+      </Box>
+      <SectionHead th={th} title="커밋" count={shown.length} id="commits:head" note={shown.length !== m.commits.length ? `전체 ${m.commits.length} 중` : undefined} />
       {rows.map((cm, i) => (
-        <ListRow key={cm.sha} th={th} index={i} id={`row:commit:${cm.sha}`} selected={s.tab === 'commits' && s.cursor.commits === i} onClick={() => c.moveTo(i)}>
+        <ListRow key={cm.sha} th={th} index={i} id={`row:commit:${cm.sha}`} selected={s.tab === 'commits' && cursorOf(s) === i} onClick={() => c.moveTo(i)}>
           <CommitLine th={th} c={cm} now={now} showTopic />
         </ListRow>
       ))}
@@ -525,20 +680,404 @@ function Commits({ th, s, c, now }: { th: Theme; s: State; c: Controller; now: n
   )
 }
 
+type Seg = { key: string; label: string; n: number; color: Rgba }
+
+/** 분포: 누적 막대 한 줄 + 범례 (0 인 칸은 그리지 않음) */
+function Dist({ th, segs, id, title }: { th: Theme; segs: Seg[]; id: string; title: string }) {
+  const shown = segs.filter(x => x.n > 0)
+  return (
+    <Box id={id} style={{ flexDirection: 'column', gap: th.space * 0.8, margin: { top: th.space * 2, bottom: 0, left: 0, right: 0 } }}>
+      <Box style={{ flexDirection: 'row', alignItems: 'center', gap: th.space * 1.5 }}>
+        <T th={th} size="small" color={th.muted} bold line>
+          {title}
+        </T>
+        {shown.map(x => (
+          <Box key={x.key} style={{ flexDirection: 'row', alignItems: 'center', gap: th.space * 0.6, flexShrink: 0 }}>
+            <Box style={{ width: th.space, height: th.space, cornerRadius: th.space / 2, background: x.color }} />
+            <T th={th} size="small" color={th.muted} line>
+              {`${x.label} ${x.n}`}
+            </T>
+          </Box>
+        ))}
+      </Box>
+      <Box style={{ flexDirection: 'row', gap: 3, width: '100%', height: th.space * 0.8 }}>
+        {shown.length === 0 ? <Box style={{ flexGrow: 1, height: th.space * 0.8, background: th.hairline, cornerRadius: th.space * 0.4 }} /> : null}
+        {shown.map(x => (
+          <Box key={x.key} id={`${id}:seg:${x.key}`} style={{ flexGrow: x.n, flexBasis: 0, height: th.space * 0.8, background: x.color, cornerRadius: th.space * 0.4 }} />
+        ))}
+      </Box>
+    </Box>
+  )
+}
+
+/** 필터 칩 한 줄: 값마다 '이름 N', 고른 것은 accent. 누르면 그 값 */
+function Filter({ th, s, c, fkey, label, count, name }: { th: Theme; s: State; c: Controller; fkey: string; label: string; count: (v: string) => number; name?: (v: string) => string }) {
+  const cur = filterOf(s, fkey)
+  return (
+    <Box id={`filter:${fkey}`} style={{ flexDirection: 'row', alignItems: 'center', gap: th.space * 0.6, overflow: 'hidden' }}>
+      <T th={th} size="tiny" color={th.faint} line style={{ width: th.size.tiny * 3.2 }}>
+        {label}
+      </T>
+      {filterValues(s, fkey).map(v => {
+        const on = v === cur
+        return (
+          <Box
+            key={v}
+            id={`filter:${fkey}:${v}`}
+            onClick={() => c.setFilter(fkey, v)}
+            style={{ background: on ? th.accentSoft : th.bg, cornerRadius: th.size.tiny, padding: { top: 1, bottom: 1, left: th.space, right: th.space }, hoverBackground: on ? th.accentSoft : th.card, pointerShape: 'pointer', flexShrink: 0 }}
+          >
+            <T th={th} size="tiny" color={on ? th.accent : th.muted} bold={on} line>
+              {`${v === 'all' ? '전체' : (name?.(v) ?? v)} ${count(v)}`}
+            </T>
+          </Box>
+        )
+      })}
+    </Box>
+  )
+}
+
+const REQUEST_LOOK = (th: Theme, status: string): [Rgba, Rgba] =>
+  status === 'open' ? [th.yellow, th.yellowSoft] : status === 'started' ? [th.accent, th.accentSoft] : [th.faint, th.card]
+
+function Requests({ th, s, c }: { th: Theme; s: State; c: Controller }) {
+  const m = s.model!
+  const rows = requestRows(s)
+  const n = (v: string) => (v === 'all' ? m.requests.length : m.requests.filter(r => r.status === v).length)
+  return (
+    <Box style={{ flexDirection: 'column', gap: 2 }}>
+      <Dist th={th} id="requests:dist" title="요청 상태" segs={REQUEST_STATUSES.map(v => ({ key: v, label: v, n: n(v), color: REQUEST_LOOK(th, v)[0] }))} />
+      <Box style={{ margin: { top: th.space * 1.5, bottom: 0, left: 0, right: 0 } }}>
+        <Filter th={th} s={s} c={c} fkey="requests" label="상태 f" count={n} />
+      </Box>
+      <SectionHead th={th} title="요청" count={rows.length} id="requests:head" note="request: 커밋 · 처리 상태 · 가리킨 커밋 수 (×N)" />
+      {rows.length === 0 ? (
+        <T th={th} size="small" color={th.faint}>
+          요청 없음
+        </T>
+      ) : null}
+      {rows.map((r, i) => {
+        const [fg, bg] = REQUEST_LOOK(th, r.status)
+        return (
+          <ListRow key={r.sha} th={th} index={i} id={`row:request:${r.sha}`} selected={s.tab === 'requests' && cursorOf(s) === i} onClick={() => c.moveTo(i)}>
+            <Box style={{ flexDirection: 'row', gap: th.space, alignItems: 'center', width: '100%' }}>
+              <Chip th={th} text={r.status} fg={fg} bg={bg} />
+              <T th={th} size="small" color={r.status === 'refined' ? th.muted : th.fg} line grow>
+                {r.subject}
+              </T>
+              {r.by > 0 ? (
+                <T th={th} size="tiny" color={th.faint} mono>
+                  {`×${r.by}`}
+                </T>
+              ) : null}
+              <T th={th} size="tiny" color={th.faint} mono>
+                {short(r.sha)}
+              </T>
+            </Box>
+          </ListRow>
+        )
+      })}
+    </Box>
+  )
+}
+
+// ---------- 사용자 정의 view (specs/view.md: list · table · progress) ----------
+
+const scalarKeys = (row: unknown): string[] =>
+  row !== null && typeof row === 'object' ? Object.keys(row as Record<string, unknown>).filter(k => { const v = (row as Record<string, unknown>)[k]; return v === null || typeof v !== 'object' }) : []
+const firstStringKey = (row: unknown): string | undefined =>
+  row !== null && typeof row === 'object' ? Object.keys(row as Record<string, unknown>).find(k => typeof (row as Record<string, unknown>)[k] === 'string') : undefined
+const fieldOf = (d: ViewDef, name: string): string | undefined => (typeof d.fields[name] === 'string' ? (d.fields[name] as string) : undefined)
+const num = (x: unknown): number => (Array.isArray(x) ? x.length : typeof x === 'number' ? x : typeof x === 'boolean' ? Number(x) : Number(x) || 0)
+/** 글자 폭 (em 합) */
+const textEm = (s: string) => [...s].reduce((a, ch) => a + charEm(ch), 0)
+
+function ViewTab({ th, s, c, d }: { th: Theme; s: State; c: Controller; d: ViewDef }) {
+  const m = s.model!
+  const data = viewRows(m, d)
+  const where = Object.entries(d.where).map(([k, v]) => `${k}=${String(v)}`).join(', ')
+  const owner = d.owner === 'project' ? '프로젝트 (gnam.json)' : `plugin ${d.owner}`
+  const head = (
+    <Box style={{ flexDirection: 'column', gap: 2 }}>
+      <SectionHead th={th} title={d.title} count={data?.rows.length} id="view:head" note={`${owner} · ${d.view}`} />
+      <T th={th} size="tiny" color={th.faint} mono line id="view:source">
+        {`${d.source}${where ? ` · ${where}` : ''}${data && data.rows.length !== data.all ? ` · 전체 ${data.all} 중` : ''}`}
+      </T>
+    </Box>
+  )
+  if (!data)
+    return (
+      <Box style={{ flexDirection: 'column', gap: th.space }}>
+        {head}
+        <T th={th} size="small" color={th.yellow} id="view:missing">
+          {`데이터 없음: ${d.source} (plugin 이 꺼졌거나 경로가 바뀜)`}
+        </T>
+      </Box>
+    )
+  const rows = data.rows.slice(0, VIEW_ROWS)
+  const more = data.rows.length - rows.length
+  const sel = (i: number) => s.tab === `view:${d.id}` && cursorOf(s) === i
+  let body: ReactNode
+  if (rows.length === 0)
+    body = (
+      <T th={th} size="small" color={th.faint}>
+        항목 없음
+      </T>
+    )
+  else if (d.view === 'table') {
+    const columns = Array.isArray(d.fields.columns) ? (d.fields.columns as string[]) : scalarKeys(rows[0]).slice(0, 4)
+    // 열 폭 = 머리 · 앞 50행 값 중 가장 긴 것 (4-36 em) 비율. 넘치는 칸은 말줄임
+    const weight = columns.map(col => Math.min(36, Math.max(4, textEm(col), ...rows.slice(0, 50).map(r => textEm(show(getPath(r, col)))))))
+    const cells = (vals: string[], opts: { bold?: boolean; color?: Rgba }) =>
+      vals.map((v, k) => (
+        <Box key={k} style={{ flexGrow: weight[k]!, flexShrink: 1, flexBasis: 0, minWidth: 0 }}>
+          <T th={th} size="small" color={opts.color} bold={opts.bold} line>
+            {v}
+          </T>
+        </Box>
+      ))
+    body = (
+      <Box id="view:table" style={{ flexDirection: 'column', gap: 2 }}>
+        <Box id="view:columns" style={{ flexDirection: 'row', gap: th.space * 2, padding: { top: 0, bottom: th.space * 0.6, left: th.space * 1.5, right: th.space * 1.5 }, border: { bottom: [1, th.hairline] } }}>
+          {cells(columns, { bold: true, color: th.muted })}
+        </Box>
+        {rows.map((r, i) => (
+          <ListRow key={i} th={th} index={i} id={`row:view:${i}`} selected={sel(i)} onClick={() => c.moveTo(i)}>
+            <Box style={{ flexDirection: 'row', gap: th.space * 2, width: '100%' }}>{cells(columns.map(col => show(getPath(r, col))), {})}</Box>
+          </ListRow>
+        ))}
+      </Box>
+    )
+  } else if (d.view === 'progress') {
+    const titleKey = fieldOf(d, 'title') ?? firstStringKey(rows[0]) ?? 'key'
+    body = rows.map((r, i) => {
+      const done = num(getPath(r, fieldOf(d, 'done') ?? 'done'))
+      const total = Math.max(done, num(getPath(r, fieldOf(d, 'total') ?? 'total')))
+      return (
+        <ListRow key={i} th={th} index={i} id={`row:view:${i}`} selected={sel(i)} onClick={() => c.moveTo(i)}>
+          <Box style={{ flexDirection: 'row', gap: th.space * 1.5, alignItems: 'center', width: '100%' }}>
+            <T th={th} size="small" line grow>
+              {show(getPath(r, titleKey))}
+            </T>
+            <Bar th={th} done={done} total={total} width={th.size.body * 8} color={total > 0 && done >= total ? th.green : th.accent} />
+            <Box style={{ width: th.size.small * 3.4, flexShrink: 0, flexDirection: 'row', justifyContent: 'end' }}>
+              <T th={th} size="small" color={th.faint} mono>
+                {`${done}/${total}`}
+              </T>
+            </Box>
+          </Box>
+        </ListRow>
+      )
+    })
+  } else {
+    const titleKey = fieldOf(d, 'title') ?? firstStringKey(rows[0])
+    const badgeKey = fieldOf(d, 'badge')
+    const metaKey = fieldOf(d, 'meta')
+    const detailKey = fieldOf(d, 'detail')
+    body = rows.map((r, i) => {
+      const badge = badgeKey ? show(getPath(r, badgeKey)) : ''
+      const detail = detailKey ? show(getPath(r, detailKey)) : ''
+      return (
+        <ListRow key={i} th={th} index={i} id={`row:view:${i}`} selected={sel(i)} onClick={() => c.moveTo(i)}>
+          <Box style={{ flexDirection: 'row', gap: th.space, alignItems: 'center', width: '100%' }}>
+            {badge ? <Chip th={th} text={badge} fg={th.muted} bg={th.card} /> : null}
+            <T th={th} size="small" line grow>
+              {titleKey ? show(getPath(r, titleKey)) : show(r)}
+            </T>
+            {metaKey ? (
+              <T th={th} size="tiny" color={th.faint} mono line>
+                {show(getPath(r, metaKey))}
+              </T>
+            ) : null}
+          </Box>
+          {detail ? (
+            <T th={th} size="tiny" color={th.muted} line>
+              {detail}
+            </T>
+          ) : null}
+        </ListRow>
+      )
+    })
+  }
+  return (
+    <Box style={{ flexDirection: 'column', gap: 2 }}>
+      {head}
+      <Box style={{ flexDirection: 'column', gap: 2, margin: { top: th.space, bottom: 0, left: 0, right: 0 } }}>{body}</Box>
+      {more > 0 ? (
+        <T th={th} size="tiny" color={th.faint}>
+          {`… 외 ${more}개`}
+        </T>
+      ) : null}
+    </Box>
+  )
+}
+
+// ---------- plugin ----------
+
+function Plugins({ th, s, c }: { th: Theme; s: State; c: Controller }) {
+  const m = s.model!
+  return (
+    <Box style={{ flexDirection: 'column', gap: th.space * 0.6 }}>
+      <SectionHead th={th} title="켜진 plugin" count={m.plugins.length} id="plugins:head" note="gnam.json plugins · 명령은 gnam run <plugin> <명령>" />
+      {m.plugins.map((p, i) => (
+        <ListRow key={p.id} th={th} index={i} id={`row:plugin:${p.id}`} selected={s.tab === 'plugins' && cursorOf(s) === i} onClick={() => c.moveTo(i)}>
+          <Box style={{ flexDirection: 'row', gap: th.space, alignItems: 'center', width: '100%' }}>
+            <T th={th} bold mono line>
+              {p.id}
+            </T>
+            <T th={th} size="tiny" color={th.faint} mono line>
+              {`v${p.version}`}
+            </T>
+            <Chip th={th} text={p.kind} fg={th.muted} bg={th.card} />
+            <T th={th} size="tiny" color={th.faint} line grow>
+              {p.skills.length ? `skill ${p.skills.join(' · ')}` : ''}
+            </T>
+          </Box>
+          {p.error ? (
+            <T th={th} size="small" color={th.red} block>
+              {p.error}
+            </T>
+          ) : null}
+          {p.commands.map(cmd => (
+            <Box key={cmd.name} style={{ flexDirection: 'row', gap: th.space * 1.5, width: '100%', padding: { top: 0, bottom: 0, left: th.space * 2, right: 0 } }}>
+              <T th={th} size="small" mono line style={{ width: th.size.small * 6 }}>
+                {cmd.name}
+              </T>
+              <T th={th} size="small" color={th.muted} line grow>
+                {cmd.describe}
+              </T>
+            </Box>
+          ))}
+          {p.sections.map(sec => (
+            <Box key={sec.name} style={{ flexDirection: 'column', gap: 1, width: '100%', padding: { top: th.space * 0.4, bottom: 0, left: th.space * 2, right: 0 } }}>
+              <T th={th} size="tiny" color={th.faint} bold>
+                {`섹션 ${sec.name}`}
+              </T>
+              {sec.lines.map((l, k) => (
+                <T key={k} th={th} size="tiny" color={th.muted} mono line>
+                  {`${k === sec.lines.length - 1 ? '└─' : '├─'} ${l}`}
+                </T>
+              ))}
+            </Box>
+          ))}
+        </ListRow>
+      ))}
+    </Box>
+  )
+}
+
+// ---------- 설정 (읽기 전용) ----------
+
+function Settings({ th, s, c }: { th: Theme; s: State; c: Controller }) {
+  const m = s.model!
+  const st = m.setup
+  let index = 0
+  const row = (id: string, cells: ReactNode[]) => {
+    const i = index++
+    return (
+      <ListRow key={id} th={th} index={i} id={`row:setting:${id}`} selected={s.tab === 'settings' && cursorOf(s) === i} onClick={() => c.moveTo(i)}>
+        <Box style={{ flexDirection: 'row', gap: th.space, alignItems: 'center', width: '100%' }}>
+          {cells.map((x, k) => (
+            <Fragment key={k}>{x}</Fragment>
+          ))}
+        </Box>
+      </ListRow>
+    )
+  }
+  const mark = (ok: boolean | null) => (
+    <T th={th} size="small" color={ok === null ? th.faint : ok ? th.green : th.red} bold mono style={{ width: th.size.small }}>
+      {ok === null ? '·' : ok ? '✓' : '✗'}
+    </T>
+  )
+  // 표시 없는 행도 같은 열에 맞춘다
+  const blank = <Box style={{ width: th.size.small, flexShrink: 0 }} />
+  const name = (text: string) => (
+    <T th={th} size="small" line style={{ width: th.size.small * 9 }}>
+      {text}
+    </T>
+  )
+  const note = (text: string, color = th.muted) => (
+    <T th={th} size="small" color={color} line grow>
+      {text}
+    </T>
+  )
+  const okSkills = st.skills.filter(k => k.ok).length
+  const broken = st.skills.filter(k => !k.ok)
+  const install: [string, boolean | null, string, string][] = [
+    ['hook', st.hooksOk, 'commit-msg hook', st.hooksOk ? (st.hooksPath ?? '') : `core.hooksPath ${st.hooksPath ?? '없음'} · 기대 ${st.hooksExpected ?? '.githooks'}`],
+    ['skills', broken.length === 0, 'skill 링크', `${okSkills}/${st.skills.length}${broken.length ? ` · 깨짐 ${broken.map(k => `${k.dir}/${k.name}`).join(', ')}` : ''}`],
+    ['agents', st.agentsMd.exists && st.agentsMd.inSync, 'AGENTS.md', st.agentsMd.exists ? (st.agentsMd.inSync ? 'gnam 블록 일치' : 'gnam 블록 불일치 (gnam sync)') : '없음'],
+    ['claude', st.claudeMd.exists && st.claudeMd.importsAgents, 'CLAUDE.md', st.claudeMd.exists ? (st.claudeMd.importsAgents ? '@AGENTS.md 가져옴' : '@AGENTS.md 없음') : '없음'],
+    ['handoff', null, '인계 메모', m.hasHandoff ? `있음 · ${m.handoffPath ?? ''}` : '없음'],
+  ]
+  return (
+    <Box style={{ flexDirection: 'column', gap: 2 }}>
+      <SectionHead th={th} title="설치" id="settings:install" note={`gnam ${m.gnamVersion ?? '?'} · ${st.source} · format ${st.format} · 읽기 전용 (고치기는 gnam init · sync · link)`} />
+      {install.map(([id, ok, label, text]) => row(`install:${id}`, [mark(ok), name(label), note(text, ok === false ? th.red : th.muted)]))}
+      <SectionHead th={th} title="설정 문제" count={m.problems.length} id="settings:problems" />
+      {m.problems.length === 0 ? (
+        <T th={th} size="small" color={th.faint}>
+          문제 없음
+        </T>
+      ) : (
+        m.problems.map((p, k) => row(`problem:${k}`, [mark(false), name(p.source ?? '-'), note(p.text, th.fg)]))
+      )}
+      <SectionHead th={th} title="plugin" count={m.plugins.length} id="settings:plugins" note={m.plugins.length ? '켜진 plugin · 버전 · 종류 (자세히는 plugin 탭)' : undefined} />
+      {m.plugins.length === 0 ? (
+        <T th={th} size="small" color={th.faint}>
+          없음 (코어 규약만)
+        </T>
+      ) : (
+        m.plugins.map(p => row(`plugin:${p.id}`, [blank, name(p.id), note(`v${p.version} · ${p.kind}`)]))
+      )}
+      <Box id="settings:config" style={{ flexDirection: 'column', gap: 2, padding: { top: th.space * 0.6, bottom: 0, left: th.space * 2.5 + th.size.small, right: 0 } }}>
+        <T th={th} size="tiny" color={th.faint} line>
+          {`꺼진 내장 plugin: ${st.inactive.length ? st.inactive.join(', ') : '없음'}`}
+        </T>
+        <T th={th} size="tiny" color={th.faint} line>
+          {`gnam.json 추가 키: ${st.extraConfig.length ? st.extraConfig.join(', ') : '없음'}`}
+        </T>
+      </Box>
+      <SectionHead th={th} title="커밋 종류" count={st.kinds.length} id="settings:kinds" note="제목 (format 1) 또는 Gnam trailer (format 2)" />
+      {st.kinds.map((k, i) =>
+        row(`kind:${i}`, [
+          blank,
+          <T th={th} size="tiny" mono line grow>
+            {k.label}
+          </T>,
+          <T th={th} size="small" color={k.owner === 'core' ? th.faint : th.muted} line>
+            {k.owner}
+          </T>,
+        ]),
+      )}
+    </Box>
+  )
+}
+
 const ITEM_LABEL: Record<string, string> = { risk: '위험', remaining: '남은 일', deferred: '미룸', open: '미결', blocking: '막힘' }
+
+const ITEM_COLOR = (th: Theme, kind: string): Rgba =>
+  kind === 'blocking' ? th.red : kind === 'risk' ? th.yellow : kind === 'remaining' ? th.accent : kind === 'open' ? th.orange : th.faint
 
 function Items({ th, s, c }: { th: Theme; s: State; c: Controller }) {
   const m = s.model!
+  const rows = itemRows(s)
+  const kinds = filterValues(s, 'items').slice(1)
+  const n = (v: string) => (v === 'all' ? m.items.length : m.items.filter(i => i.kind === v).length)
   return (
     <Box style={{ flexDirection: 'column', gap: 2 }}>
-      <SectionHead th={th} title="항목 (trace.items)" count={m.items.length} id="items:head" />
-      {m.items.length === 0 ? (
+      <Dist th={th} id="items:dist" title="종류" segs={kinds.map(k => ({ key: k, label: ITEM_LABEL[k] ?? k, n: n(k), color: ITEM_COLOR(th, k) }))} />
+      <Box style={{ margin: { top: th.space * 1.5, bottom: 0, left: 0, right: 0 } }}>
+        <Filter th={th} s={s} c={c} fkey="items" label="종류 f" count={n} name={k => ITEM_LABEL[k] ?? k} />
+      </Box>
+      <SectionHead th={th} title="항목" count={rows.length} id="items:head" note="plan · impl 본문의 위험 · 남은 일 · 미룸 · 미결 기록, 최근 순. 해결 여부는 판정하지 않음" />
+      {rows.length === 0 ? (
         <T th={th} size="small" color={th.faint}>
           없음
         </T>
       ) : null}
-      {m.items.map((it: Item, i) => (
-        <ListRow key={i} th={th} index={i} id={`row:item:${i}`} selected={s.tab === 'items' && s.cursor.items === i} onClick={() => c.moveTo(i)}>
+      {rows.map((it: Item, i) => (
+        <ListRow key={i} th={th} index={i} id={`row:item:${i}`} selected={s.tab === 'items' && cursorOf(s) === i} onClick={() => c.moveTo(i)}>
           <Box style={{ flexDirection: 'row', gap: th.space, alignItems: 'center', width: '100%' }}>
             <Chip th={th} text={ITEM_LABEL[it.kind] ?? it.kind} fg={it.kind === 'risk' ? th.yellow : th.muted} bg={it.kind === 'risk' ? th.yellowSoft : th.card} />
             <T th={th} size="small" grow>
@@ -556,27 +1095,38 @@ function Items({ th, s, c }: { th: Theme; s: State; c: Controller }) {
 
 // ---------- 틀 ----------
 
-const KEYS: Record<TabId, string> = {
-  overview: 'j/k ↑/↓ 이동 · Enter 펼치기 · Esc 접기 · 1-5 탭 · r 새로고침',
-  decisions: 'j/k ↑/↓ 이동 · 1-5 · ←/→ 탭 · r 새로고침',
-  history: 'j/k ↑/↓ 이동 · 1-5 · ←/→ 탭 · r 새로고침',
-  commits: 'j/k ↑/↓ 이동 · 1-5 · ←/→ 탭 · r 새로고침',
-  items: 'j/k ↑/↓ 이동 · 1-5 · ←/→ 탭 · r 새로고침',
+/** 하단 키 안내 (탭 수에 따라 숫자 범위) */
+export function keysHint(s: State): string {
+  const n = Math.min(9, tabsOf(s.model).length)
+  const tabs = `1-${n} · ←/→ 탭`
+  if (s.tab === 'overview') return `j/k ↑/↓ 이동 · Enter 펼치기 · Esc 접기 · ${tabs} · r 새로고침`
+  const filter = hasFilter(s.tab) ? (s.tab === 'commits' ? ' · f 종류 · t topic' : ' · f 필터') : ''
+  return `j/k ↑/↓ 이동${filter} · ${tabs} · r 새로고침`
 }
 
 function Header({ th, s, c }: { th: Theme; s: State; c: Controller }) {
   const m = s.model
   const meta = [m?.branch, m?.gnamVersion ? `gnam ${m.gnamVersion}` : null].filter(Boolean).join(' · ')
+  const plugins = m ? (m.plugins.length ? `plugin ${m.plugins.map(p => p.id).join(' · ')}` : 'plugin 없음 (코어 규약만)') : ''
   return (
-    <Box style={{ flexDirection: 'row', alignItems: 'center', gap: th.space * 1.5, padding: { top: 0, bottom: th.space * 1.5, left: 0, right: 0 } }}>
-      <T th={th} size="title" bold line>
-        {m?.purpose.title ?? m?.project ?? 'gnam'}
-      </T>
-      <T th={th} size="small" color={th.faint} line grow>
-        {meta}
-      </T>
-      <Box style={{ flexDirection: 'row', gap: th.space * 0.5, flexShrink: 0 }}>
-        {TABS.map((t, i) => {
+    <Box style={{ flexDirection: 'column', gap: th.space * 1.2, padding: { top: 0, bottom: th.space * 0.5, left: 0, right: 0 } }}>
+      <Box style={{ flexDirection: 'row', alignItems: 'center', gap: th.space * 1.5 }}>
+        <T th={th} size="title" bold line>
+          {m?.purpose.title ?? m?.project ?? 'gnam'}
+        </T>
+        <Box style={{ flexDirection: 'column', gap: 1, flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0 }}>
+          <T th={th} size="small" color={th.faint} line>
+            {meta}
+          </T>
+          {plugins ? (
+            <T th={th} size="tiny" color={th.faint} line id="plugins-line">
+              {plugins}
+            </T>
+          ) : null}
+        </Box>
+      </Box>
+      <Box style={{ flexDirection: 'row', gap: th.space * 0.5, overflow: 'hidden' }}>
+        {tabsOf(m).map((t, i) => {
           const on = s.tab === t.id
           return (
             <Box
@@ -592,7 +1142,7 @@ function Header({ th, s, c }: { th: Theme; s: State; c: Controller }) {
               }}
             >
               <T th={th} size="small" color={on ? th.accent : th.muted} bold={on} line>
-                {`${i + 1} ${t.label}`}
+                {i < 9 ? `${i + 1} ${t.label}` : t.label}
               </T>
             </Box>
           )
@@ -608,7 +1158,7 @@ export function App({ controller, now = Date.now }: { controller: Controller; no
   const t = now()
   // 탭을 바꾸거나 첫 행으로 오면 맨 위로 (목적 · 섹션 제목이 보이게)
   const scroller = useRef<NodeHandle>(null)
-  const cursor = s.cursor[s.tab]
+  const cursor = cursorOf(s)
   useEffect(() => {
     if (cursor === 0) scroller.current?.scrollTo?.(0)
   }, [s.tab, cursor])
@@ -625,6 +1175,10 @@ export function App({ controller, now = Date.now }: { controller: Controller; no
   else if (s.tab === 'decisions') body = <Decisions th={th} s={s} c={controller} />
   else if (s.tab === 'history') body = <History th={th} s={s} c={controller} now={t} />
   else if (s.tab === 'commits') body = <Commits th={th} s={s} c={controller} now={t} />
+  else if (s.tab === 'requests') body = <Requests th={th} s={s} c={controller} />
+  else if (s.tab === 'plugins') body = <Plugins th={th} s={s} c={controller} />
+  else if (s.tab === 'settings') body = <Settings th={th} s={s} c={controller} />
+  else if (viewOf(s.model, s.tab)) body = <ViewTab th={th} s={s} c={controller} d={viewOf(s.model, s.tab)!} />
   else body = <Items th={th} s={s} c={controller} />
 
   return (
@@ -648,7 +1202,7 @@ export function App({ controller, now = Date.now }: { controller: Controller; no
       </Box>
       <Box style={{ flexDirection: 'row', gap: th.space, border: { top: [1, th.hairline] }, padding: { top: th.space, bottom: 0, left: 0, right: 0 } }}>
         <T th={th} size="tiny" color={th.faint} line grow id="keys">
-          {KEYS[s.tab]}
+          {keysHint(s)}
         </T>
         <T th={th} size="tiny" color={th.faint} line>
           {s.isLoading ? '읽는 중…' : s.loadedAt ? `읽음 ${ago(Math.floor(s.loadedAt / 1000), t)}` : ''}
