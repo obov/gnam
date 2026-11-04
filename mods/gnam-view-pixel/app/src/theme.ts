@@ -23,6 +23,9 @@ export type Theme = {
   yellowSoft: Rgba
   red: Rgba
   redSoft: Rgba
+  /** 끝났지만 남은 일 (다음 계획 필요) */
+  orange: Rgba
+  orangeSoft: Rgba
   /** 글자 크기 (px) */
   size: { title: number; lead: number; body: number; small: number; tiny: number }
   /** 간격 단위 (px) */
@@ -68,6 +71,8 @@ export function makeTheme(colors: TerminalColors | null, basePx: number, preferr
     yellowSoft: mix(bg, yellow, 0.18),
     red,
     redSoft: mix(bg, red, 0.18),
+    orange: mix(red, yellow, 0.45),
+    orangeSoft: mix(bg, mix(red, yellow, 0.45), 0.18),
     size: { title: Math.round(px * 1.5), lead: Math.round(px * 1.15), body: px, small: Math.round(px * 0.86), tiny: Math.round(px * 0.76) },
     space: Math.round(px * 0.5),
     radius: Math.round(px * 0.6),

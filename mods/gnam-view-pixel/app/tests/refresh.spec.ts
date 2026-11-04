@@ -57,12 +57,13 @@ test('선택한 topic 은 갱신 뒤에도 이름으로 유지', async () => {
   const c = new Controller(loader)
   await c.refresh()
   c.key({ key: 'j' })
+  c.key({ key: 'j' })
   c.key({ key: 'enter' })
   assert.equal(c.getState().expanded, 'web')
   repo.head = 'h2'
   await c.refresh()
   assert.equal(c.getState().expanded, 'web')
-  assert.equal(c.getState().cursor.overview, 1)
+  assert.equal(c.getState().cursor.overview, 2)
 })
 
 test('독립 모드 주기 갱신: 같은 상태면 gnam status 0회, HEAD 바뀌면 1회', async () => {

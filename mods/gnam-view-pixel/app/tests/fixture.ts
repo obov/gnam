@@ -91,7 +91,7 @@ export const STATUS = {
         exists: true,
         summary: null,
         problem: null,
-        unimplemented: [],
+        unimplemented: [{ line: 9, text: '압축 형식' }],
         open: [],
         plans: [plan('p5exp000', 'spec.export.plan: 내보내기 기본', 'done', 1, 1)],
         chores: [],

@@ -71,6 +71,8 @@ export type Topic = {
   open: Line[]
   unimplemented: Line[]
   blocking: string[]
+  /** 최근 plan 은 끝났지만 미구현 · 미결 · 막힘이 남음 → '지금' 묶음, '다음 계획 필요' */
+  needsPlan: boolean
   /** 마지막 커밋 시각 */
   lastTime: number | null
 }
@@ -87,7 +89,7 @@ export type Model = {
   gnamVersion: string | null
   purpose: Purpose
   /** next = 시작 전 plan, none = plan 없음 (둘 다 '다음' 묶음) */
-  counts: { topics: number; now: number; next: number; none: number; done: number; stepsDone: number; stepsTotal: number; plans: number; commits: number }
+  counts: { topics: number; now: number; needsPlan: number; next: number; none: number; done: number; stepsDone: number; stepsTotal: number; plans: number; commits: number }
   now: string[]
   next: string[]
   done: string[]
@@ -250,11 +252,15 @@ export function buildModel(raw: Raw): Model {
     const planSummary = live?.summary ?? null
     const exists = t.exists !== false
     const plugin = builtins.has(name) ? name : null
+    const unimplemented = lines(t.unimplemented)
+    const open = lines(t.open)
+    const blocking = blockingAll.filter(b => b.topic === name).map(b => `${b.id ? `${b.id}. ` : ''}${String(b.text ?? '')}`)
+    const needsPlan = status === 'done' && unimplemented.length + open.length + blocking.length > 0
     topics[name] = {
       name,
       specPath: String(t.path ?? `specs/${name}.md`),
       exists,
-      group: GROUP_OF[status] ?? 'next',
+      group: needsPlan ? 'now' : (GROUP_OF[status] ?? 'next'),
       problem: 'problem' in t ? str(t.problem) : null,
       summary,
       planSummary,
@@ -267,9 +273,10 @@ export function buildModel(raw: Raw): Model {
       files,
       pluginActive: plugin ? builtins.get(plugin) === true : true,
       plugin,
-      open: lines(t.open),
-      unimplemented: lines(t.unimplemented),
-      blocking: blockingAll.filter(b => b.topic === name).map(b => `${b.id ? `${b.id}. ` : ''}${String(b.text ?? '')}`),
+      open,
+      unimplemented,
+      blocking,
+      needsPlan,
       lastTime: Math.max(0, ...mine.map(c => c.time), ...plans.map(p => p.time ?? 0)) || null,
     }
     if (!exists) orphans.push(name)
@@ -277,7 +284,11 @@ export function buildModel(raw: Raw): Model {
 
   const live = Object.values(topics).filter(t => t.exists)
   const recent = (a: Topic, b: Topic) => (b.lastTime ?? 0) - (a.lastTime ?? 0) || a.name.localeCompare(b.name)
-  const now = live.filter(t => t.group === 'now').sort(recent).map(t => t.name)
+  // 지금 = 진행 중 (먼저) → 다음 계획 필요 (D4)
+  const now = live
+    .filter(t => t.group === 'now')
+    .sort((a, b) => Number(a.needsPlan) - Number(b.needsPlan) || recent(a, b))
+    .map(t => t.name)
   const next = live.filter(t => t.group === 'next').sort(recent).map(t => t.name)
   const done = live.filter(t => t.group === 'done').sort(recent).map(t => t.name)
 
@@ -290,7 +301,7 @@ export function buildModel(raw: Raw): Model {
   for (const b of blockingAll) decisions.push({ kind: 'blocking', topic: str(b.topic), where: str(b.plan)?.slice(0, 7) ?? str(b.topic) ?? '', text: `${b.id ? `${b.id}. ` : ''}${String(b.text ?? '')}` })
   for (const o of arr(trace.decisions?.open)) decisions.push({ kind: 'open', topic: null, where: `${o.path ?? ''}${o.line ? `:${o.line}` : ''}`, text: String(o.text ?? '') })
   // 진행 중 · 시작 전 plan 이 아직 정할 것 (Decisions expected)
-  for (const name of [...now, ...next]) {
+  for (const name of [...now, ...next].filter(n => !topics[n]!.needsPlan)) {
     const p = [...topics[name]!.plans].reverse().find(x => x.status !== 'superseded')
     for (const d of p?.expected ?? []) decisions.push({ kind: 'expected', topic: name, where: p!.sha.slice(0, 7), text: d })
   }
@@ -302,7 +313,8 @@ export function buildModel(raw: Raw): Model {
   const items = arr(trace.items)
     .map(i => ({ kind: String(i.kind ?? 'item'), text: String(i.text ?? ''), sha: String(i.sha ?? '') }))
     .reverse()
-  const stepsLive = [...now, ...next].map(n => topics[n]!.progress)
+  // 남은 단계는 진행 중 · 시작 전 plan 만 (다음 계획 필요 topic 의 plan 은 끝남)
+  const stepsLive = [...now, ...next].filter(n => !topics[n]!.needsPlan).map(n => topics[n]!.progress)
 
   return {
     project: (typeof s.project === 'string' ? s.project : raw.cwd).split('/').filter(Boolean).at(-1) ?? raw.cwd,
@@ -312,7 +324,8 @@ export function buildModel(raw: Raw): Model {
     purpose: parsePurpose(raw.readme, raw.readmePath),
     counts: {
       topics: live.length,
-      now: now.length,
+      now: now.filter(n => !topics[n]!.needsPlan).length,
+      needsPlan: now.filter(n => topics[n]!.needsPlan).length,
       next: next.filter(n => topics[n]!.status !== 'none').length,
       none: next.filter(n => topics[n]!.status === 'none').length,
       done: done.length,

@@ -60,7 +60,17 @@ test('첫 화면: 목적 → 진행 → 지금 → 다음 → 구현된 기능, 
   assert.ok(order.every(i => i >= 0), `섹션 제목 ${JSON.stringify(order)}`)
   assert.deepEqual([...order].sort((a, b) => a - b), order)
   assert.ok(t.includes('할 일을 기록하는 저장소'))
-  assert.ok(t.includes('spec 6개 · 진행 중 1 · 시작 전 1 · plan 없음 1 · 끝남 3 · 지금 · 다음 단계 1/5'))
+  assert.ok(t.includes('spec 6개 · 진행 중 1 · 다음 계획 필요 1 · 시작 전 1 · plan 없음 1 · 끝남 2 · 지금 · 다음 단계 1/5'))
+  // 진행 막대 칸: 진행 중 · 다음 계획 필요 · 시작 전 · plan 없음 · 끝남
+  assert.deepEqual(ids(byId(tree, 'section:progress-bar'), 'progress-seg:'), ['progress-seg:now', 'progress-seg:needs-plan', 'progress-seg:next', 'progress-seg:none', 'progress-seg:done'])
+  // 행 신호: 미구현 칩 · 다음 계획 필요 칩 (지금 묶음), 막힘 칩
+  assert.deepEqual(ids(byId(tree, 'section:now'), 'topic:'), ['topic:api', 'topic:export'])
+  const exp = texts({ toJSON: () => byId(tree, 'topic:export')! } as ReactTestRenderer)
+  assert.ok(exp.includes('미구현 1'))
+  assert.ok(exp.includes('다음 계획 필요'))
+  const apiRow = texts({ toJSON: () => byId(tree, 'topic:api')! } as ReactTestRenderer)
+  assert.ok(apiRow.includes('막힘 1') && apiRow.includes('미결 1'))
+  assert.ok(!apiRow.includes('다음 계획 필요'))
   // plan 없는 topic 은 '시작 전' 이 아니라 'plan 없음'
   const docs = texts({ toJSON: () => byId(tree, 'topic:docs')! } as ReactTestRenderer)
   assert.ok(docs.includes('plan 없음'))
@@ -68,7 +78,7 @@ test('첫 화면: 목적 → 진행 → 지금 → 다음 → 구현된 기능, 
   assert.equal(byId(tree, 'topic:README'), undefined)
   const done = ids(byId(tree, 'section:done'), 'topic:')
   assert.equal(done.length, c.getState().model!.done.length)
-  assert.deepEqual(done, ['topic:sync', 'topic:lore', 'topic:export'])
+  assert.deepEqual(done, ['topic:sync', 'topic:lore'])
   // 행 = 이름 + 사람용 한 줄 + 진행
   assert.ok(t.includes('앱이 목록을 한 번에 받는다'))
   assert.ok(t.includes('1/3'))
@@ -79,8 +89,9 @@ test('첫 화면: 목적 → 진행 → 지금 → 다음 → 구현된 기능, 
   assert.match(textOf(byId(tree, 'keys')!), /j\/k/)
 })
 
-test('j · enter 로 두 번째 topic 펼침 (문제 → 해결 → 이력 → 세부), 다시 enter 로 접힘', async () => {
+test('j · enter 로 세 번째 topic 펼침 (문제 → 해결 → 이력 → 세부), 다시 enter 로 접힘', async () => {
   const { tree, c, key } = await mount()
+  await key('j')
   await key('j')
   await key('enter')
   assert.equal(c.getState().expanded, 'web')
@@ -96,6 +107,7 @@ test('j · enter 로 두 번째 topic 펼침 (문제 → 해결 → 이력 → �
 
   // ↑ 로 첫 topic, 펼치면 problem · 대체된 plan 이력 · 커밋 · 파일
   await key('up')
+  await key('up')
   await key('return')
   const api = texts({ toJSON: () => byId(tree, 'topic:api')! } as ReactTestRenderer)
   assert.ok(api.includes('앱마다 API 를 따로 불러 느리다'))
@@ -104,6 +116,7 @@ test('j · enter 로 두 번째 topic 펼침 (문제 → 해결 → 이력 → �
   assert.ok(api.includes('src/api.ts'))
   assert.ok(api.includes('막힘 1'))
   // 다른 topic 펼치면 앞의 것은 접힘 (1단)
+  await key('j')
   await key('j')
   await key('enter')
   assert.equal(c.getState().expanded, 'web')

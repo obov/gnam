@@ -153,17 +153,18 @@ function Purpose({ th, m }: { th: Theme; m: Model }) {
 
 function Progress({ th, m }: { th: Theme; m: Model }) {
   const c = m.counts
-  const parts = [`spec ${c.topics}개`, `진행 중 ${c.now}`, `시작 전 ${c.next}`, ...(c.none > 0 ? [`plan 없음 ${c.none}`] : []), `끝남 ${c.done}`]
+  const parts = [`spec ${c.topics}개`, `진행 중 ${c.now}`, ...(c.needsPlan > 0 ? [`다음 계획 필요 ${c.needsPlan}`] : []), `시작 전 ${c.next}`, ...(c.none > 0 ? [`plan 없음 ${c.none}`] : []), `끝남 ${c.done}`]
   if (c.stepsTotal > 0) parts.push(`지금 · 다음 단계 ${c.stepsDone}/${c.stepsTotal}`)
-  const seg = (n: number, color: Rgba, key: string) => (n > 0 ? <Box key={key} style={{ flexGrow: n, flexBasis: 0, height: th.space * 0.8, background: color, cornerRadius: th.space * 0.4 }} /> : null)
+  const seg = (n: number, color: Rgba, key: string) => (n > 0 ? <Box key={key} id={`progress-seg:${key}`} style={{ flexGrow: n, flexBasis: 0, height: th.space * 0.8, background: color, cornerRadius: th.space * 0.4 }} /> : null)
   return (
     <Box style={{ flexDirection: 'column', gap: th.space }}>
       <SectionHead th={th} title="진행" id="section:progress" />
       <T th={th} line id="progress-line">
         {parts.join(' · ')}
       </T>
-      <Box style={{ flexDirection: 'row', gap: 3, width: '100%' }}>
+      <Box id="section:progress-bar" style={{ flexDirection: 'row', gap: 3, width: '100%' }}>
         {seg(c.now, th.accent, 'now')}
+        {seg(c.needsPlan, th.orange, 'needs-plan')}
         {seg(c.next, th.yellow, 'next')}
         {seg(c.none, th.hairline, 'none')}
         {seg(c.done, th.green, 'done')}
@@ -328,7 +329,13 @@ function TopicDetail({ th, t, now }: { th: Theme; t: Topic; now: number }) {
 function TopicRow({ th, t, index, selected, expanded, nameWidth, now, onClick }: { th: Theme; t: Topic; index: number; selected: boolean; expanded: boolean; nameWidth: number; now: number; onClick: () => void }) {
   const ref = useScrollIntoView(selected, index, expanded)
   const off = !t.pluginActive
-  const dot = t.status === 'none' ? th.faint : t.group === 'now' ? th.accent : t.group === 'next' ? th.yellow : th.green
+  const dot = t.status === 'none' ? th.faint : t.needsPlan ? th.orange : t.group === 'now' ? th.accent : t.group === 'next' ? th.yellow : th.green
+  // 남은 일 칩: 막힘만 색 (상태), 미구현 · 미결은 개수만
+  const signals: [string, Rgba, Rgba][] = [
+    ...(t.blocking.length ? [[`막힘 ${t.blocking.length}`, th.red, th.redSoft] as [string, Rgba, Rgba]] : []),
+    ...(t.unimplemented.length ? [[`미구현 ${t.unimplemented.length}`, th.muted, th.bg] as [string, Rgba, Rgba]] : []),
+    ...(t.open.length ? [[`미결 ${t.open.length}`, th.muted, th.bg] as [string, Rgba, Rgba]] : []),
+  ]
   const nameColor = off ? th.faint : th.fg
   return (
     <Box
@@ -353,6 +360,10 @@ function TopicRow({ th, t, index, selected, expanded, nameWidth, now, onClick }:
         <T th={th} color={off ? th.faint : th.muted} line grow>
           {t.headline || t.summary || ''}
         </T>
+        {signals.map(([text, fg, bg]) => (
+          <Chip key={text} th={th} text={text} fg={fg} bg={bg} />
+        ))}
+        {t.needsPlan ? <Chip th={th} text="다음 계획 필요" fg={th.orange} bg={th.orangeSoft} /> : null}
         {t.status === 'none' ? <Chip th={th} text="plan 없음" fg={th.muted} bg={th.bg} /> : null}
         {off ? <Chip th={th} text="plugin 꺼짐" fg={th.faint} bg={th.bg} /> : null}
         {t.progress.total > 0 ? <Bar th={th} done={t.progress.done} total={t.progress.total} width={th.size.body * 3.5} color={off ? th.faint : dot} /> : null}

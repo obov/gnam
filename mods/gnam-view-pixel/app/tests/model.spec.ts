@@ -8,17 +8,20 @@ const build = (status: unknown = STATUS) => buildModel({ cwd: '/repo', status: s
 
 test('now · next · done 분류, done 은 필터 없이 전부', () => {
   const m = build()
-  assert.deepEqual(m.now, ['api'])
+  // 끝났지만 미구현이 남은 export 는 '다음 계획 필요' 로 지금 묶음 (진행 중 뒤)
+  assert.deepEqual(m.now, ['api', 'export'])
+  assert.equal(m.topics.export!.needsPlan, true)
+  assert.equal(m.topics.api!.needsPlan, false)
   // plan 없는 topic (docs) 도 '다음' 묶음이지만 '시작 전' 과 따로 센다
   assert.deepEqual(m.next, ['web', 'docs'])
   assert.equal(m.topics.docs!.status, 'none')
   // 최근 커밋 순
-  assert.deepEqual(m.done, ['sync', 'lore', 'export'])
-  assert.equal(m.counts.done, 3)
+  assert.deepEqual(m.done, ['sync', 'lore'])
+  assert.equal(m.counts.done, 2)
   assert.deepEqual(m.orphans, ['gone'])
   assert.equal(m.topics['']?.name, undefined)
   assert.equal(m.topics.README, undefined, 'readme topic 은 spec 아님')
-  assert.deepEqual(m.counts, { topics: 6, now: 1, next: 1, none: 1, done: 3, stepsDone: 1, stepsTotal: 5, plans: 7, commits: 9 })
+  assert.deepEqual(m.counts, { topics: 6, now: 1, needsPlan: 1, next: 1, none: 1, done: 2, stepsDone: 1, stepsTotal: 5, plans: 7, commits: 9 })
 })
 
 test('plan Summary 가 없으면 커밋 제목 (Goal 아님)', () => {
