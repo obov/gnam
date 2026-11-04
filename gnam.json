@@ -1,1 +1,10 @@
-{ "format": 2, "plugins": [] }
+{
+  "format": 2,
+  "plugins": [
+    "@gnam/multirun",
+    "@gnam/harness",
+    "@gnam/multi-agent",
+    "@gnam/run",
+    "@gnam/merge"
+  ]
+}
