@@ -58,6 +58,7 @@ npx gnam run <plugin> <command>        # plugin 명령
 | `multi-agent` | multi-agent · agent-routing 스킬 · `status` | run, merge, harness |
 | `layout` | `.gnam/layout.json` 폴더 구조 선언 · 커밋마다 새 위반 경고 (`enforce: block` 이면 거부) · `layout:` 커밋 · `where` · `check` · `show` · `capture` | - |
 | `multirun` | 같은 plan 을 N 개 clone 에서 변형 실행 · 원본 tag 보존 · report 비교 · `start` · `sync` · `status` · `collect` · `open` · `close` · `abort` | harness |
+| `export` | 하위 폴더를 배포 전용 저장소로 내보내기 (path + include, `Export-Source` trailer) · 버전 태그 · `build` · `push` · `status` | - |
 
 표기: `@gnam/<id>` (내장) · `./경로` (로컬) · npm 패키지명 (외부).
 

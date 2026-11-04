@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.0
+
+- 내장 plugin `export` (specs/export.md): gnam.json `export.targets` 의 하위 폴더 (+ `include` 파일) 를 배포 전용 저장소로 내보낸다. `gnam run export build` = 로컬 `gnam/export/<id>` 에 `Export-Source` · `Export-Target` trailer 배포 커밋 (변경 없으면 생략), `push` = force 없이 push · version 파일 값 태그, `status` = 마지막 내보낸 원본 · 미반영 커밋 수. 검사 `export/target-missing` · `export/version-format`, status `plugins.export.sections.targets`
+- release: export 를 함께 켜면 export version 파일 변경은 `release: export:<id> <version>` 커밋에서만 (`commit/version-outside`). `Package: export:<id>` 절 = 배포 저장소 주석 태그 메시지. `release publish` 는 export 항목을 건너뛴다
+
 ## 0.6.0
 
 - 내장 plugin `layout` (specs/layout.md): `.gnam/layout.json` 에 폴더 구조를 선언 (eslint-plugin-project-structure folder-structure 호환 부분 집합: structure · rules · ruleId · enforceExistence · 재귀 · regexParameters · ignorePatterns · structureRoot). commit-msg 는 부모 대비 새 위반만 경고, gnam.json `layout.enforce: "block"` 이면 거부. `layout:` 커밋 (layout.json 만 · 본문 Goal). `gnam run layout where · check · show · capture`, status `plugins.layout.sections.rules` (탭) · `violations`
