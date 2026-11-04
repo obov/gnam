@@ -1,0 +1,30 @@
+{
+  "name": "gnam-view-pixel-app",
+  "version": "0.1.0",
+  "private": true,
+  "description": "gnam-view-pixel 의 pixel 앱과 bridge (Claude Code mod 가 실행)",
+  "license": "MIT",
+  "main": "dist/main.cjs",
+  "scripts": {
+    "setup": "npm ci && node node_modules/@zenbu-labs/pixel/scripts/postinstall.mjs && npm run build",
+    "build": "node build.mjs",
+    "typecheck": "tsc -p .",
+    "test": "tsc -p . && node build.mjs --tests && node --test --test-concurrency=1 'dist/tests/*.spec.cjs'"
+  },
+  "allowScripts": {
+    "@zenbu-labs/pixel@0.2.10": true,
+    "esbuild@0.28.2": true
+  },
+  "dependencies": {
+    "@zenbu-labs/pixel": "0.2.10",
+    "react": "18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "24.3.0",
+    "@types/react": "18.3.31",
+    "@types/react-test-renderer": "18.3.1",
+    "esbuild": "0.28.2",
+    "react-test-renderer": "18.3.1",
+    "typescript": "5.9.3"
+  }
+}

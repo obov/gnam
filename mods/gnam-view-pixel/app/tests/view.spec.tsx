@@ -1,0 +1,143 @@
+import assert from 'node:assert/strict'
+import { test } from 'node:test'
+
+import { act, create, type ReactTestRenderer, type ReactTestRendererJSON } from 'react-test-renderer'
+
+import { Controller } from '../src/store.ts'
+import { App } from '../src/view.tsx'
+import { NOW_MS, fakeRepo } from './fixture.ts'
+
+;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+
+type Node = ReactTestRendererJSON
+
+function nodes(tree: ReactTestRenderer): Node[] {
+  const out: Node[] = []
+  const walk = (n: Node | string | null) => {
+    if (!n || typeof n === 'string') return
+    out.push(n)
+    for (const c of n.children ?? []) walk(c as Node | string)
+  }
+  const json = tree.toJSON()
+  for (const n of Array.isArray(json) ? json : [json]) walk(n)
+  return out
+}
+
+const textOf = (n: Node): string => (n.children ?? []).map(c => (typeof c === 'string' ? c : textOf(c as Node))).join('')
+const texts = (tree: ReactTestRenderer) => nodes(tree).filter(n => n.type === 'text').map(textOf)
+const byId = (tree: ReactTestRenderer, id: string) => nodes(tree).find(n => n.props.id === id)
+const ids = (n: Node | undefined, prefix: string): string[] => {
+  if (!n) return []
+  const out: string[] = []
+  const walk = (x: Node) => {
+    if (typeof x.props.id === 'string' && x.props.id.startsWith(prefix)) out.push(x.props.id)
+    for (const c of x.children ?? []) if (typeof c !== 'string') walk(c as Node)
+  }
+  walk(n)
+  return out
+}
+
+async function mount() {
+  const { repo, loader } = fakeRepo()
+  const c = new Controller(loader, null, () => NOW_MS)
+  let tree!: ReactTestRenderer
+  await act(async () => {
+    tree = create(<App controller={c} now={() => NOW_MS} />)
+  })
+  await act(() => c.refresh())
+  const key = async (k: string, mods = {}) => {
+    await act(async () => {
+      c.key({ key: k, mods })
+    })
+  }
+  return { c, tree, repo, key }
+}
+
+test('첫 화면: 목적 → 진행 → 지금 → 다음 → 구현된 기능, 구현된 기능 행 = done topic 수', async () => {
+  const { tree, c } = await mount()
+  const t = texts(tree)
+  const order = ['목적', '진행', '지금', '다음', '구현된 기능'].map(h => t.indexOf(h))
+  assert.ok(order.every(i => i >= 0), `섹션 제목 ${JSON.stringify(order)}`)
+  assert.deepEqual([...order].sort((a, b) => a - b), order)
+  assert.ok(t.includes('할 일을 기록하는 저장소'))
+  assert.ok(t.includes('spec 5개 · 진행 중 1 · 시작 전 1 · 끝남 3 · 지금 · 다음 단계 1/5'))
+  const done = ids(byId(tree, 'section:done'), 'topic:')
+  assert.equal(done.length, c.getState().model!.done.length)
+  assert.deepEqual(done, ['topic:sync', 'topic:lore', 'topic:export'])
+  // 행 = 이름 + 사람용 한 줄 + 진행
+  assert.ok(t.includes('앱이 목록을 한 번에 받는다'))
+  assert.ok(t.includes('1/3'))
+  // 꺼진 plugin 기능 표시
+  assert.ok(texts({ toJSON: () => byId(tree, 'topic:lore')! } as ReactTestRenderer).includes('plugin 꺼짐'))
+  assert.ok(!texts({ toJSON: () => byId(tree, 'topic:sync')! } as ReactTestRenderer).includes('plugin 꺼짐'))
+  // 하단 키 안내 1줄
+  assert.match(textOf(byId(tree, 'keys')!), /j\/k/)
+})
+
+test('j · enter 로 두 번째 topic 펼침 (문제 → 해결 → 이력 → 세부), 다시 enter 로 접힘', async () => {
+  const { tree, c, key } = await mount()
+  await key('j')
+  await key('enter')
+  assert.equal(c.getState().expanded, 'web')
+  const labels = () => nodes(tree).filter(n => n.props.id === 'field-label').map(textOf)
+  assert.deepEqual(labels(), ['문제', '해결', '이력', '세부'])
+  const web = texts({ toJSON: () => byId(tree, 'topic:web')! } as ReactTestRenderer)
+  assert.ok(web.includes('—'), '문제 없음은 비움')
+  assert.ok(web.includes('웹 화면'))
+  assert.ok(web.includes('웹 첫 화면'))
+  await key('enter')
+  assert.equal(c.getState().expanded, null)
+  assert.deepEqual(labels(), [])
+
+  // ↑ 로 첫 topic, 펼치면 problem · 대체된 plan 이력 · 커밋 · 파일
+  await key('up')
+  await key('return')
+  const api = texts({ toJSON: () => byId(tree, 'topic:api')! } as ReactTestRenderer)
+  assert.ok(api.includes('앱마다 API 를 따로 불러 느리다'))
+  assert.ok(api.includes('대체됨'))
+  assert.ok(api.includes('커밋 3'))
+  assert.ok(api.includes('src/api.ts'))
+  assert.ok(api.includes('막힘 1'))
+  // 다른 topic 펼치면 앞의 것은 접힘 (1단)
+  await key('j')
+  await key('enter')
+  assert.equal(c.getState().expanded, 'web')
+  assert.equal(labels().length, 4)
+})
+
+test('뒤쪽 탭: 탭마다 fixture 항목 수만큼 행', async () => {
+  const { tree, c, key } = await mount()
+  const m = c.getState().model!
+  await key('2')
+  assert.equal(c.getState().tab, 'decisions')
+  assert.equal(ids(byId(tree, 'decisions:blocking'), 'row:decision:').length, 1)
+  assert.equal(ids(byId(tree, 'decisions:open'), 'row:decision:').length, 1)
+  assert.equal(ids(byId(tree, 'decisions:expected'), 'row:decision:').length, 3)
+  assert.equal(ids(byId(tree, 'decisions:made'), 'row:decision:').length, 2)
+  await key('3')
+  const plans = nodes(tree).filter(n => String(n.props.id).startsWith('row:plan:'))
+  assert.equal(plans.length, m.history.length)
+  assert.equal(plans[0]!.props.id, 'row:plan:p2api000', '최근 plan 이 위')
+  assert.ok(texts(tree).includes('→ p2api00 가 대체'))
+  await key('4')
+  assert.equal(nodes(tree).filter(n => String(n.props.id).startsWith('row:commit:')).length, 9)
+  await key('5')
+  assert.equal(nodes(tree).filter(n => String(n.props.id).startsWith('row:item:')).length, 3)
+  assert.ok(texts(tree).includes('실측 남음 · 두 번째 줄'))
+  await key('tab', { shift: true })
+  assert.equal(c.getState().tab, 'commits')
+  await key('1')
+  assert.equal(c.getState().tab, 'overview')
+})
+
+test('r 은 강제 새로고침, 읽기 실패 시 기존 화면 + 오류 1줄', async () => {
+  const { tree, c, repo, key } = await mount()
+  repo.fail = true
+  await key('r')
+  await act(() => c.refresh(true))
+  assert.ok(byId(tree, 'topic:api'), '기존 topic 유지')
+  assert.match(textOf(byId(tree, 'error-line')!), /boom: gnam\.json 깨짐/)
+  repo.fail = false
+  await act(() => c.refresh(true))
+  assert.equal(byId(tree, 'error-line'), undefined)
+})
