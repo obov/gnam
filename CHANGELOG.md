@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- trace 단계 (specs/info.md): plan Plan: 절의 단계 줄 `S1 제목` · `S1. 제목` 과 impl `Plan: <hash>` 의 단계 참조 `S3` · `S1-S3` · `S1-3` · `S3a` (단계 3) 를 숫자 단계와 같게 읽는다. S 번호로 기록한 저장소의 plan 이 0/0 대신 실제 진행 n/m · status 를 낸다
 - spec 문제 줄 (specs/human-summary.md): spec 첫 줄 (`# <topic> — <해결하는 기능>`) 다음 문단 첫 줄 `문제: <사람이 겪는 문제>`. 검사 없음. `templates/specs-README.md` · plan 규약 문서에 형식
 - `gnam status` trace: `topics.<topic>.problem` (문제 줄 값, 없으면 null). `--schema` 에 키 추가 (schema 판 그대로)
 

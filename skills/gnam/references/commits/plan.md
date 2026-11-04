@@ -32,7 +32,7 @@ trailer     Gnam: spec.<topic>.plan · Summary · Blocking · Supersedes (대체
 ```text
 Summary             (trailer) 사람용 한 줄 (120자 이하). 이 계획이 끝나면 사용하는 사람에게 무엇이 달라지는가. 필수 (commit/plan-summary)
 Goal                이 계획이 끝나면 무엇이 참이 되는가
-Plan                단계 목록. 단계마다 완료: 조건
+Plan                단계 목록. 단계마다 완료: 조건. 단계 줄은 들여쓰기 없이 `1. 제목` 또는 `S1 제목` · `S1. 제목` (마일스톤 S 번호)
 Scope               바꿀 실제 경로. 범위 밖은 명시
 Blocking            (trailer) 착수 전에 사람이 확정해야 하는 결정. 'Blocking: 없음' 또는 항목마다 'Blocking: B<n> <내용>' 반복
 Decisions expected  구현자가 정해도 되는 결정 (D1…). 결과는 impl 커밋 Decisions 에 번호와 함께
