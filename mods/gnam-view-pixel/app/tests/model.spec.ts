@@ -9,13 +9,16 @@ const build = (status: unknown = STATUS) => buildModel({ cwd: '/repo', status: s
 test('now · next · done 분류, done 은 필터 없이 전부', () => {
   const m = build()
   assert.deepEqual(m.now, ['api'])
-  assert.deepEqual(m.next, ['web'])
+  // plan 없는 topic (docs) 도 '다음' 묶음이지만 '시작 전' 과 따로 센다
+  assert.deepEqual(m.next, ['web', 'docs'])
+  assert.equal(m.topics.docs!.status, 'none')
   // 최근 커밋 순
   assert.deepEqual(m.done, ['sync', 'lore', 'export'])
   assert.equal(m.counts.done, 3)
   assert.deepEqual(m.orphans, ['gone'])
   assert.equal(m.topics['']?.name, undefined)
-  assert.deepEqual(m.counts, { topics: 5, now: 1, next: 1, done: 3, stepsDone: 1, stepsTotal: 5, plans: 7, commits: 9 })
+  assert.equal(m.topics.README, undefined, 'readme topic 은 spec 아님')
+  assert.deepEqual(m.counts, { topics: 6, now: 1, next: 1, none: 1, done: 3, stepsDone: 1, stepsTotal: 5, plans: 7, commits: 9 })
 })
 
 test('plan Summary 가 없으면 커밋 제목 (Goal 아님)', () => {
@@ -61,6 +64,10 @@ test('topic 커밋 · 파일 · 결정', () => {
   ])
   assert.deepEqual(api.blocking, ['B1. 인증 방식 미정'])
   assert.deepEqual(m.decisions.map(d => d.kind), ['blocking', 'open', 'expected', 'expected', 'expected', 'made', 'made'])
+  // 막힘의 where = plan sha (trace.decisions.blocking 의 plan)
+  assert.equal(m.decisions[0]!.where, 'p2api00')
+  // 항목은 최근 순 (trace.items 의 역순)
+  assert.deepEqual(m.items.map(i => i.sha), ['ccccccc3', 'bbbbbbb2', 'aaaaaaa1'])
   // 시각 모름 (git log 범위 밖) 은 가장 오래된 쪽
   assert.deepEqual(m.history.map(p => p.sha).slice(0, 3), ['p7gone00', 'p1api000', 'p5exp000'])
   assert.equal(m.history.at(-1)!.sha, 'p2api000')

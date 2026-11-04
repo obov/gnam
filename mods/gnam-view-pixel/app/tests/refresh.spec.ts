@@ -34,6 +34,24 @@ test('갱신: 같은 HEAD 면 gnam status 0회, 바뀌면 1회, 실패 시 기�
   assert.equal(c.getState().error, null)
 })
 
+test('README · 인계 메모 수정 시각만 바뀌어도 다시 읽음', async () => {
+  const { repo, loader } = fakeRepo()
+  const c = new Controller(loader)
+  await c.refresh()
+  await c.refresh()
+  assert.equal(loader.statusCalls, 1)
+  repo.mtimes['/repo/README.md'] = 2
+  await c.refresh()
+  assert.equal(loader.statusCalls, 2, 'README.md 수정 → 1회')
+  await c.refresh()
+  assert.equal(loader.statusCalls, 2)
+  repo.mtimes['/repo/.git/gnam/handoff.md'] = 5
+  await c.refresh()
+  assert.equal(loader.statusCalls, 3, '인계 메모 생김 → 1회')
+  await c.refresh()
+  assert.equal(loader.statusCalls, 3)
+})
+
 test('선택한 topic 은 갱신 뒤에도 이름으로 유지', async () => {
   const { repo, loader } = fakeRepo()
   const c = new Controller(loader)

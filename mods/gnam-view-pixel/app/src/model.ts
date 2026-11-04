@@ -86,7 +86,8 @@ export type Model = {
   head: string | null
   gnamVersion: string | null
   purpose: Purpose
-  counts: { topics: number; now: number; next: number; done: number; stepsDone: number; stepsTotal: number; plans: number; commits: number }
+  /** next = 시작 전 plan, none = plan 없음 (둘 다 '다음' 묶음) */
+  counts: { topics: number; now: number; next: number; none: number; done: number; stepsDone: number; stepsTotal: number; plans: number; commits: number }
   now: string[]
   next: string[]
   done: string[]
@@ -100,6 +101,8 @@ export type Model = {
   commits: Commit[]
   items: Item[]
   problems: string[]
+  /** 인계 메모 파일 경로 (변경 감지용, status handoff.path) */
+  handoffPath: string | null
 }
 
 type Json = Record<string, any>
@@ -233,7 +236,8 @@ export function buildModel(raw: Raw): Model {
   const topics: Record<string, Topic> = {}
   const orphans: string[] = []
   for (const [name, t] of Object.entries((trace.topics ?? {}) as Record<string, Json>)) {
-    if (name === '') continue
+    // '' = spec 없는 chore 묶음, readme = specs/README.md (spec 아님)
+    if (name === '' || name.toLowerCase() === 'readme') continue
     const plans = arr(t.plans).map(p => toPlan(name, p, times))
     const live = [...plans].reverse().find(p => p.status !== 'superseded') ?? null
     const status = live?.status ?? 'none'
@@ -282,7 +286,8 @@ export function buildModel(raw: Raw): Model {
     .sort((a, b) => (a.time ?? 0) - (b.time ?? 0) || a.topic.localeCompare(b.topic))
 
   const decisions: Decision[] = []
-  for (const b of blockingAll) decisions.push({ kind: 'blocking', topic: str(b.topic), where: str(b.sha)?.slice(0, 7) ?? str(b.topic) ?? '', text: `${b.id ? `${b.id}. ` : ''}${String(b.text ?? '')}` })
+  // trace.decisions.blocking = { topic, plan, id, text } (plan = plan 커밋 sha)
+  for (const b of blockingAll) decisions.push({ kind: 'blocking', topic: str(b.topic), where: str(b.plan)?.slice(0, 7) ?? str(b.topic) ?? '', text: `${b.id ? `${b.id}. ` : ''}${String(b.text ?? '')}` })
   for (const o of arr(trace.decisions?.open)) decisions.push({ kind: 'open', topic: null, where: `${o.path ?? ''}${o.line ? `:${o.line}` : ''}`, text: String(o.text ?? '') })
   // 진행 중 · 시작 전 plan 이 아직 정할 것 (Decisions expected)
   for (const name of [...now, ...next]) {
@@ -293,7 +298,10 @@ export function buildModel(raw: Raw): Model {
     for (const d of p.decisions) decisions.push({ kind: 'made', topic: p.topic, where: p.sha.slice(0, 7), text: d })
   }
 
-  const items = arr(trace.items).map(i => ({ kind: String(i.kind ?? 'item'), text: String(i.text ?? ''), sha: String(i.sha ?? '') }))
+  // trace.items 는 오래된 것 → 최근. 화면은 최근 순
+  const items = arr(trace.items)
+    .map(i => ({ kind: String(i.kind ?? 'item'), text: String(i.text ?? ''), sha: String(i.sha ?? '') }))
+    .reverse()
   const stepsLive = [...now, ...next].map(n => topics[n]!.progress)
 
   return {
@@ -305,7 +313,8 @@ export function buildModel(raw: Raw): Model {
     counts: {
       topics: live.length,
       now: now.length,
-      next: next.length,
+      next: next.filter(n => topics[n]!.status !== 'none').length,
+      none: next.filter(n => topics[n]!.status === 'none').length,
       done: done.length,
       stepsDone: stepsLive.reduce((n, p) => n + p.done, 0),
       stepsTotal: stepsLive.reduce((n, p) => n + p.total, 0),
@@ -322,6 +331,7 @@ export function buildModel(raw: Raw): Model {
     commits,
     items,
     problems: arr(s.problems).map(p => (typeof p === 'string' ? p : String(p.message ?? JSON.stringify(p)))),
+    handoffPath: str(s.handoff?.path),
   }
 }
 
@@ -355,10 +365,14 @@ export class Loader {
     private readonly files: Files,
   ) {}
 
-  /** HEAD · gnam.json · specs/*.md 수정 시각 */
+  /** 인계 메모 경로 (마지막 status 의 handoff.path). 첫 읽기 전에는 모른다 (첫 읽기는 늘 읽음) */
+  private handoffPath: string | null = null
+
+  /** HEAD · gnam.json · README · 인계 메모 · specs/*.md 수정 시각 */
   async signature(): Promise<string> {
     const head = await this.exec(['git', 'rev-parse', 'HEAD'], this.cwd).catch(() => null)
     const parts = [head?.code === 0 ? head.stdout.trim() : 'no-head', String(await this.files.mtime(`${this.cwd}/gnam.json`))]
+    for (const f of [`${this.cwd}/README.md`, `${this.cwd}/readme.md`, this.handoffPath]) if (f) parts.push(String(await this.files.mtime(f)))
     const specs = (await this.files.list(`${this.cwd}/specs`)) ?? []
     for (const f of specs.filter(f => f.endsWith('.md')).sort()) parts.push(`${f}@${await this.files.mtime(`${this.cwd}/specs/${f}`)}`)
     return parts.join('|')
@@ -399,7 +413,9 @@ export class Loader {
       readme = await this.files.read(`${this.cwd}/readme.md`)
     }
     const model = buildModel({ cwd: this.cwd, status, readme, readmePath, log: log.code === 0 ? log.stdout : '' })
-    this.last = sig
+    this.handoffPath = model.handoffPath
+    // 인계 메모 경로를 이제 알았으면 그 수정 시각까지 넣은 서명으로 기억 (다음 비교가 같은 모양)
+    this.last = model.handoffPath ? await this.signature() : sig
     return model
   }
 }

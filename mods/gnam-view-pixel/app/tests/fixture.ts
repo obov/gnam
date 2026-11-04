@@ -29,6 +29,7 @@ export const STATUS = {
     { id: 'run', active: true, requires: [] },
   ],
   problems: [],
+  handoff: { path: '/repo/.git/gnam/handoff.md', exists: false, content: null, modifiedAt: null },
   env: { branch: 'main' },
   trace: {
     head: 'h1',
@@ -39,7 +40,7 @@ export const STATUS = {
       { kind: 'open', text: '보존 기간', sha: 'ccccccc3' },
     ],
     decisions: {
-      blocking: [{ topic: 'api', id: 'B1', text: '인증 방식 미정', sha: 'p2api000' }],
+      blocking: [{ topic: 'api', id: 'B1', text: '인증 방식 미정', plan: 'p2api000' }],
       open: [{ path: 'specs/api.md', line: 3, text: '보존 기간' }],
     },
     topics: {
@@ -105,6 +106,17 @@ export const STATUS = {
         plans: [plan('p6lore00', 'spec.lore.plan: lore', 'done', 3, 3, { summary: '팀 노하우를 커밋으로 남긴다' })],
         chores: [],
       },
+      docs: {
+        path: 'specs/docs.md',
+        exists: true,
+        summary: '사용 설명서',
+        problem: null,
+        unimplemented: [],
+        open: [],
+        plans: [],
+        chores: [],
+      },
+      README: { path: 'specs/README.md', exists: true, summary: null, unimplemented: [], open: [], plans: [], chores: [] },
       gone: {
         path: 'specs/gone.md',
         exists: false,
@@ -157,10 +169,12 @@ export type FakeRepo = {
   status: unknown
   fail: boolean
   calls: string[][]
+  /** 경로 → 수정 시각 (gnam.json · specs/ 밖) */
+  mtimes: Record<string, number>
 }
 
 export function fakeRepo(): { repo: FakeRepo; loader: Loader } {
-  const repo: FakeRepo = { head: 'h1', status: STATUS, fail: false, calls: [] }
+  const repo: FakeRepo = { head: 'h1', status: STATUS, fail: false, calls: [], mtimes: { '/repo/README.md': 1 } }
   const exec = async (argv: string[]): Promise<ExecResult> => {
     repo.calls.push(argv)
     if (argv[0] === 'git' && argv[1] === 'rev-parse') return { code: 0, stdout: `${repo.head}\n`, stderr: '' }
@@ -176,8 +190,8 @@ export function fakeRepo(): { repo: FakeRepo; loader: Loader } {
   }
   const files: Files = {
     read: async p => (p === '/repo/README.md' ? README : p === '/repo/package.json' ? '{"name":"repo"}' : null),
-    mtime: async p => (p === '/repo/gnam.json' || p.startsWith('/repo/specs/') ? 1 : null),
-    list: async d => (d === '/repo/specs' ? ['api.md', 'web.md', 'sync.md', 'export.md', 'lore.md'] : null),
+    mtime: async p => (p === '/repo/gnam.json' || p.startsWith('/repo/specs/') ? 1 : (repo.mtimes[p] ?? null)),
+    list: async d => (d === '/repo/specs' ? ['api.md', 'web.md', 'sync.md', 'export.md', 'lore.md', 'docs.md', 'README.md'] : null),
   }
   return { repo, loader: new Loader('/repo', exec, files) }
 }
