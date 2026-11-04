@@ -68,7 +68,7 @@ Spec → Plan → Impl → Code
 Code → Impl → Plan → Spec
   git blame -L <start>,<end> <소스 파일>
   git show <impl-hash>            # 본문 Plan: <plan-hash> <단계>
-  git show <plan-hash>            # Goal · Plan · Blocking · Decisions expected · Risks · Open · Supersedes
+  git show <plan-hash>            # Summary · Goal · Plan · Blocking · Decisions expected · Risks · Open · Supersedes
   git show <plan-hash>:specs/<topic>.md
 ```
 

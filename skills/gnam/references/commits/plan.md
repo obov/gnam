@@ -23,12 +23,13 @@ spec 파일을 추가하거나 수정하는 커밋. 본문에 **그 spec을 구�
 ```text
 제목 접두   spec.<topic>.plan:
 파일 수     spec 파일 하나 또는 0 (빈 커밋). 여러 spec 파일 동시 커밋 금지
-본문        Goal · Plan · Scope · Blocking · Decisions expected · Risks · Open · Supersedes (대체할 때) · Breaking (해당할 때)
+본문        Summary · Goal · Plan · Scope · Blocking · Decisions expected · Risks · Open · Supersedes (대체할 때) · Breaking (해당할 때)
 ```
 
 본문 필드:
 
 ```text
+Summary             사람용 한 줄 (120자 이하). 이 계획이 끝나면 사용하는 사람에게 무엇이 달라지는가. 필수 (commit/plan-summary)
 Goal                이 계획이 끝나면 무엇이 참이 되는가
 Plan                단계 목록. 단계마다 완료: 조건
 Scope               바꿀 실제 경로. 범위 밖은 명시
@@ -38,6 +39,14 @@ Risks               구현이 잘못될 수 있는 지점 (R1…)
 Open                이 계획 범위 밖의 미결. 이 계획의 착수를 막지 않는다
 Supersedes          이 계획이 대체하는 이전 plan hash (아래 계획 교체)
 Breaking            쓰는 쪽이 코드 · 설정 · 절차를 바꿔야 하는 변경. 무엇이 깨지는지 · 쓰는 쪽이 할 일. 릴리스 major 근거 (release plugin)
+```
+
+Summary 는 진행 상황을 보는 사람이 읽는다 (specs/human-summary.md). 파일 · 함수 · 내부 용어 대신 결과를 한 줄로.
+Goal 은 구현자용 완료 근거로 그대로 쓴다. Summary 가 Goal 을 대신하지 않는다.
+
+```text
+나쁨  Summary: normalized_name 컬럼 추가, 조회를 normalized 기준으로 전환
+좋음  Summary: 대소문자만 다른 이름으로 workspace 가 둘 생기지 않는다
 ```
 
 결정의 위치:
@@ -78,6 +87,8 @@ git log --grep 'Supersedes: <plan-hash>' --oneline   # 이 plan 을 대체한 pl
 
 ```text
 spec.workspace.plan: 이름을 대소문자 구분 없이 유일하게 만든다
+
+Summary: 대소문자만 다른 이름으로 workspace 가 둘 생기지 않는다
 
 Goal:
 동일 이름의 대소문자 변형이 서로 다른 workspace로 생성되는 문제 제거.

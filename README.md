@@ -27,7 +27,7 @@ Node (>= 20) · Bun (>= 1.2) 모두 지원. 실행 파일은 hook 에서 node �
 ```text
 chore:                spec 과 무관한 변경 (의존성 · 설정 · 도구)
 refactor:             동작 유지 · 구조만. 본문 Goal · Scope · Invariant. specs/ 변경 금지
-spec.<topic>.plan:    spec 파일 하나 (또는 빈 커밋) + 본문 Goal · Plan · Blocking
+spec.<topic>.plan:    spec 파일 하나 (또는 빈 커밋) + 본문 Summary (사람용 한 줄) · Goal · Plan · Blocking
 spec.<topic>.impl:    본문 첫 줄 Plan: <plan hash> <단계>
 spec.<topic>.chore:   계획 없는 spec 정리. 본문 Goal · Scope
 공통                  Co-authored-by 금지 · squash 금지

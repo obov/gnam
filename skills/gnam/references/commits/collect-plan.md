@@ -39,6 +39,8 @@ From: · Spec: 이 가리키는 커밋은 수집 plan 보다 먼저 커밋된 �
 ```text
 spec.workspace.plan: 남은 작업 수집 — 충돌 정책 · 청구 중단
 
+Summary: 이름 충돌이 난 기존 workspace 를 정리하고, 지운 workspace 에는 더 청구하지 않는다
+
 Goal:
 a1b2c3d · 9f8e7d6 에 남은 항목을 한 plan 에서 마무리.
 

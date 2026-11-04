@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.0
+
+- plan 커밋 본문 `Summary:` 필수 (사람용 한 줄, 120자 이하, 규칙 `commit/plan-summary`). commit-msg · `verify --range` · `--push` 는 항상, 전체 `verify` 는 첫 Summary plan 이후만 검사 (도입 전 plan 면제)
+- `gnam status` trace: `topics.<topic>.summary` (spec 첫 줄 `# <topic> — <설명>`) · `plans[].summary`
+- 이전: 새 plan 커밋에 'Summary: <이 계획이 끝나면 사용하는 사람에게 무엇이 달라지는가>' 한 줄을 쓴다. 기존 plan 은 고치지 않는다. npx gnam sync 로 AGENTS.md 블록 갱신
+
 ## 0.4.0
 
 - 내장 plugin `multirun`: 착수 가능한 plan 하나를 N 개 clone 에서 변형 agent 가 각자 구현. 변형 커밋은 원본 tag `multirun/<run-id>/vN/…` 로 보존, 요약 세션이 `multirun.<topic>.report` 로 비교, 결정 커밋 `Multirun: <report> <vN|combine|discard>`. `gnam run multirun start · sync · status · collect · open · close · abort`
