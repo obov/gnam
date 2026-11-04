@@ -15,6 +15,7 @@ type Calls = { run: string[][]; http: { url: string; body: unknown }[]; blits: u
 function engine($: any, on: any, launch: { stdout: string; exitCode: number }, surfaces: string[] = ['terminal']): Calls {
   const calls: Calls = { run: [], http: [], blits: [] }
   const clock = mock.clock(on)
+  mock.env(on, {})
   let polls = 0
   on('command.register', () => ({ value: { command: 'gnam-pixel' } }))
   on('ui.open', () => ({ value: { isPlaced: true } }))

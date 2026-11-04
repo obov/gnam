@@ -17,6 +17,16 @@
         "dark",
         "light"
       ]
+    },
+    "split": {
+      "type": "string",
+      "title": "herdr 분할 방향",
+      "description": "herdr 안에서 /gnam-pixel 이 앱을 띄울 분할 pane 의 방향 (Claude Code pane 기준)",
+      "default": "right",
+      "options": [
+        "right",
+        "down"
+      ]
     }
   }
 }
