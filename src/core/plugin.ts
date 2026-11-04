@@ -74,6 +74,18 @@ export interface StatusSection {
   deep?: boolean
   schema?: object
   collect(ctx: StatusContext): unknown | Promise<unknown>
+  /** 이 섹션을 탭으로 보여 주는 정의 (specs/view.md). id · source 는 gnam 이 정한다 */
+  view?: ViewHint
+}
+
+/** 탭 정의 중 plugin 이 정하는 부분 (specs/view.md '탭 정의') */
+export interface ViewHint {
+  title: string
+  view: "list" | "table" | "progress"
+  where?: Record<string, string | number | boolean | null>
+  /** title · badge · meta · detail · done · total = 키 점 경로, columns = 키 점 경로 목록 */
+  fields?: Partial<Record<"title" | "badge" | "meta" | "detail" | "done" | "total", string>> & { columns?: string[] }
+  icon?: string
 }
 
 export interface OutputFormat {

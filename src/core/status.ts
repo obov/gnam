@@ -12,6 +12,7 @@ import type { StatusContext } from "./plugin.ts"
 import { pluginLine, summary } from "./summary.ts"
 import { CORE_RULES } from "./rules.ts"
 import { collectTrace } from "./trace.ts"
+import { collectViews } from "./view.ts"
 import { verifySkills } from "./skills.ts"
 import { agentsProblems, HOOKS_DIR, hookProblems, isLink, skillDirs, skillProblems, skillSources } from "./project.ts"
 
@@ -214,8 +215,16 @@ export async function problemsOf(ctx: Context): Promise<Problem[]> {
   for (const message of [...hookProblems(ctx.cwd), ...skillProblems(ctx.cwd, loaded), ...agentsProblems(ctx.cwd, loaded)])
     problems.push({ source: "install", message })
   for (const message of verifySkills(ctx.cwd, loaded.map((l) => l.plugin))) problems.push({ source: "install", message: `스킬 ${message}` })
+  for (const message of (await viewsOf(ctx)).problems) problems.push({ source: "config", message })
   problems.push(...ctx.late)
   return problems
+}
+
+/** 탭 정의 (specs/view.md). 프로젝트 탭 · plugin 섹션 view */
+async function viewsOf(ctx: Context) {
+  const { config } = ctx.config()
+  const { loaded } = await ctx.plugins()
+  return ctx.once("views", () => collectViews(config, loaded.map((l) => l.plugin)))
 }
 
 function handoffOf(cwd: string) {
@@ -311,6 +320,10 @@ export const SECTIONS: [string, Section][] = [
       }
       return out
     },
+  ],
+  [
+    "views",
+    async (ctx) => (await viewsOf(ctx)).views,
   ],
   [
     "builtins",

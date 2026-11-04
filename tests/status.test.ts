@@ -10,7 +10,7 @@ test("status 트리: 키 순서 · plugin · 종류 · config · install", async
   const repo = tempRepo({ format: 1, plugins: ["@gnam/recall"] })
   try {
     const tree = await collectStatus({ cwd: repo.root })
-    expect(Object.keys(tree)).toEqual(["schema", "gnam", "project", "config", "plugins", "builtins", "kinds", "rules", "install", "problems", "handoff", "env", "trace"])
+    expect(Object.keys(tree)).toEqual(["schema", "gnam", "project", "config", "plugins", "views", "builtins", "kinds", "rules", "install", "problems", "handoff", "env", "trace"])
     expect(tree["schema"]).toBe(1)
     expect(tree["gnam"]).toMatchObject({ format: 1, source: "checkout" })
     expect(tree["config"]).toMatchObject({ raw: { format: 1, plugins: ["@gnam/recall"] }, effective: { format: 1 } })
