@@ -168,6 +168,7 @@ npx gnam status gnam.version -C ../a -C ../b       # 여러 저장소
 ```
 
 트리 = schema · gnam · project · config · plugins · builtins · kinds · rules · install · problems · handoff · env · trace.
+`trace.topics.<topic>` 의 `summary` · `problem` 은 spec 첫 줄 설명 (해결하는 기능) · 다음 줄 `문제: …` (사람이 겪는 문제), `plans[].summary` 는 plan 의 Summary (사람용 한 줄, specs/human-summary.md).
 형식 json · compact · ndjson · raw · env · text + plugin 형식. 코드에서는 `import { status } from "@obov/gnam/status"`.
 
 ## Claude Code pane (gnam-view)

@@ -50,6 +50,19 @@ Goal 은 구현자용 완료 근거로 그대로 쓴다. Summary 가 Goal 을 �
 좋음  Summary: 대소문자만 다른 이름으로 workspace 가 둘 생기지 않는다
 ```
 
+spec 파일을 새로 만들거나 첫 부분을 고칠 때 사람용 두 줄을 둔다 (specs/human-summary.md, 검사 없음).
+
+```text
+# <topic> — <사람용 한 줄 설명>     해결하는 기능 (gnam status trace.topics.<topic>.summary)
+
+문제: <사람이 겪는 불편>            첫 줄 다음 첫 줄. 이 기능이 없으면 겪는 문제 (trace.topics.<topic>.problem). 뒤는 빈 줄
+```
+
+```text
+나쁨  문제: WorkspaceService 에 이름 정규화가 없음
+좋음  문제: 대소문자만 다른 이름으로 workspace 가 둘 생겨 어느 쪽이 맞는지 헷갈린다
+```
+
 결정의 위치:
 
 ```text
