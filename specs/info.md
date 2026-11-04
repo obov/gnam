@@ -117,7 +117,6 @@ impls       sha · subject · step · deviation · decisions · remaining · def
 - 단계 줄 (plan Plan: 절) = `1. 제목` 또는 `S1 제목` · `S1. 제목` (마일스톤 규약의 S 번호, skills/gnam/references/commits/milestone-close.md). n 은 숫자 부분
 - 하위 단계 줄 = `S4a. 제목` · `S4a 제목` (들여쓰기 없음). 부모 단계 4 의 parts (id `4a` · title · impls) 로 묶는다. 부모 줄 (`S4 …`) 이 없으면 단계 4 를 만들고 title = parts 제목을 ' · ' 로 이음
 - parts 가 있는 단계는 parts 마다 impl 이 있어야 impl 있는 단계로 센다 (status · n/m). 부모 참조 (`S4`) 는 모든 parts 를 가리킨다
-- 미구현: 하위 단계 줄 · parts
 - impl Plan: 의 단계 참조 = `3` · `1-3` · `S3` · `S1-S3` · `S1-3` · 하위 단계 `S3a` (단계 3 을 가리킨다). 쉼표 · 공백으로 여러 개
 - summary 두 키의 형식 · 검사: specs/human-summary.md
 - chores = 그 topic 의 spec.<topic>.chore 커밋 sha · subject · requests. topic 없는 chore · refactor 는 trace.topics."" 아래

@@ -19,7 +19,14 @@ const obj = (properties: Record<string, Schema>, description?: string, extra: Sc
 })
 const marker = obj({ line: int, text: str() })
 
-const STEP = obj({ n: int, title: str(), done: strOrNull("완료: 조건"), impls: arr(str(), "그 단계를 Plan: 으로 가리킨 impl sha") })
+const STEP_PART = obj({ id: str("하위 단계 id (S4a → 4a)"), title: str(), impls: arr(str(), "그 하위 단계 (또는 부모 단계) 를 Plan: 으로 가리킨 impl sha") })
+const STEP = obj({
+  n: int,
+  title: str(),
+  done: strOrNull("완료: 조건"),
+  impls: arr(str(), "그 단계를 Plan: 으로 가리킨 impl sha"),
+  parts: arr(STEP_PART, "하위 단계 (S4a. 줄). 있으면 parts 마다 impl 이 있어야 impl 있는 단계"),
+})
 const IMPL = obj({
   sha: str(),
   subject: str(),

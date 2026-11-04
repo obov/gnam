@@ -4,7 +4,7 @@
 import { fieldsOf } from "./fields.ts"
 import { git, lines } from "./git.ts"
 import type { Problem } from "./status.ts"
-import type { Plan, Trace } from "./trace.ts"
+import { stepHasImpl, type Plan, type Trace } from "./trace.ts"
 
 export interface SummaryInput {
   cwd: string
@@ -55,7 +55,7 @@ export function summary(input: SummaryInput): string {
   const active = [...plans.values()]
     .filter((p) => p.status === "partial" || p.status === "not-started")
     .sort((a, b) => (order.get(a.sha) ?? 0) - (order.get(b.sha) ?? 0))
-    .map((p) => `${topicOf(p)} ${short(p.sha)} ${p.steps.filter((s) => s.impls.length > 0).length}/${p.steps.length}`)
+    .map((p) => `${topicOf(p)} ${short(p.sha)} ${p.steps.filter(stepHasImpl).length}/${p.steps.length}`)
   if (active.length > 0) out.push(`${label("plan")}${capped(active).join(" · ")}`)
 
   trace.decisions.blocking.forEach((b, i) => {

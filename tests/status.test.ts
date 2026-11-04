@@ -104,6 +104,20 @@ test("요약: 문제 · 인계 메모 · 요청 · plan (최근부터 · 외 N) 
   }
 })
 
+test("요약: plan n/m 은 parts 있는 단계를 parts 마다 impl 이 있을 때만 센다 (단계 수 유지)", async () => {
+  const repo = tempRepo(null)
+  try {
+    commit(repo, "chore: gnam 도입", { "gnam.json": JSON.stringify({ format: 1, plugins: [] }) })
+    const p = commit(repo, "spec.a.plan: 나눔\n\nSummary: s\n\nGoal:\ng\n\nPlan:\nS4a. 파서\nS4b. 출력\nS5. 마감\n\nBlocking: 없음")
+    commit(repo, `spec.a.impl: 파서\n\nPlan: ${p.slice(0, 7)} S4a`)
+    commit(repo, `spec.a.impl: 마감\n\nPlan: ${p.slice(0, 7)} S5`)
+    const plan = (await summaryOf(repo.root)).split("\n").find((l) => l.startsWith("plan "))
+    expect(plan).toBe(`plan       a ${p.slice(0, 7)} 1/2`)
+  } finally {
+    repo.cleanup()
+  }
+})
+
 test("요약: 빈 저장소는 첫 줄 · 인계 메모 줄만", async () => {
   const repo = tempRepo()
   try {
@@ -234,6 +248,9 @@ test("--schema: 최상위 키 · trace 하위 키 · plugin 섹션이 schema 에
       const node = JSON.parse(repo.gnam("status", path, "--schema").out) as { type: string[] }
       expect(node.type).toEqual(["string", "null"])
     }
+    const step = JSON.parse(repo.gnam("status", "trace.topics.a.plans.0.steps.0", "--schema").out) as { properties: Record<string, { items?: { properties?: object } }> }
+    expect(Object.keys(step.properties)).toEqual(["n", "title", "done", "impls", "parts"])
+    expect(Object.keys(step.properties["parts"]?.items?.properties ?? {})).toEqual(["id", "title", "impls"])
     const handoffKeys = Object.keys((JSON.parse(repo.gnam("status", "handoff", "--schema").out) as { properties: object }).properties)
     expect(handoffKeys).toEqual(Object.keys(tree["handoff"] as object))
   } finally {

@@ -20,11 +20,25 @@ interface Commit {
   fields: Map<string, string[]>
 }
 
+/** 하위 단계 (`S4a. 제목`). id = '4a' */
+export interface StepPart {
+  id: string
+  title: string
+  impls: string[]
+}
+
 export interface Step {
   n: number
   title: string
   done: string | null
   impls: string[]
+  /** 하위 단계. 없으면 [] */
+  parts: StepPart[]
+}
+
+/** impl 있는 단계: parts 가 있으면 parts 마다 impl, 없으면 단계에 impl (specs/info.md steps · status) */
+export function stepHasImpl(step: Step): boolean {
+  return step.parts.length > 0 ? step.parts.every((p) => p.impls.length > 0) : step.impls.length > 0
 }
 
 export interface Impl {
@@ -142,33 +156,88 @@ function readCommits(cwd: string, boundary: string | null): Commit[] {
   return commits.reverse()
 }
 
-/** '1' · '1-2' · '2, 4' · 'S3' · 'S1-S3' · 'S1-3' · 'S3a' (하위 단계 → 3) → 단계 번호 */
-export function stepNumbers(text: string): number[] {
-  const numbers: number[] = []
-  for (const part of text.split(/[,\s]+/)) {
-    const range = /^S?(\d+)-S?(\d+)$/.exec(part)
-    const single = /^(?:(\d+)|S(\d+)[a-z]?)$/.exec(part)
-    if (range !== null) for (let n = Number(range[1]); n <= Number(range[2]); n++) numbers.push(n)
-    else if (single !== null) numbers.push(Number(single[1] ?? single[2]))
-  }
-  return numbers
+/** 단계 참조 하나: 단계 n, 하위 단계 id (`S3a` → '3a', 없으면 null) */
+export interface StepRef {
+  n: number
+  part: string | null
 }
 
-/** Plan: 절의 단계 줄 (들여쓰기 없음): '1. 제목' · 'S1 제목' · 'S1. 제목'. 'S1:' · 하위 단계 'S1a.' 는 단계 줄 아님 */
-const STEP_LINE = /^(?:(\d+)\.|S(\d+)\.?)\s+(.*)$/
+/** '1' · '1-2' · '2, 4' · 'S3' · 'S1-S3' · 'S1-3' · 'S3a' (하위 단계 3a) → 단계 참조 */
+export function stepRefs(text: string): StepRef[] {
+  const refs: StepRef[] = []
+  for (const part of text.split(/[,\s]+/)) {
+    const range = /^S?(\d+)-S?(\d+)$/.exec(part)
+    const single = /^(?:(\d+)|S(\d+)([a-z])?)$/.exec(part)
+    if (range !== null) for (let n = Number(range[1]); n <= Number(range[2]); n++) refs.push({ n, part: null })
+    else if (single !== null) {
+      const n = Number(single[1] ?? single[2])
+      refs.push({ n, part: single[3] === undefined ? null : `${n}${single[3]}` })
+    }
+  }
+  return refs
+}
 
-/** Plan: 절의 번호 단계. 완료: 줄부터 단계 끝까지가 done */
+/** '1' · '1-2' · '2, 4' · 'S3' · 'S1-S3' · 'S1-3' · 'S3a' (하위 단계 → 3) → 단계 번호 */
+export function stepNumbers(text: string): number[] {
+  return stepRefs(text).map((r) => r.n)
+}
+
+/** Plan: 절의 단계 줄 (들여쓰기 없음): '1. 제목' · 'S1 제목' · 'S1. 제목'. 'S1:' 은 단계 줄 아님 */
+const STEP_LINE = /^(?:(\d+)\.|S(\d+)\.?)\s+(.*)$/
+/** 하위 단계 줄 (들여쓰기 없음): 'S4a. 제목' · 'S4a 제목' (a-z 한 글자). 'S4a:' 는 아님 */
+const PART_LINE = /^S(\d+)([a-z])\.?\s+(.*)$/
+
+/** 완료: 줄부터 끝까지 (줄마다 trim). 없으면 null */
+function doneOf(rest: string[]): string | null {
+  const at = rest.findIndex((l) => /^\s*완료:/.test(l))
+  const done = at < 0 ? null : rest.slice(at).map((l) => l.trim()).join("\n").replace(/^완료:\s*/, "").trim()
+  return done === "" || done === null ? null : done
+}
+
+/**
+ * Plan: 절의 번호 단계. 완료: 줄부터 단계 끝까지가 done.
+ * 하위 단계 줄은 같은 번호의 (가장 최근) 단계의 parts 로 묶고, 그 단계가 없으면 만든다 (title = parts 제목 ' · ').
+ * 하위 단계 본문의 완료: 는 부모 done 에 '<id>: <내용>' 줄로 합친다
+ */
 export function stepsOf(lines: string[] | undefined): Omit<Step, "impls">[] {
-  const steps: { n: number; title: string; rest: string[] }[] = []
+  interface Raw {
+    n: number
+    title: string | null
+    rest: string[]
+    parts: { id: string; title: string; rest: string[] }[]
+  }
+  const steps: Raw[] = []
+  let body: string[] | undefined
   for (const line of lines ?? []) {
     const m = STEP_LINE.exec(line)
-    if (m !== null) steps.push({ n: Number(m[1] ?? m[2]), title: (m[3] ?? "").trim(), rest: [] })
-    else steps.at(-1)?.rest.push(line)
+    const sub = m === null ? PART_LINE.exec(line) : null
+    if (m !== null) {
+      const step: Raw = { n: Number(m[1] ?? m[2]), title: (m[3] ?? "").trim(), rest: [], parts: [] }
+      steps.push(step)
+      body = step.rest
+    } else if (sub !== null) {
+      const n = Number(sub[1])
+      let parent = steps.findLast((s) => s.n === n)
+      if (parent === undefined) {
+        parent = { n, title: null, rest: [], parts: [] }
+        steps.push(parent)
+      }
+      const part = { id: `${n}${sub[2]}`, title: (sub[3] ?? "").trim(), rest: [] as string[] }
+      parent.parts.push(part)
+      body = part.rest
+    } else body?.push(line)
   }
-  return steps.map(({ n, title, rest }) => {
-    const at = rest.findIndex((l) => /^\s*완료:/.test(l))
-    const done = at < 0 ? null : rest.slice(at).map((l) => l.trim()).join("\n").replace(/^완료:\s*/, "").trim()
-    return { n, title, done: done === "" ? null : done }
+  return steps.map(({ n, title, rest, parts }) => {
+    const done = [doneOf(rest), ...parts.map((p) => {
+      const d = doneOf(p.rest)
+      return d === null ? null : `${p.id}: ${d}`
+    })].filter((d) => d !== null)
+    return {
+      n,
+      title: title ?? parts.map((p) => p.title).join(" · "),
+      done: done.length === 0 ? null : done.join("\n"),
+      parts: parts.map((p) => ({ id: p.id, title: p.title, impls: [] })),
+    }
   })
 }
 
@@ -262,7 +331,7 @@ export function collectTrace(cwd: string, since?: string): Trace {
       decisionsExpected: itemsOf(c.fields.get("Decisions expected")),
       risks: itemsOf(c.fields.get("Risks")),
       open: itemsOf(c.fields.get("Open")),
-      steps: stepsOf(c.fields.get("Plan")).map((s) => ({ ...s, impls: [] })),
+      steps: stepsOf(c.fields.get("Plan")).map(({ parts, ...s }) => ({ ...s, impls: [], parts })),
       status: "not-started",
       impls: [],
       topics,
@@ -292,7 +361,15 @@ export function collectTrace(cwd: string, since?: string): Trace {
       }
       if (plan !== undefined) {
         plan.impls.push(record)
-        for (const n of stepNumbers(step)) plan.steps.find((s) => s.n === n)?.impls.push(c.sha)
+        const add = (list: string[]) => {
+          if (!list.includes(c.sha)) list.push(c.sha)
+        }
+        for (const r of stepRefs(step)) {
+          const target = plan.steps.find((s) => s.n === r.n)
+          if (target === undefined) continue
+          add(target.impls)
+          for (const p of target.parts) if (r.part === null || p.id === r.part) add(p.impls)
+        }
         if (range?.shas.has(c.sha) === true) touched.add(plan.sha)
       }
       for (const text of itemsOf(c.fields.get("Remaining"))) items.push({ kind: "remaining", text, sha: c.sha })
@@ -314,7 +391,7 @@ export function collectTrace(cwd: string, since?: string): Trace {
     for (const text of itemsOf(c.fields.get("Deferred"))) items.push({ kind: "deferred", text, sha: c.sha })
   }
   for (const plan of plans.values()) {
-    const withImpl = plan.steps.filter((s) => s.impls.length > 0).length
+    const withImpl = plan.steps.filter(stepHasImpl).length
     plan.status =
       plan.supersededBy !== null
         ? "superseded"

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- trace 하위 단계 (specs/info.md): plan Plan: 절의 하위 단계 줄 `S4a. 제목` · `S4a 제목` 을 단계 4 의 `parts` ({ id · title · impls }) 로 묶는다 (부모 줄 없으면 단계 4 생성, title = parts 제목 ' · '). impl `S4a` 참조는 단계 4 와 parts 4a, `S4` 참조는 단계 4 와 모든 parts 에 연결. parts 가 있는 단계는 parts 마다 impl 이 있어야 status done · 요약 n/m 에 센다 (하위 단계 줄을 쓴 기존 plan 은 done → partial 로 바뀔 수 있다). `--schema` step 에 `parts`
 - trace 단계 (specs/info.md): plan Plan: 절의 단계 줄 `S1 제목` · `S1. 제목` 과 impl `Plan: <hash>` 의 단계 참조 `S3` · `S1-S3` · `S1-3` · `S3a` (단계 3) 를 숫자 단계와 같게 읽는다. S 번호로 기록한 저장소의 plan 이 0/0 대신 실제 진행 n/m · status 를 낸다
 - spec 문제 줄 (specs/human-summary.md): spec 첫 줄 (`# <topic> — <해결하는 기능>`) 다음 문단 첫 줄 `문제: <사람이 겪는 문제>`. 검사 없음. `templates/specs-README.md` · plan 규약 문서에 형식
 - `gnam status` trace: `topics.<topic>.problem` (문제 줄 값, 없으면 null). `--schema` 에 키 추가 (schema 판 그대로)
