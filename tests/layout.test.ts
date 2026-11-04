@@ -216,3 +216,91 @@ test("gnam verify 파일 검사: 기본 warn 통과 · enforce block 이면 실�
     repo.cleanup()
   }
 })
+
+test("커밋 검사: 새 위반만 · warn / block · 필수 파일 삭제 · layout: 커밋 · layout.json 은 layout: 에서만", async () => {
+  const { mkdirSync, rmSync, writeFileSync } = await import("node:fs")
+  const { dirname, join } = await import("node:path")
+  const { tempRepo } = await import("./helpers.ts")
+  const repo = tempRepo({ format: 1, plugins: ["@gnam/layout"] })
+  const write = (path: string, content = path) => {
+    mkdirSync(dirname(join(repo.root, path)), { recursive: true })
+    writeFileSync(join(repo.root, path), content)
+    repo.git("add", path)
+  }
+  const layout = (value: object) => write(".gnam/layout.json", JSON.stringify(value))
+  const check = (message: string) => {
+    writeFileSync(join(repo.root, ".msg"), message)
+    return repo.gnam("commit-msg", join(repo.root, ".msg"))
+  }
+  const commit = (message: string) => {
+    const r = check(message)
+    if (r.status === 0) repo.git("commit", "-q", "--no-verify", "-m", message)
+    return r
+  }
+  const base = { structure: [{ name: "gnam.json" }, { name: "*.md" }, { name: "src", children: [{ name: "*.ts" }] }] }
+  try {
+    write("gnam.json", JSON.stringify({ format: 1, plugins: ["@gnam/layout"] }))
+    layout(base)
+    write("old.js")
+    write("README.md")
+    const adopt = commit("chore: layout 도입")
+    expect(adopt.status).toBe(0)
+    expect(adopt.err).toContain("GNAM/layout/unlisted (warn)")
+    expect(adopt.err).toContain("old.js")
+
+    write("old.js", "changed")
+    const edit = commit("chore: 기존 위반 파일 수정")
+    expect(edit.status).toBe(0)
+    expect(edit.err).not.toContain("GNAM/layout")
+
+    write("src/a.js")
+    const warn = check("chore: 새 위반")
+    expect(warn.status).toBe(0)
+    expect(warn.err).toContain("GNAM/layout/unlisted (warn)")
+    expect(warn.err).toContain("src/a.js")
+    repo.git("rm", "-q", "--cached", "src/a.js")
+    rmSync(join(repo.root, "src/a.js"))
+
+    write("gnam.json", JSON.stringify({ format: 1, plugins: ["@gnam/layout"], layout: { enforce: "block" } }))
+    write("src/index.ts")
+    expect(commit("chore: block · 진입점").status).toBe(0)
+    write("src/a.js")
+    const block = check("chore: 새 위반 (block)")
+    expect(block.status).toBe(1)
+    expect(block.err).toContain("GNAM/layout/unlisted\n")
+    repo.git("rm", "-q", "--cached", "src/a.js")
+
+    layout({ ...base, structure: [base.structure[0], base.structure[1], { name: "src", enforceExistence: "index.ts", children: [{ name: "*.ts" }] }] })
+    expect(check("layout: src 진입점 필수").err).toContain("GNAM/commit/layout-goal")
+    write("README.md", "x")
+    expect(check("layout: src 진입점 필수\n\nGoal: 진입점 고정").err).toContain("GNAM/commit/layout-files")
+    repo.git("reset", "-q", "README.md")
+    expect(commit("layout: src 진입점 필수\n\nGoal: 진입점 고정").status).toBe(0)
+
+    repo.git("rm", "-q", "src/index.ts")
+    write("src/b.ts")
+    const removed = check("chore: 진입점 삭제")
+    expect(removed.status).toBe(1)
+    expect(removed.err).toContain("GNAM/layout/existence")
+    expect(removed.err).toContain("src/index.ts 없음")
+    repo.git("reset", "-q", "--hard", "HEAD")
+
+    layout({ ...base, ignorePatterns: ["x/**"] })
+    const outside = check("chore: 규칙 몰래 변경")
+    expect(outside.status).toBe(1)
+    expect(outside.err).toContain("GNAM/commit/layout-files")
+    repo.git("reset", "-q", "--hard", "HEAD")
+
+    layout({ structure: [{ name: "(" }] })
+    expect(check("layout: 깨진 규칙\n\nGoal: x").err).toContain("GNAM/layout/schema")
+    repo.git("reset", "-q", "--hard", "HEAD")
+
+    const verify = repo.gnam("verify")
+    expect(verify.status).toBe(1)
+    expect(verify.err).toContain("GNAM/layout/unlisted\n")
+    expect(verify.err).toContain("old.js")
+    expect(verify.err).not.toContain("GNAM/commit/")
+  } finally {
+    repo.cleanup()
+  }
+})
