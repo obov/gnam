@@ -1,6 +1,6 @@
 /**
  * 새 버전 확인 · 업그레이드 후 이전 안내 (specs/upgrade.md).
- *   이전 항목   CHANGELOG.md 버전 절 (## <version>) 안의 '- 이전: <할 일>' 줄
+ *   이전 항목   CHANGELOG.md 버전 절 (## <version> · ## [<version>](…)) 안의 '- 이전: <할 일>' 줄 · BREAKING CHANGES 절의 '이전:'
  *   outdated    npm registry dist-tags.latest + 그 버전 tarball 의 CHANGELOG.md
  *   link        <git common dir>/gnam/version 과 설치 버전 비교
  */
@@ -33,25 +33,42 @@ export function compareVersions(a: string, b: string): number {
   return x.pre < y.pre ? -1 : 1
 }
 
-const SECTION = /^##\s+v?(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)\s*$/
+const SECTION = /^##\s+(?:v?(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)|\[v?(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)\]\([^)]*\)(?:\s+\([^)]*\))?)\s*$/
 const MIGRATION = /^\s*-\s*이전:\s*(.+?)\s*$/
+/** release-please 의 BREAKING CHANGES 절 머리 (### ⚠ BREAKING CHANGES) */
+const BREAKING = /^###\s+(?:⚠\s*)?BREAKING CHANGES\s*$/
+/** BREAKING CHANGES 절의 목록 줄 중 '이전:' 뒤. 끝의 커밋 링크 ([hash](url)) 는 뺀다 */
+const BREAKING_MIGRATION = /^\s*[-*]\s.*?이전:\s*(.+?)\s*$/
+const COMMIT_LINK = /\s*\(\[[0-9a-f]{7,40}\]\([^)]*\)\)\s*$/
 
-/** 버전 절마다 이전 항목 (문서 순서) */
+/**
+ * 버전 절마다 이전 항목 (문서 순서).
+ * 절 머리 = '## <version>' · '## [<version>](<link>) (<date>)' (release-please).
+ * 이전 항목 = '- 이전: <할 일>' 줄 · BREAKING CHANGES 절의 '이전:' 을 포함한 목록 줄
+ */
 export function changelogMigrations(text: string): Migration[] {
   const out: Migration[] = []
   let version: string | null = null
+  let breaking = false
   for (const line of text.split(/\r?\n/)) {
     const section = SECTION.exec(line)
     if (section !== null) {
-      version = section[1] ?? null
+      version = section[1] ?? section[2] ?? null
+      breaking = false
       continue
     }
     if (/^#{1,2}\s/.test(line)) {
       version = null
       continue
     }
-    const migration = MIGRATION.exec(line)
-    if (version !== null && migration !== null) out.push({ version, text: migration[1] ?? "" })
+    if (/^###\s/.test(line)) {
+      breaking = BREAKING.test(line)
+      continue
+    }
+    if (version === null) continue
+    const migration = MIGRATION.exec(line) ?? (breaking ? BREAKING_MIGRATION.exec(line) : null)
+    const value = (migration?.[1] ?? "").replace(COMMIT_LINK, "").trim()
+    if (migration !== null && value !== "") out.push({ version, text: value })
   }
   return out
 }

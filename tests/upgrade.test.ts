@@ -59,6 +59,43 @@ test("이전 항목: 0.3.0 → 0.4.1 은 0.3.1 · 0.4.0 · 0.4.1 만 오래된 �
   expect(migrationsBetween(CHANGELOG, "0.4.1", "0.3.0")).toEqual([])
 })
 
+const RELEASE_PLEASE = `# Changelog
+
+## [0.9.0](https://github.com/obov/gnam/compare/v0.8.0...v0.9.0) (2026-11-10)
+
+
+### ⚠ BREAKING CHANGES
+
+* **export:** 설정 키 변경. 이전: gnam.json export.targets 를 export.repos 로 바꾼다 ([abc1234](https://github.com/obov/gnam/commit/abc1234))
+* **view:** 탭 정의 위치 이동 ([def5678](https://github.com/obov/gnam/commit/def5678))
+
+### Features
+
+* **export:** 이전: 이라는 단어가 든 기능 설명 ([1111111](https://github.com/obov/gnam/commit/1111111))
+
+## [0.8.0](https://github.com/obov/gnam/compare/v0.7.0...v0.8.0) (2026-11-05)
+
+
+### Bug Fixes
+
+* 수정 ([2222222](https://github.com/obov/gnam/commit/2222222))
+
+## 0.7.0
+
+- 이전: 0.7.0 할 일
+`
+
+test("이전 항목: release-please 머리 · BREAKING CHANGES 절의 이전: · 기존 형식과 공존", () => {
+  expect(changelogMigrations(RELEASE_PLEASE)).toEqual([
+    { version: "0.9.0", text: "gnam.json export.targets 를 export.repos 로 바꾼다" },
+    { version: "0.7.0", text: "0.7.0 할 일" },
+  ])
+  expect(migrationsBetween(RELEASE_PLEASE, "0.6.0", "0.9.0").map((m) => m.version)).toEqual(["0.7.0", "0.9.0"])
+  expect(migrationsBetween(RELEASE_PLEASE, "0.8.0", "0.9.0").map((m) => m.text)).toEqual([
+    "gnam.json export.targets 를 export.repos 로 바꾼다",
+  ])
+})
+
 test("link 이전 안내: 기록 없음 → 기록만, 0.3.0 → 0.4.0 출력 후 갱신, 다운그레이드 → 안내 없이 갱신", () => {
   const repo = tempRepo()
   try {
