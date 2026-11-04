@@ -31,8 +31,19 @@ export type PixelNotice = {
   text: string
 } | null
 
+/** herdr 분할 pane 모드에서 연 pane (null = 열지 않음). 세션 동안 ($.state) 유지: reload 뒤에도 같은 pane */
+export type SplitPane = {
+  /** 연 pane id (herdr pane split 의 result.pane.pane_id) */
+  pane: string
+  /** 그 pane 의 tab */
+  tab: string | null
+  /** 분할한 Claude Code pane (HERDR_PANE_ID) */
+  caller: string
+  direction: 'right' | 'down'
+} | null
+
 declare module 'claude-code' {
   interface PluginState {
-    'gnam-view-pixel': { notice: Shaped<PixelNotice> }
+    'gnam-view-pixel': { notice: Shaped<PixelNotice>; split: Shaped<SplitPane> }
   }
 }

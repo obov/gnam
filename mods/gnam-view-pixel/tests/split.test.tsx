@@ -1,7 +1,7 @@
 import { expect, mock, test } from 'claude-code/testing'
 
 // herdr 안 (HERDR_ENV=1): /gnam-pixel 은 bridge 대신 herdr 분할 pane 에서 pixel 앱을 직접 실행한다
-const HERDR = { HERDR_ENV: '1', HERDR_PANE_ID: 'w1:p1', HERDR_BIN_PATH: '/bin/herdr' }
+const HERDR = { HERDR_ENV: '1', HERDR_PANE_ID: 'w1:p1', HERDR_TAB_ID: 'w1:t1', HERDR_BIN_PATH: '/bin/herdr' }
 const CHECK = JSON.stringify({ pixel: '/plug/app/node_modules/.bin/pixel', entry: '/plug/app/dist/main.cjs' })
 
 type Herdr = { panes: Set<string>; next: number; fail?: string }
@@ -14,7 +14,7 @@ function engine(on: any, env: Record<string, string>, herdr: Herdr = { panes: ne
   on('ui.open', () => ({ value: { isPlaced: true } }))
   on('ui.close', () => ({ value: undefined }))
   on('session.start', (_: unknown, e: any) => ({ cwd: e.cwd }))
-  on('session.end', () => ({}))
+  on('session.end', () => ({ sessionId: 's1' }))
   on('session.cwd', () => ({ value: '/repo' }))
   on('session.surfaces', () => ({ value: ['terminal'] }))
   on('http.fetch', () => ({ value: { status: 500, ok: false, headers: {}, text: '' } }))
@@ -86,6 +86,54 @@ test('herdr pane run 실패: 만든 pane 을 닫는다', async ($, on) => {
   await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
   const r = await $.command.run({ command: 'gnam-pixel', args: '' } as any)
   expect(r.text).toContain('앱을 실행할 수 없음')
+  expect(herdr('pane close').map(a => a[3])).toEqual(['w1:p2'])
+})
+
+test('두 번째 /gnam-pixel: split 1회 유지 + focus, close 에서 pane close', async ($, on) => {
+  const { herdr } = engine(on, HERDR)
+  await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+  await $.command.run({ command: 'gnam-pixel', args: '' } as any)
+  const again = await $.command.run({ command: 'gnam-pixel', args: '' } as any)
+  expect(again.text).toContain('이동했습니다')
+  expect(herdr('pane split')).toHaveLength(1)
+  expect(herdr('pane get').map(a => a[3])).toEqual(['w1:p2'])
+  expect(herdr('pane focus')[0]!.slice(1)).toEqual(['pane', 'focus', '--direction', 'right', '--pane', 'w1:p1'])
+
+  const closed = await $.command.run({ command: 'gnam-pixel', args: 'close' } as any)
+  expect(closed.text).toContain('닫았습니다')
+  expect(herdr('pane close').map(a => a[3])).toEqual(['w1:p2'])
+
+  // 닫은 뒤에는 다시 새로 만든다
+  await $.command.run({ command: 'gnam-pixel', args: '' } as any)
+  expect(herdr('pane split')).toHaveLength(2)
+})
+
+test('연 pane 이 다른 tab 으로 옮겨졌으면 그 tab 으로 focus', async ($, on) => {
+  const { herdr } = engine(on, { ...HERDR, HERDR_TAB_ID: 'w1:t9' })
+  await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+  await $.command.run({ command: 'gnam-pixel', args: '' } as any)
+  await $.command.run({ command: 'gnam-pixel', args: '' } as any)
+  expect(herdr('tab focus').map(a => a[3])).toEqual(['w1:t1'])
+  expect(herdr('pane focus')).toHaveLength(0)
+})
+
+test('사용자가 pane 을 닫았으면 (pane get 실패) 새로 만든다', async ($, on) => {
+  const state = { panes: new Set<string>(), next: 2 }
+  const { herdr } = engine(on, HERDR, state)
+  await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+  await $.command.run({ command: 'gnam-pixel', args: '' } as any)
+  state.panes.clear()
+  const r = await $.command.run({ command: 'gnam-pixel', args: '' } as any)
+  expect(r.text).toContain('열었습니다')
+  expect(herdr('pane split')).toHaveLength(2)
+  expect(herdr('pane focus')).toHaveLength(0)
+})
+
+test('세션 종료: 연 pane 을 닫는다', async ($, on) => {
+  const { herdr } = engine(on, HERDR)
+  await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+  await $.command.run({ command: 'gnam-pixel', args: '' } as any)
+  await $.session.end({ reason: 'exit' } as any)
   expect(herdr('pane close').map(a => a[3])).toEqual(['w1:p2'])
 })
 

@@ -9,7 +9,7 @@ import type { EngineInterface, Register } from 'claude-code'
 
 import type { BridgeState, Frame, PixelNotice } from '../types'
 import { isBridgeState, isInputMessage, isLaunchReport, isSizeMessage } from './protocol.ts'
-import { herdrContext, openSplit } from './split.ts'
+import { closeSplit, herdrContext, openSplit } from './split.ts'
 import { MAX_IMAGE_CELLS } from './surface.tsx'
 
 const PANE = 'gnam-pixel'
@@ -221,7 +221,15 @@ export const register: Register = (on, options) => {
       await update($, notice, () => null)
       return { text: 'setup 끝: /gnam-pixel 로 열기' }
     }
-    if (arg === 'close' || (!arg && state.open && !(await read($, notice)))) {
+    if (arg === 'close') {
+      const split = await closeSplit($, await herdrContext($))
+      if (state.open || !split) {
+        await $.ui.close({ id: PANE })
+        await closePane($)
+      }
+      return { text: split ? 'gnam herdr pane 을 닫았습니다' : 'gnam pane 을 닫았습니다' }
+    }
+    if (!arg && state.open && !(await read($, notice))) {
       await $.ui.close({ id: PANE })
       await closePane($)
       return { text: 'gnam pane 을 닫았습니다' }
@@ -318,6 +326,8 @@ export const register: Register = (on, options) => {
 
   on('session.end', async ($, e, next) => {
     const r = await next(e)
+    // 분할 pane 의 앱이 세션보다 오래 남지 않게 닫는다
+    await closeSplit($, await herdrContext($))
     await post($, '/close')
     state.port = null
     return r
