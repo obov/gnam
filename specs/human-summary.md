@@ -73,7 +73,6 @@ trace.topics.<topic>.plans[].summary  plan 의 Summary: 값 (없으면 null)
 
 - `--since` 와 무관하게 현재 spec 파일 · 해당 plan 본문에서 읽는다
 - 스키마 (`--schema`) 에 세 키 추가. schema 판은 그대로 (키 추가)
-- 미구현: `problem` 키 · 스키마 · 이 저장소 spec 의 문제 줄
 
 ## 이전
 

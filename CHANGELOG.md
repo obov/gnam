@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- spec 문제 줄 (specs/human-summary.md): spec 첫 줄 (`# <topic> — <해결하는 기능>`) 다음 문단 첫 줄 `문제: <사람이 겪는 문제>`. 검사 없음. `templates/specs-README.md` · plan 규약 문서에 형식
+- `gnam status` trace: `topics.<topic>.problem` (문제 줄 값, 없으면 null). `--schema` 에 키 추가 (schema 판 그대로)
+
 ## 0.8.0
 
 - 커밋 형식 format 2 (specs/commit-format.md): 제목 Conventional Commits (`<type>(<topic>)[!]: …`), gnam 종류 · 한 줄 필드는 메시지 끝 trailer (`Gnam: spec.<topic>.<plan|impl|chore>` · `Summary` · `Blocking` · `Plan` …). release-please · semantic-release · commitlint 같은 표준 도구가 history 를 그대로 읽는다. `gnam init` 기본값 format 2, 기존 format 1 저장소는 그대로 동작
