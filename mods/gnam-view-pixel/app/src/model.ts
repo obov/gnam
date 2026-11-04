@@ -79,6 +79,10 @@ export type Topic = {
 
 export type Decision = { kind: 'blocking' | 'open' | 'made' | 'expected'; topic: string | null; where: string; text: string }
 export type Item = { kind: string; text: string; sha: string }
+/** trace.requests: open · started · refined, by = 이 요청을 가리킨 커밋 */
+export type Request = { sha: string; subject: string; status: string; by: number }
+/** status problems: source = config · install · plugin … */
+export type Problem = { source: string | null; text: string }
 
 export type Purpose = { title: string | null; tagline: string | null; text: string | null; from: string | null }
 
@@ -102,9 +106,28 @@ export type Model = {
   /** 최근 커밋 → 오래된 것 */
   commits: Commit[]
   items: Item[]
-  problems: string[]
+  problems: Problem[]
   /** 인계 메모 파일 경로 (변경 감지용, status handoff.path) */
   handoffPath: string | null
+  /** 인계 메모가 있음 (.git/gnam/handoff.md) */
+  hasHandoff: boolean
+  requests: Request[]
+  /** 요청 탭 · 신호를 보일지: 요청이 있거나 request plugin 이 켜짐 */
+  hasRequests: boolean
+}
+
+/** 사람이 처리할 신호 (첫 화면 경고 묶음) */
+export function signals(m: Model): { decide: number; blocking: number; open: number; requests: number; problems: number; handoff: boolean } {
+  const blocking = m.decisions.filter(d => d.kind === 'blocking').length
+  const open = m.decisions.filter(d => d.kind === 'open').length
+  return {
+    decide: blocking + open,
+    blocking,
+    open,
+    requests: m.hasRequests ? m.requests.filter(r => r.status !== 'refined').length : 0,
+    problems: m.problems.length,
+    handoff: m.hasHandoff,
+  }
 }
 
 type Json = Record<string, any>
@@ -314,6 +337,7 @@ export function buildModel(raw: Raw): Model {
     .map(i => ({ kind: String(i.kind ?? 'item'), text: String(i.text ?? ''), sha: String(i.sha ?? '') }))
     .reverse()
   // 남은 단계는 진행 중 · 시작 전 plan 만 (다음 계획 필요 topic 의 plan 은 끝남)
+  const requests: Request[] = arr(trace.requests).map(r => ({ sha: String(r.sha ?? ''), subject: stripPrefix(String(r.subject ?? '')), status: String(r.status ?? 'open'), by: Array.isArray(r.by) ? r.by.length : 0 }))
   const stepsLive = [...now, ...next].filter(n => !topics[n]!.needsPlan).map(n => topics[n]!.progress)
 
   return {
@@ -343,8 +367,11 @@ export function buildModel(raw: Raw): Model {
     history,
     commits,
     items,
-    problems: arr(s.problems).map(p => (typeof p === 'string' ? p : String(p.message ?? JSON.stringify(p)))),
+    problems: arr(s.problems).map(p => (typeof p === 'string' ? { source: null, text: p } : { source: str(p.source), text: String(p.message ?? JSON.stringify(p)) })),
     handoffPath: str(s.handoff?.path),
+    hasHandoff: s.handoff?.exists === true,
+    requests,
+    hasRequests: requests.length > 0 || builtins.get('request') === true || (s.plugins !== null && typeof s.plugins === 'object' && 'request' in s.plugins),
   }
 }
 

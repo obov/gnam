@@ -2,14 +2,23 @@
 import type { Loader, Model } from './model.ts'
 import { makeTheme, type TerminalColors, type Theme } from './theme.ts'
 
-export const TABS = [
+export type TabId = string
+export type Tab = { id: TabId; label: string }
+
+/** 고정 탭 */
+export const TABS: Tab[] = [
   { id: 'overview', label: '개요' },
   { id: 'decisions', label: '결정' },
   { id: 'history', label: '이력' },
   { id: 'commits', label: '커밋' },
   { id: 'items', label: '항목' },
-] as const
-export type TabId = (typeof TABS)[number]['id']
+]
+
+/** 이 모델에서 보이는 탭 (순서 = 숫자 키) */
+export function tabsOf(m: Model | null): Tab[] {
+  void m
+  return TABS
+}
 
 /** 커밋 탭에 그리는 최근 커밋 수 (나머지는 개수만) */
 export const COMMIT_ROWS = 300
@@ -20,6 +29,7 @@ export type State = {
   error: string | null
   isLoading: boolean
   tab: TabId
+  /** 탭마다 선택 행 (없으면 0) */
   cursor: Record<TabId, number>
   /** 펼친 topic (1단: 하나만) */
   expanded: string | null
@@ -32,6 +42,8 @@ export type Key = { key: string; mods?: { shift?: boolean; ctrl?: boolean; alt?:
 export function overviewRows(m: Model | null): string[] {
   return m ? [...m.now, ...m.next, ...m.done] : []
 }
+
+export const cursorOf = (s: State, tab: TabId = s.tab): number => s.cursor[tab] ?? 0
 
 export function rowCount(s: State, tab: TabId = s.tab): number {
   const m = s.model
@@ -48,6 +60,7 @@ export function rowCount(s: State, tab: TabId = s.tab): number {
     case 'items':
       return m.items.length
   }
+  return 0
 }
 
 export class Controller {
@@ -67,7 +80,7 @@ export class Controller {
       error: null,
       isLoading: false,
       tab: 'overview',
-      cursor: { overview: 0, decisions: 0, history: 0, commits: 0, items: 0 },
+      cursor: {},
       expanded: null,
       theme: makeTheme(null, this.basePx, themePref),
       loadedAt: 0,
@@ -120,25 +133,28 @@ export class Controller {
     const draft = { ...s, model }
     const cursor = { ...s.cursor }
     // 선택한 topic 을 이름으로 유지
-    const prevName = overviewRows(s.model)[s.cursor.overview]
+    const prevName = overviewRows(s.model)[cursorOf(s, 'overview')]
     const rows = overviewRows(model)
     const at = prevName ? rows.indexOf(prevName) : -1
-    cursor.overview = at >= 0 ? at : Math.min(s.cursor.overview, Math.max(0, rows.length - 1))
-    for (const t of TABS) if (t.id !== 'overview') cursor[t.id] = Math.min(cursor[t.id], Math.max(0, rowCount(draft, t.id) - 1))
+    cursor.overview = at >= 0 ? at : Math.min(cursorOf(s, 'overview'), Math.max(0, rows.length - 1))
+    for (const id of Object.keys(cursor)) if (id !== 'overview') cursor[id] = Math.min(cursor[id] ?? 0, Math.max(0, rowCount(draft, id) - 1))
     const expanded = s.expanded && model.topics[s.expanded] ? s.expanded : null
-    this.set({ model, cursor, expanded, error: null, isLoading: false, loadedAt: this.now() })
+    // 보던 탭이 사라졌으면 (plugin 꺼짐 등) 개요로
+    const tab = tabsOf(model).some(t => t.id === s.tab) ? s.tab : 'overview'
+    this.set({ model, cursor, expanded, tab, error: null, isLoading: false, loadedAt: this.now() })
   }
 
+  /** 없는 탭 (요청 0 + plugin 꺼짐 등) 은 무시 */
   setTab(tab: TabId): void {
-    if (tab !== this.state.tab) this.set({ tab })
+    if (tab !== this.state.tab && tabsOf(this.state.model).some(t => t.id === tab)) this.set({ tab })
   }
 
   move(by: number): void {
     const s = this.state
     const n = rowCount(s)
     if (n === 0) return
-    const next = Math.max(0, Math.min(n - 1, s.cursor[s.tab] + by))
-    if (next !== s.cursor[s.tab]) this.set({ cursor: { ...s.cursor, [s.tab]: next } })
+    const next = Math.max(0, Math.min(n - 1, cursorOf(s) + by))
+    if (next !== cursorOf(s)) this.set({ cursor: { ...s.cursor, [s.tab]: next } })
   }
 
   moveTo(index: number): void {
@@ -152,7 +168,7 @@ export class Controller {
   toggle(name?: string): void {
     const s = this.state
     const rows = overviewRows(s.model)
-    const target = name ?? rows[s.cursor.overview]
+    const target = name ?? rows[cursorOf(s, 'overview')]
     if (!target) return
     const at = rows.indexOf(target)
     this.set({ expanded: s.expanded === target ? null : target, cursor: at >= 0 ? { ...s.cursor, overview: at } : s.cursor })
@@ -163,7 +179,8 @@ export class Controller {
     const k = e.key.toLowerCase()
     const shift = e.mods?.shift === true
     if (e.mods?.ctrl || e.mods?.super || e.mods?.alt) return false
-    const tabIndex = TABS.findIndex(t => t.id === this.state.tab)
+    const tabs = tabsOf(this.state.model)
+    const tabIndex = Math.max(0, tabs.findIndex(t => t.id === this.state.tab))
     switch (k) {
       case 'j':
       case 'down':
@@ -195,22 +212,22 @@ export class Controller {
         if (this.state.expanded) this.set({ expanded: null })
         return true
       case 'tab':
-        this.setTab(TABS[(tabIndex + (shift ? TABS.length - 1 : 1)) % TABS.length]!.id)
+        this.setTab(tabs[(tabIndex + (shift ? tabs.length - 1 : 1)) % tabs.length]!.id)
         return true
       case 'right':
       case 'l':
-        this.setTab(TABS[Math.min(TABS.length - 1, tabIndex + 1)]!.id)
+        this.setTab(tabs[Math.min(tabs.length - 1, tabIndex + 1)]!.id)
         return true
       case 'left':
       case 'h':
-        this.setTab(TABS[Math.max(0, tabIndex - 1)]!.id)
+        this.setTab(tabs[Math.max(0, tabIndex - 1)]!.id)
         return true
       case 'r':
         void this.refresh(true)
         return true
     }
     if (/^[1-9]$/.test(k)) {
-      const t = TABS[Number(k) - 1]
+      const t = tabs[Number(k) - 1]
       if (t) this.setTab(t.id)
       return true
     }

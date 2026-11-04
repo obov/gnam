@@ -1,9 +1,9 @@
 // 화면. 첫 화면 = 목적 → 진행 → 지금 → 다음 → 구현된 기능, topic 펼침 = 문제 → 해결 → 이력 → 세부.
 import { useEffect, useRef, useSyncExternalStore, type ReactNode } from 'react'
 
-import type { Commit, Decision, Item, Model, Plan, Topic } from './model.ts'
+import { signals, type Commit, type Decision, type Item, type Model, type Plan, type Topic } from './model.ts'
 import { Box, Text, type Color, type NodeHandle, type Style } from './pixel.ts'
-import { COMMIT_ROWS, TABS, overviewRows, type Controller, type State, type TabId } from './store.ts'
+import { COMMIT_ROWS, cursorOf, overviewRows, tabsOf, type Controller, type State } from './store.ts'
 import type { Rgba, Theme } from './theme.ts'
 
 const SANS = ['sans-serif']
@@ -169,6 +169,47 @@ function Progress({ th, m }: { th: Theme; m: Model }) {
         {seg(c.none, th.hairline, 'none')}
         {seg(c.done, th.green, 'done')}
       </Box>
+    </Box>
+  )
+}
+
+/**
+ * 사람이 할 일 · 설정 신호 (진행 줄 아래). 있는 것만 한 줄씩 (누르면 해당 탭),
+ * 0 인 것은 흐린 한 줄로 접는다: '사람이 할 일 없음 · 설정 정상'
+ */
+function Signals({ th, m, c }: { th: Theme; m: Model; c: Controller }) {
+  const g = signals(m)
+  type Row = { id: string; dot: Rgba; label: string; detail: string; tab: string }
+  const rows: Row[] = []
+  if (g.decide > 0)
+    rows.push({ id: 'decide', dot: g.blocking > 0 ? th.red : th.yellow, label: `결정할 것 ${g.decide}`, detail: [g.blocking ? `막힘 ${g.blocking}` : '', g.open ? `미결 ${g.open}` : ''].filter(Boolean).join(' · '), tab: 'decisions' })
+  if (g.requests > 0) rows.push({ id: 'requests', dot: th.yellow, label: `처리 중인 요청 ${g.requests}`, detail: m.requests.filter(r => r.status !== 'refined').map(r => r.subject).join(' · '), tab: 'requests' })
+  if (g.problems > 0) rows.push({ id: 'problems', dot: th.red, label: `설정 문제 ${g.problems}`, detail: m.problems.map(p => p.text).join(' · '), tab: 'settings' })
+  if (g.handoff) rows.push({ id: 'handoff', dot: th.accent, label: '인계 메모 있음', detail: m.handoffPath?.replace(/^.*\/(\.git\/)/, '$1') ?? '', tab: 'settings' })
+  const ok = [g.decide === 0 && g.requests === 0 ? '사람이 할 일 없음' : '', g.problems === 0 ? '설정 정상' : ''].filter(Boolean).join(' · ')
+  return (
+    <Box id="section:signals" style={{ flexDirection: 'column', gap: 2, margin: { top: th.space * 1.5, bottom: 0, left: 0, right: 0 } }}>
+      {rows.map(r => (
+        <Box
+          key={r.id}
+          id={`signal:${r.id}`}
+          onClick={() => c.setTab(r.tab)}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: th.space, width: '100%', cornerRadius: th.radius * 0.6, padding: { top: 2, bottom: 2, left: 0, right: th.space }, hoverBackground: th.card, pointerShape: 'pointer' }}
+        >
+          <Box style={{ width: th.space, height: th.space, cornerRadius: th.space / 2, background: r.dot, flexShrink: 0 }} />
+          <T th={th} size="small" bold line>
+            {r.label}
+          </T>
+          <T th={th} size="small" color={th.muted} line grow>
+            {r.detail}
+          </T>
+        </Box>
+      ))}
+      {ok ? (
+        <T th={th} size="small" color={th.faint} line id="signal:ok">
+          {ok}
+        </T>
+      ) : null}
     </Box>
   )
 }
@@ -395,7 +436,7 @@ function TopicSection({ th, s, c, names, title, id, start, nameWidth, now }: { t
             t={m.topics[n]!}
             index={start + i}
             nameWidth={nameWidth}
-            selected={s.tab === 'overview' && s.cursor.overview === start + i}
+            selected={s.tab === 'overview' && cursorOf(s) === start + i}
             expanded={s.expanded === n}
             now={now}
             onClick={() => c.toggle(n)}
@@ -415,6 +456,7 @@ function Overview({ th, s, c, now }: { th: Theme; s: State; c: Controller; now: 
     <Box style={{ flexDirection: 'column' }}>
       <Purpose th={th} m={m} />
       <Progress th={th} m={m} />
+      <Signals th={th} m={m} c={c} />
       <TopicSection th={th} s={s} c={c} names={m.now} title="지금" id="section:now" start={0} nameWidth={nameWidth} now={now} />
       <TopicSection th={th} s={s} c={c} names={m.next} title="다음" id="section:next" start={m.now.length} nameWidth={nameWidth} now={now} />
       <TopicSection th={th} s={s} c={c} names={m.done} title="구현된 기능" id="section:done" start={m.now.length + m.next.length} nameWidth={nameWidth} now={now} />
@@ -476,7 +518,7 @@ function Decisions({ th, s, c }: { th: Theme; s: State; c: Controller }) {
               rows.map(d => {
                 const i = index++
                 return (
-                  <ListRow key={i} th={th} index={i} id={`row:decision:${i}`} selected={s.tab === 'decisions' && s.cursor.decisions === i} onClick={() => c.moveTo(i)}>
+                  <ListRow key={i} th={th} index={i} id={`row:decision:${i}`} selected={s.tab === 'decisions' && cursorOf(s) === i} onClick={() => c.moveTo(i)}>
                     <Box style={{ flexDirection: 'row', gap: th.space, alignItems: 'center', width: '100%' }}>
                       {d.topic ? <Chip th={th} text={d.topic} fg={g.kind === 'blocking' ? th.red : th.muted} bg={g.kind === 'blocking' ? th.redSoft : th.card} /> : null}
                       <T th={th} size="small" color={g.kind === 'blocking' ? th.red : th.fg} grow>
@@ -504,7 +546,7 @@ function History({ th, s, c, now }: { th: Theme; s: State; c: Controller; now: n
     <Box style={{ flexDirection: 'column', gap: 2 }}>
       <SectionHead th={th} title="plan 이력 (최근 → 과거)" count={rows.length} id="history:head" note="Summary 우선, 없으면 커밋 제목" />
       {rows.map((p, i) => (
-        <ListRow key={p.sha} th={th} index={i} id={`row:plan:${p.sha}`} selected={s.tab === 'history' && s.cursor.history === i} onClick={() => c.moveTo(i)}>
+        <ListRow key={p.sha} th={th} index={i} id={`row:plan:${p.sha}`} selected={s.tab === 'history' && cursorOf(s) === i} onClick={() => c.moveTo(i)}>
           <PlanLine th={th} p={p} now={now} showTopic />
           {p.status === 'superseded' && p.supersededBy ? (
             <T th={th} size="tiny" color={th.faint} style={{ margin: { top: 0, bottom: 0, left: th.size.tiny * 5.2 + th.space, right: 0 } }}>
@@ -525,7 +567,7 @@ function Commits({ th, s, c, now }: { th: Theme; s: State; c: Controller; now: n
     <Box style={{ flexDirection: 'column', gap: 2 }}>
       <SectionHead th={th} title="최근 커밋" count={m.commits.length} id="commits:head" />
       {rows.map((cm, i) => (
-        <ListRow key={cm.sha} th={th} index={i} id={`row:commit:${cm.sha}`} selected={s.tab === 'commits' && s.cursor.commits === i} onClick={() => c.moveTo(i)}>
+        <ListRow key={cm.sha} th={th} index={i} id={`row:commit:${cm.sha}`} selected={s.tab === 'commits' && cursorOf(s) === i} onClick={() => c.moveTo(i)}>
           <CommitLine th={th} c={cm} now={now} showTopic />
         </ListRow>
       ))}
@@ -551,7 +593,7 @@ function Items({ th, s, c }: { th: Theme; s: State; c: Controller }) {
         </T>
       ) : null}
       {m.items.map((it: Item, i) => (
-        <ListRow key={i} th={th} index={i} id={`row:item:${i}`} selected={s.tab === 'items' && s.cursor.items === i} onClick={() => c.moveTo(i)}>
+        <ListRow key={i} th={th} index={i} id={`row:item:${i}`} selected={s.tab === 'items' && cursorOf(s) === i} onClick={() => c.moveTo(i)}>
           <Box style={{ flexDirection: 'row', gap: th.space, alignItems: 'center', width: '100%' }}>
             <Chip th={th} text={ITEM_LABEL[it.kind] ?? it.kind} fg={it.kind === 'risk' ? th.yellow : th.muted} bg={it.kind === 'risk' ? th.yellowSoft : th.card} />
             <T th={th} size="small" grow>
@@ -569,12 +611,12 @@ function Items({ th, s, c }: { th: Theme; s: State; c: Controller }) {
 
 // ---------- 틀 ----------
 
-const KEYS: Record<TabId, string> = {
-  overview: 'j/k ↑/↓ 이동 · Enter 펼치기 · Esc 접기 · 1-5 탭 · r 새로고침',
-  decisions: 'j/k ↑/↓ 이동 · 1-5 · ←/→ 탭 · r 새로고침',
-  history: 'j/k ↑/↓ 이동 · 1-5 · ←/→ 탭 · r 새로고침',
-  commits: 'j/k ↑/↓ 이동 · 1-5 · ←/→ 탭 · r 새로고침',
-  items: 'j/k ↑/↓ 이동 · 1-5 · ←/→ 탭 · r 새로고침',
+/** 하단 키 안내 (탭 수에 따라 숫자 범위) */
+export function keysHint(s: State): string {
+  const n = Math.min(9, tabsOf(s.model).length)
+  const tabs = `1-${n} · ←/→ 탭`
+  if (s.tab === 'overview') return `j/k ↑/↓ 이동 · Enter 펼치기 · Esc 접기 · ${tabs} · r 새로고침`
+  return `j/k ↑/↓ 이동 · ${tabs} · r 새로고침`
 }
 
 function Header({ th, s, c }: { th: Theme; s: State; c: Controller }) {
@@ -589,7 +631,7 @@ function Header({ th, s, c }: { th: Theme; s: State; c: Controller }) {
         {meta}
       </T>
       <Box style={{ flexDirection: 'row', gap: th.space * 0.5, flexShrink: 0 }}>
-        {TABS.map((t, i) => {
+        {tabsOf(m).map((t, i) => {
           const on = s.tab === t.id
           return (
             <Box
@@ -621,7 +663,7 @@ export function App({ controller, now = Date.now }: { controller: Controller; no
   const t = now()
   // 탭을 바꾸거나 첫 행으로 오면 맨 위로 (목적 · 섹션 제목이 보이게)
   const scroller = useRef<NodeHandle>(null)
-  const cursor = s.cursor[s.tab]
+  const cursor = cursorOf(s)
   useEffect(() => {
     if (cursor === 0) scroller.current?.scrollTo?.(0)
   }, [s.tab, cursor])
@@ -661,7 +703,7 @@ export function App({ controller, now = Date.now }: { controller: Controller; no
       </Box>
       <Box style={{ flexDirection: 'row', gap: th.space, border: { top: [1, th.hairline] }, padding: { top: th.space, bottom: 0, left: 0, right: 0 } }}>
         <T th={th} size="tiny" color={th.faint} line grow id="keys">
-          {KEYS[s.tab]}
+          {keysHint(s)}
         </T>
         <T th={th} size="tiny" color={th.faint} line>
           {s.isLoading ? '읽는 중…' : s.loadedAt ? `읽음 ${ago(Math.floor(s.loadedAt / 1000), t)}` : ''}

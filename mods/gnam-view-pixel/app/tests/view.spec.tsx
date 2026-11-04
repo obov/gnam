@@ -5,7 +5,7 @@ import { act, create, type ReactTestRenderer, type ReactTestRendererJSON } from 
 
 import { Controller } from '../src/store.ts'
 import { App } from '../src/view.tsx'
-import { NOW_MS, fakeRepo } from './fixture.ts'
+import { NOW_MS, fakeRepo, variant } from './fixture.ts'
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -37,8 +37,9 @@ const ids = (n: Node | undefined, prefix: string): string[] => {
   return out
 }
 
-async function mount() {
+async function mount(status?: unknown) {
   const { repo, loader } = fakeRepo()
+  if (status) repo.status = status
   const c = new Controller(loader, null, () => NOW_MS)
   let tree!: ReactTestRenderer
   await act(async () => {
@@ -87,6 +88,38 @@ test('첫 화면: 목적 → 진행 → 지금 → 다음 → 구현된 기능, 
   assert.ok(!texts({ toJSON: () => byId(tree, 'topic:sync')! } as ReactTestRenderer).includes('plugin 꺼짐'))
   // 하단 키 안내 1줄
   assert.match(textOf(byId(tree, 'keys')!), /j\/k/)
+})
+
+test('경고 묶음: 결정 · 요청 · 설정 문제 · 인계 메모, 누르면 해당 탭, 모두 0 이면 흐린 한 줄', async () => {
+  const { tree, c } = await mount(
+    variant(s => {
+      s.problems = [{ source: 'install', message: 'core.hooksPath = /x, 기대 .githooks' }]
+      s.handoff.exists = true
+    }),
+  )
+  const sig = () => texts({ toJSON: () => byId(tree, 'section:signals')! } as ReactTestRenderer)
+  // 진행 줄 아래
+  const t = texts(tree)
+  assert.ok(t.indexOf('결정할 것 2') > t.findIndex(x => x.startsWith('spec 6개')))
+  assert.ok(sig().includes('결정할 것 2'))
+  assert.ok(sig().includes('막힘 1 · 미결 1'))
+  assert.ok(sig().includes('처리 중인 요청 1'))
+  assert.ok(sig().includes('설정 문제 1'))
+  assert.ok(sig().includes('core.hooksPath = /x, 기대 .githooks'), '문제 텍스트')
+  assert.ok(sig().includes('인계 메모 있음'))
+  assert.equal(byId(tree, 'signal:ok'), undefined)
+  await act(async () => byId(tree, 'signal:decide')!.props.onClick())
+  assert.equal(c.getState().tab, 'decisions')
+
+  // 모두 0 이면 한 줄
+  const quiet = await mount(
+    variant(s => {
+      s.trace.decisions = { blocking: [], open: [] }
+      s.trace.requests = []
+    }),
+  )
+  const q = texts({ toJSON: () => byId(quiet.tree, 'section:signals')! } as ReactTestRenderer)
+  assert.deepEqual(q, ['사람이 할 일 없음 · 설정 정상'])
 })
 
 test('j · enter 로 세 번째 topic 펼침 (문제 → 해결 → 이력 → 세부), 다시 enter 로 접힘', async () => {

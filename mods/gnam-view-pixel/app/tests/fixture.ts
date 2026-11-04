@@ -33,7 +33,7 @@ export const STATUS = {
   env: { branch: 'main' },
   trace: {
     head: 'h1',
-    requests: [],
+    requests: [{ sha: 'r1req0000', subject: 'request: 목록을 빨리', refines: null, refinedBy: [], by: ['i2api000'], status: 'started' }],
     items: [
       { kind: 'risk', text: '토큰 만료', sha: 'aaaaaaa1' },
       { kind: 'remaining', text: '실측 남음\n두 번째 줄', sha: 'bbbbbbb2' },
@@ -129,6 +129,13 @@ export const STATUS = {
       '': { path: 'specs/.md', exists: false, summary: null, unimplemented: [], open: [], plans: [], chores: [{ sha: 'c0', subject: 'chore: x' }] },
     },
   },
+}
+
+/** STATUS 복사본을 고친 것 */
+export function variant(fn: (s: any) => void): typeof STATUS {
+  const s = JSON.parse(JSON.stringify(STATUS))
+  fn(s)
+  return s
 }
 
 /** problem 키가 없는 gnam (구버전) */
