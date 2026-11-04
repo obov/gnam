@@ -2,7 +2,7 @@ import { writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { test } from "node:test"
 import { expect } from "./expect.ts"
-import { collectTrace, specProblemOf, specSummaryOf, stepNumbers, stepsOf, TraceError } from "../src/core/trace.ts"
+import { collectTrace, specProblemOf, specSummaryOf, stepNumbers, stepRefs, stepsOf, TraceError } from "../src/core/trace.ts"
 import { tempRepo } from "./helpers.ts"
 import { commit, fixture } from "./trace-fixture.ts"
 
@@ -10,8 +10,8 @@ test("단계 해석: 번호 · 범위 · 완료 줄", () => {
   expect(stepNumbers("1-3")).toEqual([1, 2, 3])
   expect(stepNumbers("2, 4")).toEqual([2, 4])
   expect(stepsOf(["1. 파서", "   완료: 테스트", "   통과", "2. 출력"])).toEqual([
-    { n: 1, title: "파서", done: "테스트\n통과" },
-    { n: 2, title: "출력", done: null },
+    { n: 1, title: "파서", done: "테스트\n통과", parts: [] },
+    { n: 2, title: "출력", done: null, parts: [] },
   ])
 })
 
@@ -24,12 +24,94 @@ test("단계 해석: S 번호 단계 줄 · 단계 참조 (specs/info.md)", () =
   expect(stepNumbers("S1, S4b 리뷰 반영")).toEqual([1, 4])
   expect(stepNumbers("S4 (d) D3")).toEqual([4])
   expect(stepsOf(["S1. 파서", "   완료: 테스트", "S2 출력", "1. 숫자", "   완료: 숫자 테스트"])).toEqual([
-    { n: 1, title: "파서", done: "테스트" },
-    { n: 2, title: "출력", done: null },
-    { n: 1, title: "숫자", done: "숫자 테스트" },
+    { n: 1, title: "파서", done: "테스트", parts: [] },
+    { n: 2, title: "출력", done: null, parts: [] },
+    { n: 1, title: "숫자", done: "숫자 테스트", parts: [] },
   ])
-  // 들여쓰기 · 'S1:' · 하위 단계 줄 · S 뒤 공백 없음은 단계 줄 아님 (앞 단계 본문)
-  expect(stepsOf(["S1 파서", "    S3 버킷", "S2: 파일", "S4a. 하위", "S5x"])).toEqual([{ n: 1, title: "파서", done: null }])
+  // 들여쓰기 · 'S1:' · 'S4a:' · 들여쓴 하위 단계 · S 뒤 공백 없음은 단계 줄 아님 (앞 단계 본문)
+  expect(stepsOf(["S1 파서", "    S3 버킷", "S2: 파일", "S4a: 경로", "  S4b. 들여씀", "S5x", "S6ab. 두 글자"])).toEqual([
+    { n: 1, title: "파서", done: null, parts: [] },
+  ])
+})
+
+test("단계 해석: 하위 단계 줄 (S4a.) → 부모 단계의 parts (specs/info.md)", () => {
+  expect(stepRefs("S4a, S4 S1-2 3")).toEqual([
+    { n: 4, part: "4a" },
+    { n: 4, part: null },
+    { n: 1, part: null },
+    { n: 2, part: null },
+    { n: 3, part: null },
+  ])
+  // 부모 줄 없음 → 단계 4 생성, title = parts 제목 ' · '. 하위 단계 본문의 완료: 는 부모 done 에 '<id>: ' 로
+  expect(stepsOf(["S4a. 파서", "   완료: 파서 테스트", "S4b 출력", "S5. 마감", "   완료: 확인"])).toEqual([
+    {
+      n: 4,
+      title: "파서 · 출력",
+      done: "4a: 파서 테스트",
+      parts: [
+        { id: "4a", title: "파서", impls: [] },
+        { id: "4b", title: "출력", impls: [] },
+      ],
+    },
+    { n: 5, title: "마감", done: "확인", parts: [] },
+  ])
+  // 부모 줄 + 하위 단계 줄 혼합: 부모 title 유지, 부모 완료: 다음에 parts 완료:
+  expect(stepsOf(["1. 준비", "S2. 화면", "   완료: 전체 확인", "S2a. 목록", "   완료: 목록 테스트", "S2b. 상세", "   완료: 상세 테스트"])).toEqual([
+    { n: 1, title: "준비", done: null, parts: [] },
+    {
+      n: 2,
+      title: "화면",
+      done: "전체 확인\n2a: 목록 테스트\n2b: 상세 테스트",
+      parts: [
+        { id: "2a", title: "목록", impls: [] },
+        { id: "2b", title: "상세", impls: [] },
+      ],
+    },
+  ])
+})
+
+test("trace: 하위 단계 parts 의 impl 연결 · 판정 (모든 parts 에 impl 이어야 완료)", () => {
+  const repo = tempRepo(null)
+  try {
+    commit(repo, "chore: gnam 도입", { "gnam.json": JSON.stringify({ format: 1, plugins: [] }) })
+    const partPlan = (title: string) =>
+      [`spec.a.plan: ${title}`, "", "Plan:", "S4a. 파서", "S4b. 출력", "S5. 마감", "", "Scope:", "S4a: src/a.ts", "", "Blocking: 없음"].join("\n")
+    const p1 = commit(repo, partPlan("일부"))
+    const i1 = commit(repo, `spec.a.impl: 파서\n\nPlan: ${p1.slice(0, 7)} S4a`)
+    const i2 = commit(repo, `spec.a.impl: 마감\n\nPlan: ${p1.slice(0, 7)} S5`)
+    const p2 = commit(repo, partPlan("나눠 전부"))
+    const i3 = commit(repo, `spec.a.impl: 파서\n\nPlan: ${p2.slice(0, 7)} S4a`)
+    const i4 = commit(repo, `spec.a.impl: 출력 · 마감\n\nPlan: ${p2.slice(0, 7)} S4b, S5`)
+    const p3 = commit(repo, partPlan("부모 참조"))
+    const i5 = commit(repo, `spec.a.impl: 전부\n\nPlan: ${p3.slice(0, 7)} S4-S5`)
+    const trace = collectTrace(repo.root)
+    const plans = trace.topics["a"]?.plans
+    expect(plans?.map((p) => [p.sha, p.status])).toEqual([
+      [p1, "partial"],
+      [p2, "done"],
+      [p3, "done"],
+    ])
+    expect(plans?.[0]?.steps).toEqual([
+      {
+        n: 4,
+        title: "파서 · 출력",
+        done: null,
+        impls: [i1],
+        parts: [
+          { id: "4a", title: "파서", impls: [i1] },
+          { id: "4b", title: "출력", impls: [] },
+        ],
+      },
+      { n: 5, title: "마감", done: null, impls: [i2], parts: [] },
+    ])
+    expect(plans?.[1]?.steps.map((s) => [s.impls, s.parts.map((p) => p.impls)])).toEqual([
+      [[i3, i4], [[i3], [i4]]],
+      [[i4], []],
+    ])
+    expect(plans?.[2]?.steps[0]?.parts.map((p) => p.impls)).toEqual([[i5], [i5]])
+  } finally {
+    repo.cleanup()
+  }
 })
 
 test("trace: S 단계 plan + S 참조 impl → steps[].impls · status done · partial", () => {
@@ -49,9 +131,9 @@ test("trace: S 단계 plan + S 참조 impl → steps[].impls · status done · p
       [p2, "partial"],
     ])
     expect(plans?.[0]?.steps).toEqual([
-      { n: 1, title: "파서", done: "파서 테스트", impls: [i1] },
-      { n: 2, title: "출력", done: null, impls: [i1] },
-      { n: 3, title: "문서", done: null, impls: [i2] },
+      { n: 1, title: "파서", done: "파서 테스트", impls: [i1], parts: [] },
+      { n: 2, title: "출력", done: null, impls: [i1], parts: [] },
+      { n: 3, title: "문서", done: null, impls: [i2], parts: [] },
     ])
     expect(plans?.[1]?.steps.map((s) => s.impls)).toEqual([[], [i3], []])
   } finally {
@@ -74,8 +156,8 @@ test("trace: plan status 4종 · 단계별 impl · supersededBy · 수집 plan",
       [f.p4, "not-started"],
     ])
     expect(a?.plans[0]?.steps).toEqual([
-      { n: 1, title: "파서", done: "파서 테스트", impls: [f.i1] },
-      { n: 2, title: "출력", done: "출력 테스트", impls: [] },
+      { n: 1, title: "파서", done: "파서 테스트", impls: [f.i1], parts: [] },
+      { n: 2, title: "출력", done: "출력 테스트", impls: [], parts: [] },
     ])
     expect(a?.plans[0]).toMatchObject({ requests: [f.r3], risks: ["R1. 느림"], impls: [{ sha: f.i1, step: "1", deviation: "이름 변경", remaining: "- 오류 메시지" }] })
     expect(a?.plans[1]).toMatchObject({ supersededBy: f.p3, blocking: ["B1. 옛 결정"] })
