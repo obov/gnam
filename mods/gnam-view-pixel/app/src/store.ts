@@ -1,14 +1,15 @@
 // 화면 상태 · 키 처리 · 갱신. React 밖의 작은 store (useSyncExternalStore 로 읽는다).
-import type { Loader, Model } from './model.ts'
+import type { Loader, Model, Request } from './model.ts'
 import { makeTheme, type TerminalColors, type Theme } from './theme.ts'
 
 export type TabId = string
 export type Tab = { id: TabId; label: string }
 
-/** 고정 탭 */
+/** 고정 탭 (요청은 요청이 있거나 request plugin 이 켜졌을 때만) */
 export const TABS: Tab[] = [
   { id: 'overview', label: '개요' },
   { id: 'decisions', label: '결정' },
+  { id: 'requests', label: '요청' },
   { id: 'history', label: '이력' },
   { id: 'commits', label: '커밋' },
   { id: 'items', label: '항목' },
@@ -16,9 +17,35 @@ export const TABS: Tab[] = [
 
 /** 이 모델에서 보이는 탭 (순서 = 숫자 키) */
 export function tabsOf(m: Model | null): Tab[] {
-  void m
-  return TABS
+  return TABS.filter(t => t.id !== 'requests' || m?.hasRequests === true)
 }
+
+/** 요청 상태 (순서 = 필터 순환) */
+export const REQUEST_STATUSES = ['open', 'started', 'refined']
+
+/** 필터 키 → 고를 수 있는 값 ('all' 먼저) */
+export function filterValues(s: State, key: string): string[] {
+  const m = s.model
+  if (!m) return ['all']
+  switch (key) {
+    case 'requests':
+      return ['all', ...REQUEST_STATUSES]
+  }
+  return ['all']
+}
+
+export const filterOf = (s: State, key: string): string => {
+  const v = s.filter[key] ?? 'all'
+  return filterValues(s, key).includes(v) ? v : 'all'
+}
+
+export function requestRows(s: State): Request[] {
+  const f = filterOf(s, 'requests')
+  return (s.model?.requests ?? []).filter(r => f === 'all' || r.status === f)
+}
+
+/** 탭에서 f 가 바꾸는 필터 */
+const MAIN_FILTER: Record<string, string> = { requests: 'requests' }
 
 /** 커밋 탭에 그리는 최근 커밋 수 (나머지는 개수만) */
 export const COMMIT_ROWS = 300
@@ -37,6 +64,8 @@ export type State = {
   loadedAt: number
   /** 화면 폭 (px, 모르면 0). 문단 말줄임 추정에 쓴다 */
   width: number
+  /** 탭 필터 (키 → 값, 없으면 all) */
+  filter: Record<string, string>
 }
 
 export type Key = { key: string; mods?: { shift?: boolean; ctrl?: boolean; alt?: boolean; super?: boolean } }
@@ -61,6 +90,8 @@ export function rowCount(s: State, tab: TabId = s.tab): number {
       return Math.min(m.commits.length, COMMIT_ROWS)
     case 'items':
       return m.items.length
+    case 'requests':
+      return requestRows(s).length
   }
   return 0
 }
@@ -87,6 +118,7 @@ export class Controller {
       theme: makeTheme(null, this.basePx, themePref),
       loadedAt: 0,
       width: 0,
+      filter: {},
     }
   }
 
@@ -171,6 +203,20 @@ export class Controller {
     this.set({ cursor: { ...s.cursor, [s.tab]: Math.max(0, Math.min(n - 1, index)) } })
   }
 
+  /** 필터 바꾸기. 그 필터를 쓰는 탭의 선택은 맨 위로 */
+  setFilter(key: string, value: string, tab: TabId = this.state.tab): void {
+    const s = this.state
+    if ((s.filter[key] ?? 'all') === value) return
+    this.set({ filter: { ...s.filter, [key]: value }, cursor: { ...s.cursor, [tab]: 0 } })
+  }
+
+  /** 필터를 다음 값으로 (마지막 다음은 all) */
+  cycleFilter(key: string): void {
+    const values = filterValues(this.state, key)
+    const at = values.indexOf(filterOf(this.state, key))
+    this.setFilter(key, values[(at + 1) % values.length]!)
+  }
+
   /** 개요 탭에서 topic 펼침 · 접기 (1단: 다른 topic 은 접힘) */
   toggle(name?: string): void {
     const s = this.state
@@ -232,6 +278,11 @@ export class Controller {
       case 'r':
         void this.refresh(true)
         return true
+      case 'f': {
+        const key = MAIN_FILTER[this.state.tab]
+        if (key) this.cycleFilter(key)
+        return true
+      }
     }
     if (/^[1-9]$/.test(k)) {
       const t = tabs[Number(k) - 1]

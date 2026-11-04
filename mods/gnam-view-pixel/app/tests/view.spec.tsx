@@ -170,14 +170,14 @@ test('뒤쪽 탭: 탭마다 fixture 항목 수만큼 행', async () => {
   assert.equal(ids(byId(tree, 'decisions:open'), 'row:decision:').length, 1)
   assert.equal(ids(byId(tree, 'decisions:expected'), 'row:decision:').length, 3)
   assert.equal(ids(byId(tree, 'decisions:made'), 'row:decision:').length, 2)
-  await key('3')
+  await key('4')
   const plans = nodes(tree).filter(n => String(n.props.id).startsWith('row:plan:'))
   assert.equal(plans.length, m.history.length)
   assert.equal(plans[0]!.props.id, 'row:plan:p2api000', '최근 plan 이 위')
   assert.ok(texts(tree).includes('→ p2api00 가 대체'))
-  await key('4')
-  assert.equal(nodes(tree).filter(n => String(n.props.id).startsWith('row:commit:')).length, 9)
   await key('5')
+  assert.equal(nodes(tree).filter(n => String(n.props.id).startsWith('row:commit:')).length, 9)
+  await key('6')
   assert.equal(nodes(tree).filter(n => String(n.props.id).startsWith('row:item:')).length, 3)
   assert.ok(texts({ toJSON: () => byId(tree, 'row:item:0')! } as ReactTestRenderer).includes('보존 기간'), '항목 최근 순')
   assert.ok(texts(tree).includes('실측 남음 · 두 번째 줄'))
@@ -185,6 +185,43 @@ test('뒤쪽 탭: 탭마다 fixture 항목 수만큼 행', async () => {
   assert.equal(c.getState().tab, 'commits')
   await key('1')
   assert.equal(c.getState().tab, 'overview')
+})
+
+test('요청 탭: 상태 분포 · 필터 (f · 누름) · sha · ×by, 요청 0 + plugin 꺼짐이면 탭 없음', async () => {
+  const req = (sha: string, status: string, by: string[]) => ({ sha, subject: `request: 요청 ${sha}`, refines: null, refinedBy: [], by, status })
+  const { tree, c, key } = await mount(
+    variant(s => {
+      s.trace.requests = [req('r1aaaaaaa', 'open', []), req('r2bbbbbbb', 'started', ['x', 'y']), req('r3ccccccc', 'refined', ['z'])]
+    }),
+  )
+  await key('3')
+  assert.equal(c.getState().tab, 'requests')
+  const rows = () => nodes(tree).filter(n => String(n.props.id).startsWith('row:request:'))
+  assert.equal(rows().length, 3)
+  assert.deepEqual(ids(byId(tree, 'requests:dist'), 'requests:dist:seg:'), ['requests:dist:seg:open', 'requests:dist:seg:started', 'requests:dist:seg:refined'])
+  const r2 = texts({ toJSON: () => byId(tree, 'row:request:r2bbbbbbb')! } as ReactTestRenderer)
+  assert.ok(r2.includes('×2') && r2.includes('r2bbbbb') && r2.includes('요청 r2bbbbbbb'))
+  await key('f')
+  assert.equal(rows().length, 1, 'f → open')
+  assert.equal(rows()[0]!.props.id, 'row:request:r1aaaaaaa')
+  await act(async () => byId(tree, 'filter:requests:refined')!.props.onClick())
+  assert.deepEqual(rows().map(r => r.props.id), ['row:request:r3ccccccc'])
+  await act(async () => byId(tree, 'filter:requests:all')!.props.onClick())
+  assert.equal(rows().length, 3)
+
+  // 요청 0 + request plugin 꺼짐 → 탭 없음, 숫자 키가 당겨진다
+  const none = await mount(variant(s => (s.trace.requests = [])))
+  assert.equal(none.tree.root.findAll(n => n.props.id === 'tab:requests').length, 0)
+  await none.key('3')
+  assert.equal(none.c.getState().tab, 'history')
+  // 요청 0 이어도 request plugin 이 켜져 있으면 탭
+  const on = await mount(
+    variant(s => {
+      s.trace.requests = []
+      s.builtins.push({ id: 'request', active: true, requires: [] })
+    }),
+  )
+  assert.equal(on.tree.root.findAll(n => n.props.id === 'tab:requests').length, 1)
 })
 
 test('r 은 강제 새로고침, 읽기 실패 시 기존 화면 + 오류 1줄', async () => {

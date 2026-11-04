@@ -3,7 +3,7 @@ import { useEffect, useRef, useSyncExternalStore, type ReactNode } from 'react'
 
 import { signals, type Commit, type Decision, type Item, type Model, type Plan, type Topic } from './model.ts'
 import { Box, Text, type Color, type NodeHandle, type Style } from './pixel.ts'
-import { COMMIT_ROWS, cursorOf, overviewRows, tabsOf, type Controller, type State } from './store.ts'
+import { COMMIT_ROWS, REQUEST_STATUSES, cursorOf, filterOf, filterValues, overviewRows, requestRows, tabsOf, type Controller, type State } from './store.ts'
 import type { Rgba, Theme } from './theme.ts'
 
 const SANS = ['sans-serif']
@@ -606,6 +606,107 @@ function Commits({ th, s, c, now }: { th: Theme; s: State; c: Controller; now: n
   )
 }
 
+type Seg = { key: string; label: string; n: number; color: Rgba }
+
+/** 분포: 누적 막대 한 줄 + 범례 (0 인 칸은 그리지 않음) */
+function Dist({ th, segs, id, title }: { th: Theme; segs: Seg[]; id: string; title: string }) {
+  const shown = segs.filter(x => x.n > 0)
+  return (
+    <Box id={id} style={{ flexDirection: 'column', gap: th.space * 0.8, margin: { top: th.space * 2, bottom: 0, left: 0, right: 0 } }}>
+      <Box style={{ flexDirection: 'row', alignItems: 'center', gap: th.space * 1.5 }}>
+        <T th={th} size="small" color={th.muted} bold line>
+          {title}
+        </T>
+        {shown.map(x => (
+          <Box key={x.key} style={{ flexDirection: 'row', alignItems: 'center', gap: th.space * 0.6, flexShrink: 0 }}>
+            <Box style={{ width: th.space, height: th.space, cornerRadius: th.space / 2, background: x.color }} />
+            <T th={th} size="small" color={th.muted} line>
+              {`${x.label} ${x.n}`}
+            </T>
+          </Box>
+        ))}
+      </Box>
+      <Box style={{ flexDirection: 'row', gap: 3, width: '100%', height: th.space * 0.8 }}>
+        {shown.length === 0 ? <Box style={{ flexGrow: 1, height: th.space * 0.8, background: th.hairline, cornerRadius: th.space * 0.4 }} /> : null}
+        {shown.map(x => (
+          <Box key={x.key} id={`${id}:seg:${x.key}`} style={{ flexGrow: x.n, flexBasis: 0, height: th.space * 0.8, background: x.color, cornerRadius: th.space * 0.4 }} />
+        ))}
+      </Box>
+    </Box>
+  )
+}
+
+/** 필터 칩 한 줄: 값마다 '이름 N', 고른 것은 accent. 누르면 그 값 */
+function Filter({ th, s, c, fkey, label, count, name }: { th: Theme; s: State; c: Controller; fkey: string; label: string; count: (v: string) => number; name?: (v: string) => string }) {
+  const cur = filterOf(s, fkey)
+  return (
+    <Box id={`filter:${fkey}`} style={{ flexDirection: 'row', alignItems: 'center', gap: th.space * 0.6, overflow: 'hidden' }}>
+      <T th={th} size="tiny" color={th.faint} line style={{ width: th.size.tiny * 3.2 }}>
+        {label}
+      </T>
+      {filterValues(s, fkey).map(v => {
+        const on = v === cur
+        return (
+          <Box
+            key={v}
+            id={`filter:${fkey}:${v}`}
+            onClick={() => c.setFilter(fkey, v)}
+            style={{ background: on ? th.accentSoft : th.bg, cornerRadius: th.size.tiny, padding: { top: 1, bottom: 1, left: th.space, right: th.space }, hoverBackground: on ? th.accentSoft : th.card, pointerShape: 'pointer', flexShrink: 0 }}
+          >
+            <T th={th} size="tiny" color={on ? th.accent : th.muted} bold={on} line>
+              {`${v === 'all' ? '전체' : (name?.(v) ?? v)} ${count(v)}`}
+            </T>
+          </Box>
+        )
+      })}
+    </Box>
+  )
+}
+
+const REQUEST_LOOK = (th: Theme, status: string): [Rgba, Rgba] =>
+  status === 'open' ? [th.yellow, th.yellowSoft] : status === 'started' ? [th.accent, th.accentSoft] : [th.faint, th.card]
+
+function Requests({ th, s, c }: { th: Theme; s: State; c: Controller }) {
+  const m = s.model!
+  const rows = requestRows(s)
+  const n = (v: string) => (v === 'all' ? m.requests.length : m.requests.filter(r => r.status === v).length)
+  return (
+    <Box style={{ flexDirection: 'column', gap: 2 }}>
+      <Dist th={th} id="requests:dist" title="요청 상태" segs={REQUEST_STATUSES.map(v => ({ key: v, label: v, n: n(v), color: REQUEST_LOOK(th, v)[0] }))} />
+      <Box style={{ margin: { top: th.space * 1.5, bottom: 0, left: 0, right: 0 } }}>
+        <Filter th={th} s={s} c={c} fkey="requests" label="상태 f" count={n} />
+      </Box>
+      <SectionHead th={th} title="요청" count={rows.length} id="requests:head" note="request: 커밋 · 처리 상태 · 가리킨 커밋 수 (×N)" />
+      {rows.length === 0 ? (
+        <T th={th} size="small" color={th.faint}>
+          요청 없음
+        </T>
+      ) : null}
+      {rows.map((r, i) => {
+        const [fg, bg] = REQUEST_LOOK(th, r.status)
+        return (
+          <ListRow key={r.sha} th={th} index={i} id={`row:request:${r.sha}`} selected={s.tab === 'requests' && cursorOf(s) === i} onClick={() => c.moveTo(i)}>
+            <Box style={{ flexDirection: 'row', gap: th.space, alignItems: 'center', width: '100%' }}>
+              <Chip th={th} text={r.status} fg={fg} bg={bg} />
+              <T th={th} size="small" color={r.status === 'refined' ? th.muted : th.fg} line grow>
+                {r.subject}
+              </T>
+              {r.by > 0 ? (
+                <T th={th} size="tiny" color={th.faint} mono>
+                  {`×${r.by}`}
+                </T>
+              ) : null}
+              <T th={th} size="tiny" color={th.faint} mono>
+                {short(r.sha)}
+              </T>
+            </Box>
+          </ListRow>
+        )
+      })}
+    </Box>
+  )
+}
+
 const ITEM_LABEL: Record<string, string> = { risk: '위험', remaining: '남은 일', deferred: '미룸', open: '미결', blocking: '막힘' }
 
 function Items({ th, s, c }: { th: Theme; s: State; c: Controller }) {
@@ -642,7 +743,8 @@ export function keysHint(s: State): string {
   const n = Math.min(9, tabsOf(s.model).length)
   const tabs = `1-${n} · ←/→ 탭`
   if (s.tab === 'overview') return `j/k ↑/↓ 이동 · Enter 펼치기 · Esc 접기 · ${tabs} · r 새로고침`
-  return `j/k ↑/↓ 이동 · ${tabs} · r 새로고침`
+  const filter = s.tab === 'requests' ? ' · f 필터' : ''
+  return `j/k ↑/↓ 이동${filter} · ${tabs} · r 새로고침`
 }
 
 function Header({ th, s, c }: { th: Theme; s: State; c: Controller }) {
@@ -716,6 +818,7 @@ export function App({ controller, now = Date.now }: { controller: Controller; no
   else if (s.tab === 'decisions') body = <Decisions th={th} s={s} c={controller} />
   else if (s.tab === 'history') body = <History th={th} s={s} c={controller} now={t} />
   else if (s.tab === 'commits') body = <Commits th={th} s={s} c={controller} now={t} />
+  else if (s.tab === 'requests') body = <Requests th={th} s={s} c={controller} />
   else body = <Items th={th} s={s} c={controller} />
 
   return (
