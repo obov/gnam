@@ -1,4 +1,6 @@
-# view — status 데이터를 보여 줄 탭 정의 (프로젝트 · plugin)
+# view — 진행 상황 화면에 프로젝트 · plugin 이 원하는 탭을 직접 더한다
+
+문제: 진행 상황 화면의 탭이 정해져 있어, 프로젝트 · plugin 마다 보고 싶은 정보를 화면에 띄울 수 없다
 
 `gnam status` 를 읽어 화면에 그리는 도구 (gnam-view 등) 가 무엇을 탭으로 보여 줄지 선언한다.
 탭 하나 = status 트리의 경로 하나 + 거르기 + 표시 방법. 프로젝트는 gnam.json 에, plugin 은 status 섹션에 같은 형식으로 쓴다.
