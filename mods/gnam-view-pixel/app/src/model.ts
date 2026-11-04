@@ -39,6 +39,10 @@ export type Commit = {
   /** plan · impl · chore · merge · run.start … (spec 무관이면 null) */
   kind: string | null
   files: string[]
+  /** Gnam trailer 값 (format 2, 첫 값) */
+  gnam: string | null
+  /** 커밋 종류의 주인 (status kinds: core · plugin id), 어느 종류에도 안 맞으면 other */
+  owner: string
 }
 
 export type Line = { line: number; text: string }
@@ -140,6 +144,8 @@ export type Model = {
   history: Plan[]
   /** 최근 커밋 → 오래된 것 */
   commits: Commit[]
+  /** 커밋 종류 주인 (status kinds 순서: core 먼저) */
+  owners: string[]
   items: Item[]
   problems: Problem[]
   /** 인계 메모 파일 경로 (변경 감지용, status handoff.path) */
@@ -198,7 +204,7 @@ export function parseLog(text: string): Commit[] {
     const [sha, ct, subject, trailer] = (head ?? '').split('\x1f')
     if (!sha || !subject) continue
     const { topic, kind } = gnamKind(subject, str(trailer))
-    out.push({ sha, subject, time: Number(ct) || 0, topic, kind, files: rest.map(l => l.trim()).filter(Boolean) })
+    out.push({ sha, subject, time: Number(ct) || 0, topic, kind, files: rest.map(l => l.trim()).filter(Boolean), gnam: str(trailer)?.split(',')[0]?.trim() ?? null, owner: 'other' })
   }
   return out
 }
@@ -395,7 +401,19 @@ export type Raw = {
 export function buildModel(raw: Raw): Model {
   const s = raw.status
   const trace: Json = s.trace ?? {}
-  const commits = parseLog(raw.log)
+  // 커밋 종류의 주인: status kinds 의 제목 · trailer 정규식 (format 1 · 2)
+  const kindRules = arr(s.kinds).flatMap(k => {
+    try {
+      return [{ subject: k.subject ? new RegExp(String(k.subject)) : null, trailer: k.trailer ? new RegExp(String(k.trailer)) : null, owner: String(k.owner ?? 'core') }]
+    } catch {
+      return []
+    }
+  })
+  const commits = parseLog(raw.log).map(c => ({
+    ...c,
+    owner: kindRules.find(k => k.subject?.test(c.subject) || (c.gnam !== null && k.trailer?.test(`Gnam: ${c.gnam}`)))?.owner ?? 'other',
+  }))
+  const owners = [...new Set(kindRules.map(k => k.owner))]
   const times = new Map(commits.map(c => [c.sha, c.time]))
   const builtins = new Map(arr(s.builtins).map(b => [String(b.id), b.active !== false]))
   const blockingAll = arr(trace.decisions?.blocking)
@@ -525,6 +543,7 @@ export function buildModel(raw: Raw): Model {
     decisions,
     history,
     commits,
+    owners,
     items,
     problems: arr(s.problems).map(p => (typeof p === 'string' ? { source: null, text: p } : { source: str(p.source), text: String(p.message ?? JSON.stringify(p)) })),
     handoffPath: str(s.handoff?.path),

@@ -21,7 +21,7 @@ test('now · next · done 분류, done 은 필터 없이 전부', () => {
   assert.deepEqual(m.orphans, ['gone'])
   assert.equal(m.topics['']?.name, undefined)
   assert.equal(m.topics.README, undefined, 'readme topic 은 spec 아님')
-  assert.deepEqual(m.counts, { topics: 6, now: 1, needsPlan: 1, next: 1, none: 1, done: 2, stepsDone: 1, stepsTotal: 5, plans: 7, commits: 9 })
+  assert.deepEqual(m.counts, { topics: 6, now: 1, needsPlan: 1, next: 1, none: 1, done: 2, stepsDone: 1, stepsTotal: 5, plans: 7, commits: 10 })
 })
 
 test('plan Summary 가 없으면 커밋 제목 (Goal 아님)', () => {
@@ -84,8 +84,18 @@ test('README 목적 · 로그 파싱', () => {
   assert.deepEqual(gnamKind('spec.a-b.impl: x', null), { topic: 'a-b', kind: 'impl' })
   assert.deepEqual(gnamKind('chore: x', null), { topic: null, kind: null })
   const log = parseLog(LOG)
-  assert.equal(log.length, 9)
-  assert.deepEqual(log[0], { sha: 'i2api000', subject: 'feat(api): 목록 단계 1', time: 1_700_000_000 - 100, topic: 'api', kind: 'impl', files: ['src/api.ts', 'tests/api.test.ts'] })
+  assert.equal(log.length, 10)
+  assert.deepEqual(log[0], { sha: 'i2api000', subject: 'feat(api): 목록 단계 1', time: 1_700_000_000 - 100, topic: 'api', kind: 'impl', files: ['src/api.ts', 'tests/api.test.ts'], gnam: 'spec.api.impl', owner: 'other' })
+})
+
+test('커밋 종류 주인: status kinds 의 제목 · trailer 정규식', () => {
+  const m = build()
+  const owner = (sha: string) => m.commits.find(c => c.sha === sha)!.owner
+  assert.equal(owner('i2api000'), 'core', 'trailer spec.api.impl')
+  assert.equal(owner('cchore01'), 'core', '제목 chore:')
+  assert.equal(owner('p6lore00'), 'core', 'format 1 제목')
+  assert.equal(owner('rrun0001'), 'run', 'trailer run.sync.start')
+  assert.deepEqual(m.owners, ['core', 'run'])
 })
 
 test('spec 설명 (문제 줄 제외 첫 문단)', async () => {

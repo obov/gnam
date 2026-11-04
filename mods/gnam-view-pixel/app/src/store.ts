@@ -1,5 +1,5 @@
 // 화면 상태 · 키 처리 · 갱신. React 밖의 작은 store (useSyncExternalStore 로 읽는다).
-import { applyWhere, rowsOf, type Loader, type Model, type Request, type ViewDef } from './model.ts'
+import { applyWhere, rowsOf, type Commit, type Item, type Loader, type Model, type Request, type ViewDef } from './model.ts'
 import { makeTheme, type TerminalColors, type Theme } from './theme.ts'
 
 export type TabId = string
@@ -52,6 +52,12 @@ export function filterValues(s: State, key: string): string[] {
   switch (key) {
     case 'requests':
       return ['all', ...REQUEST_STATUSES]
+    case 'items':
+      return ['all', ...new Set(m.items.map(i => i.kind))]
+    case 'commits.kind':
+      return ['all', ...m.owners.filter(o => m.commits.some(c => c.owner === o)), ...(m.commits.some(c => c.owner === 'other') ? ['other'] : [])]
+    case 'commits.topic':
+      return ['all', ...new Set(m.commits.map(c => c.topic).filter((x): x is string => x !== null))]
   }
   return ['all']
 }
@@ -66,8 +72,21 @@ export function requestRows(s: State): Request[] {
   return (s.model?.requests ?? []).filter(r => f === 'all' || r.status === f)
 }
 
-/** 탭에서 f 가 바꾸는 필터 */
-const MAIN_FILTER: Record<string, string> = { requests: 'requests' }
+export function itemRows(s: State): Item[] {
+  const f = filterOf(s, 'items')
+  return (s.model?.items ?? []).filter(i => f === 'all' || i.kind === f)
+}
+
+/** 커밋 (종류 · topic 필터 적용) */
+export function commitRows(s: State): Commit[] {
+  const k = filterOf(s, 'commits.kind')
+  const t = filterOf(s, 'commits.topic')
+  return (s.model?.commits ?? []).filter(c => (k === 'all' || c.owner === k) && (t === 'all' || c.topic === t))
+}
+
+/** 탭에서 f 가 바꾸는 필터 (커밋 탭의 t = topic) */
+const MAIN_FILTER: Record<string, string> = { requests: 'requests', items: 'items', commits: 'commits.kind' }
+export const hasFilter = (tab: TabId) => tab in MAIN_FILTER
 
 /** 커밋 탭에 그리는 최근 커밋 수 (나머지는 개수만) */
 export const COMMIT_ROWS = 300
@@ -109,9 +128,9 @@ export function rowCount(s: State, tab: TabId = s.tab): number {
     case 'history':
       return m.history.length
     case 'commits':
-      return Math.min(m.commits.length, COMMIT_ROWS)
+      return Math.min(commitRows(s).length, COMMIT_ROWS)
     case 'items':
-      return m.items.length
+      return itemRows(s).length
     case 'requests':
       return requestRows(s).length
     case 'plugins':
@@ -236,11 +255,11 @@ export class Controller {
     this.set({ filter: { ...s.filter, [key]: value }, cursor: { ...s.cursor, [tab]: 0 } })
   }
 
-  /** 필터를 다음 값으로 (마지막 다음은 all) */
-  cycleFilter(key: string): void {
+  /** 필터를 다음 (by = -1 이면 이전) 값으로 (끝 다음은 all) */
+  cycleFilter(key: string, by = 1): void {
     const values = filterValues(this.state, key)
     const at = values.indexOf(filterOf(this.state, key))
-    this.setFilter(key, values[(at + 1) % values.length]!)
+    this.setFilter(key, values[(at + by + values.length) % values.length]!)
   }
 
   /** 개요 탭에서 topic 펼침 · 접기 (1단: 다른 topic 은 접힘) */
@@ -309,6 +328,12 @@ export class Controller {
         if (key) this.cycleFilter(key)
         return true
       }
+      case 't':
+        if (this.state.tab === 'commits') {
+          if (shift) this.cycleFilter('commits.topic', -1)
+          else this.cycleFilter('commits.topic')
+        }
+        return true
     }
     if (/^[1-9]$/.test(k)) {
       const t = tabs[Number(k) - 1]

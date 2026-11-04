@@ -3,7 +3,7 @@ import { useEffect, useRef, useSyncExternalStore, type ReactNode } from 'react'
 
 import { getPath, show, signals, type Commit, type Decision, type Item, type Model, type Plan, type Topic, type ViewDef } from './model.ts'
 import { Box, Text, type Color, type NodeHandle, type Style } from './pixel.ts'
-import { COMMIT_ROWS, REQUEST_STATUSES, VIEW_ROWS, cursorOf, filterOf, filterValues, overviewRows, requestRows, tabsOf, viewOf, viewRows, type Controller, type State } from './store.ts'
+import { COMMIT_ROWS, REQUEST_STATUSES, VIEW_ROWS, commitRows, cursorOf, filterOf, filterValues, hasFilter, itemRows, overviewRows, requestRows, tabsOf, viewOf, viewRows, type Controller, type State } from './store.ts'
 import type { Rgba, Theme } from './theme.ts'
 
 const SANS = ['sans-serif']
@@ -585,13 +585,87 @@ function History({ th, s, c, now }: { th: Theme; s: State; c: Controller; now: n
   )
 }
 
+export const DAYS = 14
+
+/** 최근 DAYS 일 (오늘이 마지막 칸) 날마다 개수 */
+export function perDay(times: number[], nowMs: number): number[] {
+  const now = nowMs / 1000
+  const out = Array.from({ length: DAYS }, () => 0)
+  for (const t of times) {
+    const d = Math.floor((now - t) / 86400)
+    if (d >= 0 && d < DAYS) out[DAYS - 1 - d]! += 1
+  }
+  return out
+}
+
+/** 날마다 막대 (높이 = 개수 비율, 0 은 점) */
+function DayBars({ th, values, id, note }: { th: Theme; values: number[]; id: string; note: string }) {
+  const max = Math.max(1, ...values)
+  const h = th.size.body * 2.2
+  const w = th.size.body * 0.9
+  return (
+    <Box style={{ flexDirection: 'row', alignItems: 'end', gap: th.space * 1.5, margin: { top: th.space * 1.5, bottom: 0, left: 0, right: 0 } }}>
+      <T th={th} size="small" color={th.muted} bold line style={{ width: th.size.small * 5 }}>
+        {`${DAYS}일`}
+      </T>
+      <Box id={id} style={{ flexDirection: 'row', alignItems: 'end', gap: Math.max(2, Math.round(th.space * 0.4)), height: h }}>
+        {values.map((v, k) => (
+          <Box key={k} id={`${id}:${k}`} style={{ width: w, height: v === 0 ? 2 : Math.max(3, Math.round((h * v) / max)), background: v === 0 ? th.hairline : th.accent, cornerRadius: 2 }} />
+        ))}
+      </Box>
+      <T th={th} size="tiny" color={th.faint} line>
+        {note}
+      </T>
+    </Box>
+  )
+}
+
+/** 커밋 종류 주인 색: core 흐림, plugin 은 차례로, other 가는 선 */
+function ownerColor(th: Theme, owners: string[], o: string): Rgba {
+  if (o === 'core') return th.muted
+  if (o === 'other') return th.hairline
+  const palette = [th.accent, th.green, th.yellow, th.orange, th.red]
+  return palette[Math.max(0, owners.filter(x => x !== 'core').indexOf(o)) % palette.length]!
+}
+
 function Commits({ th, s, c, now }: { th: Theme; s: State; c: Controller; now: number }) {
   const m = s.model!
-  const rows = m.commits.slice(0, COMMIT_ROWS)
-  const rest = m.commits.length - rows.length
+  const shown = commitRows(s)
+  const rows = shown.slice(0, COMMIT_ROWS)
+  const rest = shown.length - rows.length
+  const kinds = filterValues(s, 'commits.kind').slice(1)
+  const kindN = (v: string) => (v === 'all' ? m.commits.length : m.commits.filter(x => x.owner === v).length)
+  const topic = filterOf(s, 'commits.topic')
+  const topics = filterValues(s, 'commits.topic')
+  const days = perDay(shown.map(x => x.time), now)
+  const step = (by: number) => c.cycleFilter('commits.topic', by)
+  const arrow = (label: string, by: number, id: string) => (
+    <Box id={id} onClick={() => step(by)} style={{ padding: { top: 1, bottom: 1, left: th.space * 0.6, right: th.space * 0.6 }, cornerRadius: th.size.tiny, hoverBackground: th.card, pointerShape: 'pointer', flexShrink: 0 }}>
+      <T th={th} size="tiny" color={th.muted} line>
+        {label}
+      </T>
+    </Box>
+  )
   return (
     <Box style={{ flexDirection: 'column', gap: 2 }}>
-      <SectionHead th={th} title="최근 커밋" count={m.commits.length} id="commits:head" />
+      <Dist th={th} id="commits:dist" title="종류" segs={kinds.map(o => ({ key: o, label: o, n: kindN(o), color: ownerColor(th, m.owners, o) }))} />
+      <DayBars th={th} values={days} id="commits:days" note={`선택한 커밋 중 ${days.reduce((a, x) => a + x, 0)}개`} />
+      <Box style={{ flexDirection: 'column', gap: th.space * 0.6, margin: { top: th.space * 1.5, bottom: 0, left: 0, right: 0 } }}>
+        <Filter th={th} s={s} c={c} fkey="commits.kind" label="종류 f" count={kindN} />
+        <Box id="filter:commits.topic" style={{ flexDirection: 'row', alignItems: 'center', gap: th.space * 0.6 }}>
+          <T th={th} size="tiny" color={th.faint} line style={{ width: th.size.tiny * 3.2 }}>
+            topic t
+          </T>
+          {arrow('‹', -1, 'filter:commits.topic:prev')}
+          <Box style={{ background: topic === 'all' ? th.bg : th.accentSoft, cornerRadius: th.size.tiny, padding: { top: 1, bottom: 1, left: th.space, right: th.space }, flexShrink: 0 }}>
+            <T th={th} size="tiny" color={topic === 'all' ? th.muted : th.accent} bold={topic !== 'all'} line id="filter:commits.topic:value">
+              {topic === 'all' ? `전체 (topic ${topics.length - 1}개)` : `${topic} ${m.commits.filter(x => x.topic === topic).length}`}
+            </T>
+          </Box>
+          {arrow('›', 1, 'filter:commits.topic:next')}
+        </Box>
+      </Box>
+      <SectionHead th={th} title="커밋" count={shown.length} id="commits:head" note={shown.length !== m.commits.length ? `전체 ${m.commits.length} 중` : undefined} />
       {rows.map((cm, i) => (
         <ListRow key={cm.sha} th={th} index={i} id={`row:commit:${cm.sha}`} selected={s.tab === 'commits' && cursorOf(s) === i} onClick={() => c.moveTo(i)}>
           <CommitLine th={th} c={cm} now={now} showTopic />
@@ -894,17 +968,27 @@ function Plugins({ th, s, c }: { th: Theme; s: State; c: Controller }) {
 
 const ITEM_LABEL: Record<string, string> = { risk: '위험', remaining: '남은 일', deferred: '미룸', open: '미결', blocking: '막힘' }
 
+const ITEM_COLOR = (th: Theme, kind: string): Rgba =>
+  kind === 'blocking' ? th.red : kind === 'risk' ? th.yellow : kind === 'remaining' ? th.accent : kind === 'open' ? th.orange : th.faint
+
 function Items({ th, s, c }: { th: Theme; s: State; c: Controller }) {
   const m = s.model!
+  const rows = itemRows(s)
+  const kinds = filterValues(s, 'items').slice(1)
+  const n = (v: string) => (v === 'all' ? m.items.length : m.items.filter(i => i.kind === v).length)
   return (
     <Box style={{ flexDirection: 'column', gap: 2 }}>
-      <SectionHead th={th} title="항목 (trace.items)" count={m.items.length} id="items:head" />
-      {m.items.length === 0 ? (
+      <Dist th={th} id="items:dist" title="종류" segs={kinds.map(k => ({ key: k, label: ITEM_LABEL[k] ?? k, n: n(k), color: ITEM_COLOR(th, k) }))} />
+      <Box style={{ margin: { top: th.space * 1.5, bottom: 0, left: 0, right: 0 } }}>
+        <Filter th={th} s={s} c={c} fkey="items" label="종류 f" count={n} name={k => ITEM_LABEL[k] ?? k} />
+      </Box>
+      <SectionHead th={th} title="항목" count={rows.length} id="items:head" note="plan · impl 본문의 위험 · 남은 일 · 미룸 · 미결 기록, 최근 순. 해결 여부는 판정하지 않음" />
+      {rows.length === 0 ? (
         <T th={th} size="small" color={th.faint}>
           없음
         </T>
       ) : null}
-      {m.items.map((it: Item, i) => (
+      {rows.map((it: Item, i) => (
         <ListRow key={i} th={th} index={i} id={`row:item:${i}`} selected={s.tab === 'items' && cursorOf(s) === i} onClick={() => c.moveTo(i)}>
           <Box style={{ flexDirection: 'row', gap: th.space, alignItems: 'center', width: '100%' }}>
             <Chip th={th} text={ITEM_LABEL[it.kind] ?? it.kind} fg={it.kind === 'risk' ? th.yellow : th.muted} bg={it.kind === 'risk' ? th.yellowSoft : th.card} />
@@ -928,7 +1012,7 @@ export function keysHint(s: State): string {
   const n = Math.min(9, tabsOf(s.model).length)
   const tabs = `1-${n} · ←/→ 탭`
   if (s.tab === 'overview') return `j/k ↑/↓ 이동 · Enter 펼치기 · Esc 접기 · ${tabs} · r 새로고침`
-  const filter = s.tab === 'requests' ? ' · f 필터' : ''
+  const filter = hasFilter(s.tab) ? (s.tab === 'commits' ? ' · f 종류 · t topic' : ' · f 필터') : ''
   return `j/k ↑/↓ 이동${filter} · ${tabs} · r 새로고침`
 }
 

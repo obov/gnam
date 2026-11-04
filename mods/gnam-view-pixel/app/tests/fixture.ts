@@ -33,6 +33,12 @@ export const STATUS = {
       sections: { goals: [{ name: '측정', done: 1, total: 2 }, { name: '집계', done: 3, total: 3 }] },
     },
   },
+  kinds: [
+    { label: 'chore: …', subject: '^chore: \\S', trailer: null, owner: 'core' },
+    { label: 'spec.<topic>.plan: …', subject: '^spec\\.([A-Za-z0-9_-]+)\\.plan: \\S', trailer: '^Gnam: spec\\.([A-Za-z0-9_-]+)\\.plan$', owner: 'core' },
+    { label: 'spec.<topic>.impl: …', subject: '^spec\\.([A-Za-z0-9_-]+)\\.impl: \\S', trailer: '^Gnam: spec\\.([A-Za-z0-9_-]+)\\.impl$', owner: 'core' },
+    { label: 'run.<topic>.<start|end|policy>: …', subject: '^run\\.([A-Za-z0-9_-]+)\\.(start|end|policy): \\S', trailer: '^Gnam: run\\.([A-Za-z0-9_-]+)\\.(start|end|policy)$', owner: 'run' },
+  ],
   views: [
     { id: 'risks', title: '위험', source: 'trace.items', where: { kind: 'risk' }, view: 'list', fields: { title: 'text', badge: 'kind', meta: 'sha' }, icon: null, owner: 'project' },
     { id: 'builtins', title: '내장', source: 'builtins', where: {}, view: 'table', fields: { columns: ['id', 'active'] }, icon: null, owner: 'project' },
@@ -168,6 +174,7 @@ export const LOG = [
   row('p2api000', 200, 'docs(api): 목록 한 번에', 'spec.api.plan', []),
   row('p3web000', 300, 'docs(web): 웹 첫 화면', 'spec.web.plan', []),
   row('cchore01', 350, 'chore: 의존성', '', ['package.json']),
+  row('rrun0001', 360, 'chore(sync): 위임 시작', 'run.sync.start', []),
   row('i4sync00', 400, 'feat(sync): 동기화', 'spec.sync.impl', ['src/sync.ts', 'src/api.ts']),
   row('p4sync00', 500, 'docs(sync): 동기화', 'spec.sync.plan', ['specs/sync.md']),
   row('p6lore00', 600, 'spec.lore.plan: lore', '', ['specs/lore.md']),
