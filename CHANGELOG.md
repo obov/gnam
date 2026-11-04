@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.8.0
+
+- 커밋 형식 format 2 (specs/commit-format.md): 제목 Conventional Commits (`<type>(<topic>)[!]: …`), gnam 종류 · 한 줄 필드는 메시지 끝 trailer (`Gnam: spec.<topic>.<plan|impl|chore>` · `Summary` · `Blocking` · `Plan` …). release-please · semantic-release · commitlint 같은 표준 도구가 history 를 그대로 읽는다. `gnam init` 기본값 format 2, 기존 format 1 저장소는 그대로 동작
+- format 2 검사: `commit/gnam-scope` · `gnam-type` · `impl-type` (plan Breaking = `!`, 릴리스 전 새 spec 합의 = `feat`) · `feat-plan` · `chore-scope` · `chore-spec` · `trailer-field` · `body-markup`
+- 판이 섞인 history: status · trace · plugin 조회가 두 판을 모두 읽는다. trace 는 판 올림 이전 기록도 읽는다
+- status `kinds[].trailer` (format 2 Gnam: 정규식)
+- `gnam outdated` · link 이전 안내가 release-please 형식 CHANGELOG (`## [<version>](…)`, BREAKING CHANGES 절의 `이전:` 줄) 를 읽는다
+- format 2 + release plugin = 설정 오류 (format 2 는 release-please)
+
 ## 0.7.0
 
 - 내장 plugin `export` (specs/export.md): gnam.json `export.targets` 의 하위 폴더 (+ `include` 파일) 를 배포 전용 저장소로 내보낸다. `gnam run export build` = 로컬 `gnam/export/<id>` 에 `Export-Source` · `Export-Target` trailer 배포 커밋 (변경 없으면 생략), `push` = force 없이 push · version 파일 값 태그, `status` = 마지막 내보낸 원본 · 미반영 커밋 수. 검사 `export/target-missing` · `export/version-format`, status `plugins.export.sections.targets`
