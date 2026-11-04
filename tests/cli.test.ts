@@ -14,7 +14,7 @@ test("init --no-install: gnam.json · hook · skill 링크 · AGENTS.md 블록 �
   const r = repo.gnam("init", "--no-install", "--plugins", "lore")
   assert.equal(r.status, 0, r.err)
   const config = JSON.parse(readFileSync(join(repo.root, "gnam.json"), "utf8"))
-  assert.deepEqual(config, { format: 1, plugins: ["@gnam/lore"] })
+  assert.deepEqual(config, { format: 2, plugins: ["@gnam/lore"] })
   assert.equal(repo.git("config", "core.hooksPath").out.trim(), ".githooks")
   assert.ok(existsSync(join(repo.root, ".githooks/commit-msg")))
   for (const dir of [".agents/skills", ".claude/skills"]) {
@@ -201,7 +201,7 @@ test("status: 인자 없음 = 요약, --json = JSON 트리, 경로 · 형식, -C
     assert.deepEqual(Object.keys(tree).slice(0, 3), ["schema", "gnam", "project"])
     assert.equal(a.gnam("status", "schema", "--format", "raw").out, "1\n")
     const both = JSON.parse(a.gnam("status", "gnam.format", "-C", a.root, "-C", b.root).out) as Record<string, unknown>
-    assert.deepEqual(Object.values(both), [1, 1])
+    assert.deepEqual(Object.values(both), [2, 2])
     assert.equal(Object.keys(both).length, 2)
   } finally {
     a.cleanup()

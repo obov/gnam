@@ -18,6 +18,7 @@ import type { GnamConfig } from "../../core/plugin.ts"
 import { agentsOf, fieldOf, NA } from "../run/run-format.ts"
 import { usageOf } from "../run/run-usage.ts"
 import { blockOf, byNumber, KEY_ORDER, RUN_ID, VARIANT } from "./model.ts"
+import { grepBoth, normalize, normalizeMessage } from "../../core/format.ts"
 
 export interface MultirunConfig {
   /** null = lock 파일로 판정. 문자열 = 그 셸 명령 */
@@ -171,9 +172,10 @@ export function start(args: string[], cwd: string, config: GnamConfig): number {
   const resolved = git(["rev-parse", "--verify", "-q", `${planArg}^{commit}`], source)
   if (!resolved.ok) throw new Failure(`plan 없음: ${planArg}`)
   const plan = resolved.out.trim()
-  const topic = PLAN_SUBJECT.exec(must(["show", "-s", "--format=%s", plan], source))?.[1]
+  const planView = normalize(must(["show", "-s", "--format=%s", plan], source).trim(), must(["show", "-s", "--format=%b", plan], source).trim())
+  const topic = PLAN_SUBJECT.exec(planView.subject)?.[1]
   if (topic === undefined) throw new Failure(`${planArg}: spec.<topic>.plan: 커밋이 아님`)
-  if (readyOf(must(["show", "-s", "--format=%b", plan], source)) !== true) throw new Failure(`${planArg}: Blocking 이 남은 plan (착수 가능 조건 1)`)
+  if (readyOf(planView.body) !== true) throw new Failure(`${planArg}: Blocking 이 남은 plan (착수 가능 조건 1)`)
   if (!git(["merge-base", "--is-ancestor", plan, "HEAD"], source).ok) throw new Failure(`${planArg}: HEAD 의 조상 아님`)
   const branch = git(["symbolic-ref", "--short", "-q", "HEAD"], source)
   if (!branch.ok) throw new Failure("detached HEAD. 브랜치에서 실행한다")
@@ -288,15 +290,15 @@ const RECORD = "\x1e"
 const UNIT = "\x1f"
 /** HEAD 에서 닿는 multirun 커밋 (hash · 제목 · 본문) */
 function multirunCommits(source: string, kind: "start" | "report") {
-  const out = git(["log", `--format=%H${UNIT}%s${UNIT}%B${RECORD}`, "-E", `--grep=^multirun\\.[A-Za-z0-9_-]+\\.${kind}: `], source)
+  const out = git(["log", `--format=%H${UNIT}%s${UNIT}%B${RECORD}`, "-E", ...grepBoth(`multirun\\.[A-Za-z0-9_-]+\\.${kind}`)], source)
   if (!out.ok) return []
   return out.out
     .split(RECORD)
     .map((r) => r.replace(/^\n/, ""))
     .filter((r) => r !== "")
     .map((r) => {
-      const [hash = "", subject = "", body = ""] = r.split(UNIT)
-      return { hash, subject, body }
+      const [hash = "", rawSubject = "", body = ""] = r.split(UNIT)
+      return { hash, subject: normalizeMessage(body.trim()).split("\n")[0] ?? rawSubject, body: normalizeMessage(body.trim()) }
     })
 }
 export const startOf = (state: RunState) => multirunCommits(state.source, "start").find((c) => fieldOf(c.body, "Id") === state.id) ?? null
@@ -366,9 +368,10 @@ export function runStatus(state: RunState): RunStatus {
     const variantCommit =
       tip === null
         ? null
-        : (lines(git(["log", "--format=%H %s", `${state.base}..${tip}`], where).out)
-            .map((l) => l.split(" "))
-            .find(([, ...s]) => VARIANT_COMMIT.test(s.join(" ")))?.[0] ?? null)
+        : (git(["log", `--format=%H${UNIT}%B${RECORD}`, `${state.base}..${tip}`], where)
+            .out.split(RECORD)
+            .map((r) => r.replace(/^\n/, "").split(UNIT))
+            .find(([, message]) => VARIANT_COMMIT.test(normalizeMessage((message ?? "").trim()).split("\n")[0] ?? ""))?.[0] ?? null)
     return {
       name: v.name,
       model: committed.get(v.name) || v.model,
@@ -455,8 +458,9 @@ export async function collectData(state: RunState) {
             .map((r) => r.replace(/^\n/, ""))
             .filter((r) => r !== "")
             .map((r) => {
-              const [hash = "", subject = "", body = ""] = r.split(UNIT)
-              return { hash, subject, body: body.trim() }
+              const [hash = "", rawSubject = "", body = ""] = r.split(UNIT)
+              const message = normalizeMessage(body.trim())
+              return { hash, subject: message.split("\n")[0] ?? rawSubject, body: message }
             })
     const variantCommit = commits.find((c) => VARIANT_COMMIT.test(c.subject)) ?? null
     const variant =

@@ -14,6 +14,7 @@ import { gitOrThrow } from "../../core/git.ts"
 import { sizeOf } from "./classification.ts"
 import { type Agent, agentsOf, fieldOf, KEY_ORDER, NA } from "./run-format.ts"
 import { defaultRoot, measuredOf, type Usage, usageOf } from "./run-usage.ts"
+import { grepBoth, normalize } from "../../core/format.ts"
 
 export interface RunCommit {
   hash: string
@@ -318,15 +319,16 @@ const git = (args: string[], cwd: string): string => gitOrThrow(args, cwd)
 
 function readRuns(cwd: string): RunCommit[] {
   return git(
-    ["log", "-E", "--grep", "^run\\.[A-Za-z0-9_-]+\\.(start|end|policy): ", "--format=%H%x1f%s%x1f%b%x1e"],
+    ["log", "-E", ...grepBoth("run\\.[A-Za-z0-9_-]+\\.(start|end|policy)"), "--format=%H%x1f%s%x1f%b%x1e"],
     cwd,
   )
     .split("\x1e")
     .map((chunk) => chunk.trim())
     .filter(Boolean)
     .map((chunk) => {
-      const [hash = "", subject = "", body = ""] = chunk.split("\x1f")
-      return { hash, subject, body: body.trim() }
+      const [hash = "", rawSubject = "", rawBody = ""] = chunk.split("\x1f")
+      const { subject, body } = normalize(rawSubject, rawBody.trim())
+      return { hash, subject, body }
     })
 }
 
@@ -388,18 +390,16 @@ export async function statsCli(argv: string[], cwd: string): Promise<number> {
         git(
           [
             "log",
-            "--format=%h",
-            "--all-match",
+            "--format=%h%x1f%s%x1f%b%x1e",
             "--grep",
             `^Plan: ${plan.slice(0, 7)}`,
-            "--grep",
-            "^spec\\.[A-Za-z0-9_-]+\\.impl: ",
             `${end}..HEAD`,
           ],
           cwd,
         )
-          .split("\n")
-          .filter(Boolean).length
+          .split("\x1e")
+          .map((chunk) => chunk.trim().split("\x1f"))
+          .filter(([h, s, b]) => h !== undefined && h !== "" && /^spec\.[A-Za-z0-9_-]+\.impl: /.test(normalize(s ?? "", b ?? "").subject)).length
       out = health({ commits, rows, reworkOf })
     } else {
       console.error("사용: gnam run run stats table | adopted | health | lines <merge> … | end <run.start>")

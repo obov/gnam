@@ -136,7 +136,7 @@ export function statusSchema(loaded: Loaded[]): Schema {
         "탭 정의 (specs/view.md)",
       ),
       builtins: arr(obj({ id: str(), active: bool, requires: arr(str()) })),
-      kinds: arr(obj({ label: str(), subject: str(), owner: str() })),
+      kinds: arr(obj({ label: str(), subject: str(), trailer: strOrNull("format 2 의 Gnam: trailer 정규식. 없으면 null (Gnam 없는 종류)"), owner: str() })),
       rules: arr(obj({ id: str(), owner: str(), why: str() })),
       install: obj({
         hooks: obj({ hooksPath: strOrNull(), expected: str(), commitMsg: bool }),

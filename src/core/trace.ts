@@ -8,7 +8,8 @@ import { join } from "node:path"
 import { planSummaryOf } from "./commit.ts"
 import { fieldsOf, fieldText, itemsOf, requestRefOf } from "./fields.ts"
 import { git, gitOrThrow, lines } from "./git.ts"
-import { boundaryOf, historyArgs } from "./history.ts"
+import { firstBoundaryOf, historyArgs } from "./history.ts"
+import { normalize } from "./format.ts"
 
 export class TraceError extends Error {}
 
@@ -122,7 +123,8 @@ function readCommits(cwd: string, boundary: string | null): Commit[] {
   const out = gitOrThrow(["log", "-z", "--format=%H%x00%s%x00%b", ...historyArgs("HEAD", boundary)], cwd).split("\0")
   const commits: Commit[] = []
   for (let i = 0; i + 2 < out.length; i += 3) {
-    const [sha = "", subject = "", body = ""] = out.slice(i, i + 3)
+    const [sha = "", rawSubject = "", rawBody = ""] = out.slice(i, i + 3)
+    const { subject, body } = normalize(rawSubject, rawBody)
     commits.push({ sha: sha.trim(), subject, body, fields: fieldsOf(body) })
   }
   return commits.reverse()
@@ -195,7 +197,7 @@ function rangeOf(cwd: string, since: string): { sha: string; shas: Set<string> }
 export function collectTrace(cwd: string, since?: string): Trace {
   const head = git(["rev-parse", "-q", "--verify", "HEAD"], cwd).ok ? gitOrThrow(["rev-parse", "HEAD"], cwd).trim() : null
   const range = since === undefined || since === "" ? null : rangeOf(cwd, since)
-  const boundarySha = head === null ? null : boundaryOf(cwd, "HEAD")
+  const boundarySha = head === null ? null : firstBoundaryOf(cwd, "HEAD")
   const commits = readCommits(cwd, boundarySha)
   const resolve = (hash: string, pool: Commit[] = commits) =>
     hash.length >= 7 ? (pool.find((c) => c.sha.startsWith(hash))?.sha ?? hash) : hash

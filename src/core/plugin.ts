@@ -34,6 +34,10 @@ export interface CommitContext {
   specExists: (topic: string) => boolean
   /** hash 가 이 커밋의 조상인가 (먼저 커밋됐는가) */
   isAncestor: (hash: string) => boolean
+  /** hash 커밋이 파일을 바꿨는가 (빈 plan 이 아닌가). 모르면 생략 */
+  changesFiles?: (hash: string) => boolean
+  /** hash 커밋을 포함한 릴리스 태그 (v<semver> · <component>-v<semver>) 가 있는가. 모르면 생략 */
+  released?: (hash: string) => boolean
   /** 활성 plugin id 목록 */
   plugins: string[]
   /** 활성 plugin (validateCommit 이 채운다). 다른 plugin 이 준 선언 (layout 규칙 등) 을 읽을 때 */

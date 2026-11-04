@@ -349,7 +349,7 @@ export const SECTIONS: [string, Section][] = [
       const { loaded } = await ctx.plugins()
       return [
         ...CORE_KINDS.map((k) => ({ ...k, owner: "core" })),
-        ...loaded.flatMap(({ plugin }) => (plugin.kinds ?? []).map((k) => ({ label: k.label, subject: k.subject.source, owner: plugin.id }))),
+        ...loaded.flatMap(({ plugin }) => (plugin.kinds ?? []).map((k) => ({ label: k.label, subject: k.subject.source, trailer: trailerOf(k.subject.source), owner: plugin.id }))),
       ]
     },
   ],
@@ -370,13 +370,16 @@ export const SECTIONS: [string, Section][] = [
   ["trace", (ctx) => ctx.once("trace", () => collectTrace(ctx.cwd, ctx.options.since))],
 ]
 
+/** plugin 종류의 제목 정규식 → format 2 Gnam: trailer 정규식 */
+const trailerOf = (subject: string) => `^Gnam: ${subject.replace(/^\^/, "").replace(/: (?:\\S)?$/, "")}$`
+
 /** 코어 커밋 종류 (commit.ts CORE_SUBJECT 를 종류별로 나눈 것) */
 export const CORE_KINDS = [
-  { label: "chore: …", subject: "^chore: \\S" },
-  { label: "refactor: …", subject: "^refactor: \\S" },
-  { label: "spec.<topic>.plan: …", subject: "^spec\\.([A-Za-z0-9_-]+)\\.plan: \\S" },
-  { label: "spec.<topic>.impl: …", subject: "^spec\\.([A-Za-z0-9_-]+)\\.impl: \\S" },
-  { label: "spec.<topic>.chore: …", subject: "^spec\\.([A-Za-z0-9_-]+)\\.chore: \\S" },
+  { label: "chore: …", subject: "^chore: \\S", trailer: null },
+  { label: "refactor: …", subject: "^refactor: \\S", trailer: null },
+  { label: "spec.<topic>.plan: …", subject: "^spec\\.([A-Za-z0-9_-]+)\\.plan: \\S", trailer: "^Gnam: spec\\.([A-Za-z0-9_-]+)\\.plan$" },
+  { label: "spec.<topic>.impl: …", subject: "^spec\\.([A-Za-z0-9_-]+)\\.impl: \\S", trailer: "^Gnam: spec\\.([A-Za-z0-9_-]+)\\.impl$" },
+  { label: "spec.<topic>.chore: …", subject: "^spec\\.([A-Za-z0-9_-]+)\\.chore: \\S", trailer: "^Gnam: spec\\.([A-Za-z0-9_-]+)\\.chore$" },
 ]
 
 function mergeDefaults(defaults: unknown, value: unknown): unknown {

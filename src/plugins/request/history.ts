@@ -3,6 +3,7 @@
  */
 import { git, gitOrThrow } from "../../core/git.ts"
 import { fieldsOf, REQUEST_SUBJECT, requestRefOf } from "./model.ts"
+import { normalize } from "../../core/format.ts"
 
 export interface Commit {
   sha: string
@@ -16,7 +17,8 @@ export function readCommits(cwd: string): Commit[] {
   const fields = gitOrThrow(["log", "-z", "--format=%H%x00%s%x00%b", "HEAD"], cwd).split("\0")
   const commits: Commit[] = []
   for (let i = 0; i + 2 < fields.length; i += 3) {
-    const [sha = "", subject = "", body = ""] = fields.slice(i, i + 3)
+    const [sha = "", rawSubject = "", rawBody = ""] = fields.slice(i, i + 3)
+    const { subject, body } = normalize(rawSubject, rawBody)
     commits.push({ sha: sha.trim(), subject, body })
   }
   return commits

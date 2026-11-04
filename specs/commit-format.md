@@ -4,7 +4,7 @@
 release-please · semantic-release · git-cliff · commitlint 같은 표준 도구가 gnam 저장소의 history 를 그대로 읽는다.
 spec → plan → impl 흐름과 본문 필드의 의미는 바꾸지 않는다. 바뀌는 것은 표기 위치뿐이다.
 
-미구현: 전체
+미구현: release-please 연동 (이 저장소) 의 config · manifest · workflow
 
 ## 판
 
@@ -14,6 +14,7 @@ format 2   이 문서. gnam init 의 기본값
 ```
 
 - 판 = gnam.json `format`. 판을 바꾼 커밋이 검사 경계 (기존 boundaryOf). 경계 이전 커밋은 검사하지 않는다
+- status · trace 는 gnam.json `format` 을 처음 넣은 커밋 (init) 부터 읽는다. 판 올림이 이전 기록을 가리지 않는다
 - 읽기 (status · trace · history · plugin 조회) 는 커밋마다 두 판을 모두 읽는다. 판이 섞인 history 에서 plan ↔ impl 연결이 이어진다
 - format 1 저장소는 그대로 동작한다. 판 올림은 사용자가 gnam.json 을 바꿔서 한다
 
@@ -87,12 +88,13 @@ Summary      plan. 사람용 한 줄 (specs/human-summary.md 규칙 그대로)
 Blocking     plan. 'Blocking: 없음' 또는 항목마다 'Blocking: B<n> <내용>' 반복
 Plan         impl. '<plan hash> <단계>'
 Topics       수집 plan. 'a, b'
-Spec · From  수집 plan · 연결 (commits/collect-plan.md). 값마다 한 줄 반복
 Supersedes   plan. 대체하는 plan hash
 Breaking     plan. 쓰는 쪽이 할 일 한 줄. release 수준 근거이고 그 자체로 릴리스를 만들지 않는다
 ```
 
 - impl 의 호환성 깨짐은 표준 표기: 제목 `!` + `BREAKING CHANGE: <쓰는 쪽이 할 일>` trailer
+- 수집 plan 의 `Spec:` · `From:` 은 단계 아래 들여쓴 줄 (본문, format 1 과 같음). 값이 단계마다 붙는다
+- run 의 `Agent:` · `Why:` 줄은 trailer 단락에 함께 둔다 (줄 단위로 읽음)
 - 그 밖의 본문 필드 (Goal · Plan 단계 · Scope · Decisions expected · Risks · Open · Intent · Implementation · Decisions · Invariant · Deferred …) 는 본문
 
 ## impl 의 type

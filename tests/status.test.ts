@@ -12,7 +12,7 @@ test("status 트리: 키 순서 · plugin · 종류 · config · install", async
     const tree = await collectStatus({ cwd: repo.root })
     expect(Object.keys(tree)).toEqual(["schema", "gnam", "project", "config", "plugins", "views", "builtins", "kinds", "rules", "install", "problems", "handoff", "env", "trace"])
     expect(tree["schema"]).toBe(1)
-    expect(tree["gnam"]).toMatchObject({ format: 1, source: "checkout" })
+    expect(tree["gnam"]).toMatchObject({ format: 2, source: "checkout" })
     expect(tree["config"]).toMatchObject({ raw: { format: 1, plugins: ["@gnam/recall"] }, effective: { format: 1 } })
     expect(tree["plugins"]).toMatchObject({
       recall: { spec: "@gnam/recall", kind: "builtin", commands: [{ name: "search", json: true }], agentsMd: true, configProblems: [] },
@@ -204,7 +204,7 @@ test("plugin 확장: 요약 줄 · --format plugin 형식 · gnam run --json · 
   try {
     expect(repo.gnam("status").out).toContain("demo       hello 1\n")
     expect(repo.gnam("status", "kinds", "--format", "demo-lines").out).toBe("chore: …\nrefactor: …\nspec.<topic>.plan: …\nspec.<topic>.impl: …\nspec.<topic>.chore: …\n")
-    expect(repo.gnam("status", "gnam.format", "--format", "json").out).toBe("1\n")
+    expect(repo.gnam("status", "gnam.format", "--format", "json").out).toBe("2\n")
     expect(JSON.parse(repo.gnam("run", "demo", "list", "c", "--json").out)).toEqual([
       { name: "a", n: 1 },
       { name: "c", n: 2 },

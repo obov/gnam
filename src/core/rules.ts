@@ -21,4 +21,13 @@ export const CORE_RULES: RuleMeta[] = [
   { id: "commit/impl-plan", why: "impl 본문 첫 줄 Plan: <같은 topic plan 또는 수집 plan> <단계>" },
   { id: "commit/impl-ready", why: "Blocking 이 남은 plan 은 착수하지 않는다" },
   { id: "commit/chore-body", why: "spec chore 본문 Goal · Scope" },
+  { id: "commit/gnam-trailer", why: "format 2: Gnam: trailer 는 하나" },
+  { id: "commit/gnam-scope", why: "format 2: Gnam: spec.<topic>.* 의 topic = 제목 scope" },
+  { id: "commit/gnam-type", why: "format 2: plan · spec chore = docs, impl = feat · fix" },
+  { id: "commit/impl-type", why: "format 2: impl type 이 계산한 릴리스 수준 이상 (Breaking = !, 새 합의 = feat)" },
+  { id: "commit/feat-plan", why: "format 2: feat 는 impl 에서만" },
+  { id: "commit/chore-scope", why: "format 2: Gnam: 없는 커밋의 scope 는 spec topic 이 아님" },
+  { id: "commit/chore-spec", why: "format 2: Gnam: 없는 커밋은 specs/ 를 바꾸지 않는다" },
+  { id: "commit/trailer-field", why: "format 2: 한 줄 필드는 메시지 끝 trailer 단락" },
+  { id: "commit/body-markup", why: "format 2: 본문에 '#' 줄 · '---' 줄 금지 (commit-msg 만)" },
 ]

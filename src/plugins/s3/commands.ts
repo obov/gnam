@@ -10,6 +10,7 @@ import { parseAttachment, REQUEST_SUBJECT } from "../request/model.ts"
 import { type S3Client, S3Error, s3Client } from "./client.ts"
 import { CREDENTIAL_HELP, credentialsFrom, s3ConfigOf, s3ConfigProblems, type S3Config } from "./config.ts"
 import { sha256Hex } from "./sigv4.ts"
+import { normalize } from "../../core/format.ts"
 
 export interface Io {
   env: Record<string, string | undefined>
@@ -180,7 +181,8 @@ export function s3Attachments(cwd: string, range: string): { sha: string; name: 
   const fields = result.out.split("\0")
   const out: { sha: string; name: string; bucket: string; key: string }[] = []
   for (let i = 0; i + 2 < fields.length; i += 3) {
-    const [sha = "", subject = "", body = ""] = fields.slice(i, i + 3)
+    const [sha = "", rawSubject = "", rawBody = ""] = fields.slice(i, i + 3)
+    const { subject, body } = normalize(rawSubject, rawBody)
     if (!REQUEST_SUBJECT.test(subject)) continue
     for (const line of fieldsOf(body).get("Attachments") ?? []) {
       const parsed = line.trim() === "" ? null : parseAttachment(line.trim())

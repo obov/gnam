@@ -10,7 +10,7 @@ import { SKILLS_KEY, skillsLockProblems } from "./skills.ts"
  *   <id>     plugin 설정 (예: release)
  */
 export const CONFIG_FILE = "gnam.json"
-export const FORMAT = 1
+export const FORMAT = 2
 
 export interface GnamConfig {
   format: number
@@ -47,6 +47,8 @@ export function configProblems(value: unknown): string[] {
   else if (format > FORMAT) problems.push(`format ${format} > 설치된 gnam 이 아는 판 ${FORMAT}. gnam 을 갱신한다`)
   if (!Array.isArray(plugins) || !plugins.every((p) => typeof p === "string" && p !== ""))
     problems.push("plugins = 문자열 배열")
+  else if (typeof format === "number" && format >= 2 && plugins.some((p) => p === "@gnam/release" || p === "release"))
+    problems.push("format 2 에서 release plugin 금지 (release-please 를 쓴다. specs/commit-format.md)")
   problems.push(...skillsLockProblems((value as Record<string, unknown>)[SKILLS_KEY]))
   return problems
 }

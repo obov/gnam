@@ -5,6 +5,7 @@
  */
 import type { CommitContext, GnamPlugin } from "./plugin.ts"
 import type { Violation } from "./violation.ts"
+import { CC_TYPES, headerOf, normalize, splitTrailers, trailerValues } from "./format.ts"
 
 const CORE_SUBJECT = /^(?:chore|refactor|spec\.([A-Za-z0-9_-]+)\.(plan|impl|chore)): \S/
 const CORE_LABELS = ["chore: …", "refactor: …", "spec.<topic>.<plan|impl|chore>: …"]
@@ -81,28 +82,36 @@ export type Lookup = Omit<CommitContext, "message" | "subject" | "body" | "plugi
 
 /** 커밋 하나 검사. plugins = 활성 plugin (loader.ts) */
 export function validateCommit(input: Lookup & { message: string }, plugins: GnamPlugin[] = []): Violation[] {
-  const [subject = "", ...rest] = input.message.split("\n")
+  const [rawSubject = "", ...rest] = input.message.split("\n")
+  const rawBody = rest.join("\n").trim()
+  const format = input.config?.format ?? 1
+  // format 1 저장소에서는 이 커밋을 normalize 하지 않는다 (fix: 등 CC 제목은 그대로 commit/subject)
+  const { subject, body } = format >= 2 ? normalize(rawSubject, rawBody) : { subject: rawSubject, body: rawBody }
+  // 참조 커밋도 format 1 모양으로 읽는다 (판이 섞인 history)
+  const viewOf = (hash: string) => {
+    const s = input.subjectOf(hash)
+    return s === null ? null : normalize(s, input.bodyOf(hash) ?? "")
+  }
   const ctx: CommitContext = {
     ...input,
     cwd: input.cwd ?? process.cwd(),
     view: input.view ?? { kind: "index" },
     config: input.config ?? { format: 1, plugins: [] },
+    message: body === "" ? subject : `${subject}\n\n${body}`,
     subject,
-    body: rest.join("\n").trim(),
+    body,
+    subjectOf: (hash) => viewOf(hash)?.subject ?? null,
+    bodyOf: (hash) => (input.bodyOf(hash) === null ? null : (viewOf(hash)?.body ?? "")),
     plugins: plugins.map((p) => p.id),
     active: plugins,
   }
   const violations: Violation[] = []
-  for (const line of ctx.message.split("\n")) {
-    if (/^co-authored-by:/i.test(line.trim())) {
-      violations.push({
-        rule: "commit/no-co-author",
-        why: "공동 작성자 줄 금지. 하네스가 붙이는 trailer 도 포함한다.",
-        current: line.trim(),
-        fix: "해당 줄을 지운다. Claude Code 는 .claude/settings.json attribution.commit 이 빈 문자열인지 확인한다.",
-      })
-    }
+  if (ctx.config.format >= 2) {
+    const format2 = format2Problems(ctx, rawSubject, rawBody)
+    violations.push(...format2)
+    if (format2.some((v) => v.rule === "commit/subject")) return [...coAuthor(input.message), ...violations]
   }
+  violations.push(...coAuthor(input.message))
 
   let owner = "core"
   const kind = plugins.flatMap((p) => (p.kinds ?? []).map((k) => ({ plugin: p, kind: k }))).find(({ kind }) =>
@@ -118,6 +127,141 @@ export function validateCommit(input: Lookup & { message: string }, plugins: Gna
   }
   for (const plugin of plugins) violations.push(...(plugin.everyCommit?.(ctx, owner) ?? []))
   return violations
+}
+
+function coAuthor(message: string): Violation[] {
+  return message
+    .split("\n")
+    .filter((line) => /^co-authored-by:/i.test(line.trim()))
+    .map((line) => ({
+      rule: "commit/no-co-author",
+      why: "공동 작성자 줄 금지. 하네스가 붙이는 trailer 도 포함한다.",
+      current: line.trim(),
+      fix: "해당 줄을 지운다. Claude Code 는 .claude/settings.json attribution.commit 이 빈 문자열인지 확인한다.",
+    }))
+}
+
+const SPEC_KIND = /^spec\.([A-Za-z0-9_-]+)\.(plan|impl|chore|merge)$/
+const ONE_LINE_FIELDS = /^(?:Gnam|Summary|Blocking|Topics|Supersedes|Plan: [0-9a-f]{7,40}\b)/
+type Level = "patch" | "minor" | "major"
+const LEVEL_RANK: Record<Level, number> = { patch: 0, minor: 1, major: 2 }
+
+/** format 2 검사 (specs/commit-format.md). 제목 · trailer 표기만. 종류별 본문 규칙은 normalize 뒤 기존 검사 */
+function format2Problems(ctx: CommitContext, subject: string, body: string): Violation[] {
+  const violations: Violation[] = []
+  const add = (rule: string, why: string, current: string, fix: string) =>
+    violations.push({ rule: `commit/${rule}`, why, current, fix })
+  const header = headerOf(subject)
+  if (header === null || !(CC_TYPES as readonly string[]).includes(header.type)) {
+    add(
+      "subject",
+      "format 2 제목은 Conventional Commits 다. gnam 종류는 trailer 'Gnam: <종류>' 로 적는다 (specs/commit-format.md).",
+      subject || "(빈 제목)",
+      `제목을 '<type>(<scope>)[!]: <설명>' 으로 쓴다. type = ${CC_TYPES.join(" · ")}.`,
+    )
+    return violations
+  }
+  const { text, trailers } = splitTrailers(body)
+  const gnam = trailerValues(trailers, "Gnam")
+  if (gnam.length > 1) {
+    add("gnam-trailer", "Gnam: 은 커밋 종류 하나다.", gnam.join(" · "), "Gnam: 줄을 하나만 남긴다.")
+  }
+  for (const line of text.split("\n")) {
+    if (ONE_LINE_FIELDS.test(line)) {
+      add(
+        "trailer-field",
+        "한 줄 필드 (Gnam · Summary · Blocking · Plan · Topics · Supersedes) 는 메시지 끝 trailer 단락에 둔다. git 이 trailer 로 읽어야 조회된다.",
+        line,
+        "그 줄을 메시지 마지막 단락 (Key: value 줄만) 으로 옮긴다.",
+      )
+    }
+    if (ctx.view.kind === "index" && (/^#/.test(line) || /^---\s*$/.test(line))) {
+      add(
+        "body-markup",
+        "에디터 커밋 · amend 는 '#' 줄을 지우고, git am 은 '---' 줄에서 메시지를 자른다.",
+        line,
+        "제목 줄 대신 목록 · 굵은 글씨를 쓰고, 구분선은 빈 줄로 바꾼다.",
+      )
+    }
+  }
+  const files = ctx.files ?? []
+  const kind = gnam[0]
+  if (kind !== undefined) {
+    const spec = SPEC_KIND.exec(kind)
+    if (spec !== null) {
+      const [, topic, step] = spec
+      if (header.scope !== topic) {
+        add("gnam-scope", "제목 scope 가 topic 이다. Conventional Commits 도구가 scope 로 묶는다.", subject, `제목을 '${header.type}(${topic}): …' 로 쓴다.`)
+      }
+      const types = step === "impl" ? ["feat", "fix"] : step === "merge" ? null : ["docs"]
+      if (types !== null && !types.includes(header.type)) {
+        add(
+          "gnam-type",
+          "plan · spec chore 는 docs, impl 은 feat · fix 다. type 이 릴리스 수준을 정한다.",
+          `${header.type} (Gnam: ${kind})`,
+          `type 을 ${types.join(" · ")} 로 쓴다.`,
+        )
+      }
+      if (step === "impl") violations.push(...implType(ctx, header, trailers))
+    }
+    return violations
+  }
+  if (header.type === "feat") {
+    add(
+      "feat-plan",
+      "기능은 plan 을 먼저 쓴다. feat 는 impl (Gnam: spec.<topic>.impl) 에서만.",
+      subject,
+      "plan 을 커밋하고 impl 로 쓰거나, 기능이 아니면 fix · chore 등 다른 type 을 쓴다.",
+    )
+  }
+  if (header.type !== "refactor") {
+    if (header.scope !== null && ctx.specExists(header.scope)) {
+      add(
+        "chore-scope",
+        "scope 가 spec topic 이면 spec 에 정의된 동작의 변경이다. 그 동작을 도입한 plan 을 따르는 impl 로 쓴다.",
+        subject,
+        `'Gnam: spec.${header.scope}.impl' · 'Plan: <plan hash>' trailer 를 붙이거나, scope 를 spec topic 이 아닌 이름으로 바꾼다.`,
+      )
+    }
+    const specFiles = ctx.merge ? [] : files.filter((file) => file.startsWith("specs/"))
+    if (specFiles.length > 0) {
+      add(
+        "chore-spec",
+        "Gnam: 없는 커밋 (gnam chore) 은 spec 과 무관한 변경이다. spec 정리는 spec chore, 의미 변경은 plan.",
+        specFiles.join(", "),
+        "spec 변경을 'docs(<topic>): …' + 'Gnam: spec.<topic>.chore' 또는 plan 커밋으로 나눈다.",
+      )
+    }
+  }
+  return violations
+}
+
+/** impl 제목 type 이 계산한 수준 이상인가 (commit/impl-type) */
+function implType(ctx: CommitContext, header: { type: string; breaking: boolean }, trailers: { key: string; value: string }[]): Violation[] {
+  const plan = /^([0-9a-f]{7,40})\b/.exec(trailerValues(trailers, "Plan")[0] ?? "")?.[1]
+  if (plan === undefined) return []
+  const levelOf = (hash: string): Level => {
+    const planBody = ctx.bodyOf(hash) ?? ""
+    if (/^Breaking:/m.test(planBody)) return "major"
+    const isPlan = PLAN_SUBJECT.test(ctx.subjectOf(hash) ?? "")
+    if (isPlan && ctx.changesFiles?.(hash) === true && ctx.released?.(hash) === false) return "minor"
+    return "patch"
+  }
+  const planBody = ctx.bodyOf(plan) ?? ""
+  const gathered = refsOf(planBody, "Spec").filter((hash) => HASH.test(hash))
+  const level = [plan, ...gathered].map(levelOf).reduce<Level>((a, b) => (LEVEL_RANK[b] > LEVEL_RANK[a] ? b : a), "patch")
+  const breaking = header.breaking || trailerValues(trailers, "BREAKING CHANGE").length > 0 || trailerValues(trailers, "BREAKING-CHANGE").length > 0
+  const actual: Level = breaking ? "major" : header.type === "feat" ? "minor" : "patch"
+  if (LEVEL_RANK[actual] >= LEVEL_RANK[level]) return []
+  const want = level === "major" ? "제목 '!' + 'BREAKING CHANGE: <쓰는 쪽이 할 일>' trailer" : "type feat"
+  return [
+    {
+      rule: "commit/impl-type",
+      why: "impl type 이 릴리스 수준이다. plan Breaking: = major, 릴리스 전의 새 spec 합의 = minor (feat). 계산보다 낮출 수 없다.",
+      current: `${header.type}${header.breaking ? "!" : ""} (계산 ${level}, plan ${plan.slice(0, 7)})`,
+      fix: `${want} 로 쓴다.`,
+    },
+  ]
 }
 
 function subjectViolation(subject: string, plugins: GnamPlugin[]): Violation {
