@@ -13,7 +13,7 @@ topic 펼침 문제 (spec 의 '문제:' 줄) → 해결 (spec 첫 줄 · 최근 
 
 ## 요구
 
-- 터미널 Claude Code (desktop · VS Code · mobile 은 안내만). 그림은 **kitty graphics** 를 그리는 터미널: kitty · Ghostty · iTerm2 3.5+ (WezTerm 등은 Claude Code 의 Image 지원을 따름). tmux 는 지원하지 않는다
+- 터미널 Claude Code (desktop · VS Code · mobile 은 안내만). 그림은 **kitty graphics** 를 그리는 터미널: kitty · Ghostty · iTerm2 3.5+ (WezTerm 등은 Claude Code 의 Image 지원을 따름) · herdr (분할 pane, 아래 '터미널별 동작'). tmux 는 지원하지 않는다
 - node (>= 20), macOS (arm64 · x64) 또는 Linux (x64 · arm64)
 - 프로젝트에 `@obov/gnam` 0.5 이상 (`npm i -D @obov/gnam`). spec `문제:` 줄은 `gnam status` 가 `trace.topics.<t>.problem` 을 낼 때부터 보인다 (없으면 비움)
 - pixel 런타임 (패치된 Electron, 약 300MB) 을 처음 한 번 내려받는다
@@ -23,7 +23,8 @@ topic 펼침 문제 (spec 의 '문제:' 줄) → 해결 (spec 첫 줄 · 최근 
 ```text
 /plugin install gnam-view-pixel --marketplace obov/gnam
 /gnam-pixel setup          # 런타임 내려받기 + 앱 빌드 (처음 한 번, 몇 분)
-/gnam-pixel                # 열기 · 다시 실행하면 닫기
+/gnam-pixel                # 열기 · 다시 실행하면 닫기 (herdr 에서는 연 pane 으로 이동)
+/gnam-pixel close          # 닫기
 ```
 
 셸에서 하려면 (설치된 plugin 폴더의 `app/` 에서):
@@ -40,9 +41,28 @@ claude --plugin-dir mods/gnam-view-pixel
 # 프롬프트에서 /gnam-pixel
 ```
 
+## 터미널별 동작
+
+```text
+kitty · Ghostty · iTerm2 단독   Claude Code pane 안에 그린다 (bridge → Image)
+herdr (HERDR_ENV=1)             herdr 는 Claude Code pane 의 Image (kitty placeholder) 를 그리지 못한다.
+                                대신 Claude Code pane 옆에 herdr 분할 pane 을 만들고 그 안에서 pixel 앱을 직접 실행한다
+```
+
+herdr 에서:
+
+- `/gnam-pixel` — 오른쪽 (설정 `split` 이 `down` 이면 아래) 에 pane 을 만들어 앱을 띄운다. focus 는 Claude Code pane 에 남는다. 이미 열려 있으면 새로 만들지 않고 그 pane 으로 이동
+- `/gnam-pixel close` — 연 pane 을 닫는다. 그 pane 에서 Ctrl+C 로 앱이 정상 종료해도 pane 이 닫힌다 (오류로 끝나면 오류를 보이도록 셸이 남는다). Claude Code 세션이 끝나면 mod 가 닫는다
+- 앱은 5초마다 HEAD · `gnam.json` · `specs/` 를 확인해 바뀌었을 때만 다시 읽는다 (`GNAM_VIEW_POLL_MS` 로 주기 변경). `r` 은 언제나 다시 읽기
+- 키는 그 pane 에 직접 간다 (클릭 불필요). 같은 명령을 셸에서 직접 실행할 수도 있다:
+
+```bash
+GNAM_VIEW_CWD=<저장소> <plugin 폴더>/app/node_modules/.bin/pixel <plugin 폴더>/app/dist/main.cjs
+```
+
 ## 키
 
-pane 을 한 번 클릭하면 키가 pane 으로 간다 (Esc 로 프롬프트에 돌려줌).
+pane 을 한 번 클릭하면 키가 pane 으로 간다 (Esc 로 프롬프트에 돌려줌). herdr 분할 pane 에서는 그 pane 을 focus 하면 된다.
 
 ```text
 j/k · ↑/↓        이동            Enter · 클릭   topic 펼치기 · 접기 (한 번에 하나)
@@ -56,13 +76,15 @@ r                다시 읽기        g / G          처음 · 끝
 ## 설정
 
 `theme`: `auto` (기본, 어두운 기본값 · 터미널 색을 받으면 그것) · `dark` · `light`.
+`split`: herdr 분할 방향 `right` (기본) · `down`.
 
 ## 구조
 
 ```text
 hooks/register.tsx   /gnam-pixel → bridge launch → GET /state long-poll → Image · $.ui.blit (POSIX shm frame)
 hooks/surface.tsx    Client: 키 · 마우스 · 크기를 bridge 로
-app/src/bridge.ts    별도 node 프로세스. PIXEL_EMBED 소켓 host + 127.0.0.1 http (Bearer token). 60초 idle 이면 종료
+hooks/split.ts       herdr 안: herdr pane split · run · focus · close (bridge 없음, 연 pane id 는 $.state)
+app/src/bridge.ts    별도 node 프로세스. PIXEL_EMBED 소켓 host + 127.0.0.1 http (Bearer token). 60초 idle 이면 종료. check = 설치 확인
 app/src/main.tsx     pixel 앱 (React). model.ts (status · README · git log) → store.ts (키 · 갱신) → view.tsx
 ```
 
