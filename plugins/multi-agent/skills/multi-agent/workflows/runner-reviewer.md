@@ -21,7 +21,7 @@
 runner 의 커밋 묶음 하나 = merge 커밋 하나. 독자는 "개발 지식은 적지만 제품을 잘 아는 사람". 세부는 커밋 해시 7자로 가리키고 설명하지 않는다. 짧게.
 
 ```text
-spec.<topic>.merge: {무엇을 했나, 제품 말로} ({Step 번호})
+chore({topic}): {무엇을 했나, 제품 말로} ({Step 번호})
 
 진행 현황
 - 계획 {plan hash 7자} 의 {Step} 완료. 남은 것: {다음 Step 들}
@@ -36,7 +36,11 @@ spec.<topic>.merge: {무엇을 했나, 제품 말로} ({Step 번호})
 커밋
 {해시 7자} {제목}
 …
+
+Gnam: spec.{topic}.merge
 ```
+
+format 1 제목: `spec.<topic>.merge: …` (trailer 없음).
 
 `git merge --no-ff <runner> -F <메시지 파일>`. 해시는 `git log --format='%h %s' --abbrev=7 main..<runner>`.
 

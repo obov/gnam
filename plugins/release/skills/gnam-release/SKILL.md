@@ -9,3 +9,4 @@ description: release 커밋으로 package 버전을 올리고 태그 · GitHub R
 - 설정: gnam.json `"release": { "targets": { "<dir>": "semver|calver|openapi" } }`
 - 명령: `npx gnam run release status | bump [<name>[@<level|X.Y.Z>]]… | publish <before> <sha>`
 - 검사: release 커밋 형식 · 버전, release 밖 version 변경 (commit-msg hook)
+- 판: format 1 전용 (format 2 + release plugin = 설정 오류). format 2 는 release-please (specs/commit-format.md)

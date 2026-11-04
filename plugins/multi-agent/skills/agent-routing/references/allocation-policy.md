@@ -14,7 +14,7 @@ difficulty  K1  Decisions expected 0 · Scope 모듈 1 · 참조 spec 규칙에 
             K2  Decisions expected 1 또는 Scope 모듈 2. 선례 있음
             K3  그 이상 · 새 의존 · 선례 없음
             모듈 = apps/<kind>/<name> · packages/<name>
-            선례 = 같은 경로를 바꾼 impl 이 있음 (git log --oneline --grep '^spec\.' -- <Scope 경로>)
+            선례 = 같은 경로를 바꾼 impl 이 있음 (git log --oneline --grep '^Gnam: spec\.' -- <Scope 경로>)
 ```
 
 정책 커밋이 없을 때의 출발점. 정책 커밋이 있으면 그쪽이 우선.

@@ -9,7 +9,7 @@ generated: { by: claude-code/claude-opus-5-5, at: 2026-09-26T00:00:00Z }
 # release 커밋 — 버전 변경
 
 여러 package 의 버전을 한 커밋에서 올린다. 커밋 = 버전 변경 + 무엇이 바뀌었는가. CHANGELOG 파일은 두지 않는다 (git 이 기록).
-gnam.json `release` 를 켠 저장소만 쓴다. 설정 = `"release": { "targets": { "<package 디렉터리>": "semver|calver|openapi" }, "advisor"?: "jev" }`. 검사 Rule ID = commit/release-* · commit/version-outside.
+gnam.json `release` 를 켠 저장소만 쓴다. format 1 전용 (format 2 + release plugin = 설정 오류). format 2 는 release-please (specs/commit-format.md). 설정 = `"release": { "targets": { "<package 디렉터리>": "semver|calver|openapi" }, "advisor"?: "jev" }`. 검사 Rule ID = commit/release-* · commit/version-outside.
 
 ```text
 제목      release: <name> <version> · <name> <version>

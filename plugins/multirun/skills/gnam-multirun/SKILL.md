@@ -16,7 +16,7 @@ description: 착수 가능한 plan 하나를 N 개 clone 에서 서로 다른 �
 
 ## 절차
 
-`<plan>` = 착수 가능한 `spec.<topic>.plan:` hash. `<id>` = start 가 출력하는 run-id.
+`<plan>` = 착수 가능한 plan (`Gnam: spec.<topic>.plan`) hash. `<id>` = start 가 출력하는 run-id.
 
 1. 배정 — 변형 수 N (사용자 지정) · 변형마다 모델 · effort · agent (claude · codex). 정하지 않았으면 사용자에게 묻는다
    선택: 변형마다 claude 시작 인자 파일 (`claude \ --tools … --settings …` 형식). 없으면 프로젝트 · 전역 claude-args. start 때 adapter 에 `--file <경로>`. 파일의 --model · --effort 는 버려진다 (start 의 --model · --effort 로)
@@ -30,11 +30,11 @@ description: 착수 가능한 plan 하나를 N 개 clone 에서 서로 다른 �
    완료 알림으로 깨어날 때마다 status · sync. 남은 변형이 있으면 턴 종료
 6. 변형 전부 variant 커밋 (또는 중단) → 변형 세션 close (clone 은 남긴다)
 7. 요약 — `npx gnam run multirun open <id> vN` (변형마다) → 요약 세션 (harness 세션 또는 Claude Code subagent) 에 roles/summarizer.md 지시
-   → report 본문 받기 → 조정자가 측정 키 확인 후 `multirun.<topic>.report:` 빈 커밋 (main)
+   → report 본문 받기 → 조정자가 측정 키 확인 후 report 빈 커밋 (`chore(<topic>): …` + `Gnam: multirun.<topic>.report`, main)
 8. 사용자와 결정 — report 의 Comparison · Recommendation 을 보이고 고른다. 결정 커밋에 `Multirun: <report hash> <vN | combine | discard>`
-   - 채택 vN: `git checkout -b adopt-vN multirun/<id>/vN/heads/vN` → `git rebase main` → main 에서 `git merge --no-ff adopt-vN` (제목 `spec.<topic>.merge:`, merge plugin 없으면 저장소 관례)
-   - 조합: 새 `spec.<topic>.plan:` (Supersedes: 원래 plan, `Sources: multirun/<id>/v2 Step 1` 처럼 단계별 출처) → 단일 실행 또는 다시 multirun
-   - 폐기: 새 `spec.<topic>.plan:` (Supersedes) 또는 사유를 남긴 chore
+   - 채택 vN: `git checkout -b adopt-vN multirun/<id>/vN/heads/vN` → `git rebase main` → main 에서 `git merge --no-ff adopt-vN` (`chore(<topic>): …` + `Gnam: spec.<topic>.merge`, merge plugin 없으면 저장소 관례)
+   - 조합: 새 plan (`Gnam: spec.<topic>.plan`, Supersedes: 원래 plan, `Sources: multirun/<id>/v2 Step 1` 처럼 단계별 출처) → 단일 실행 또는 다시 multirun
+   - 폐기: 새 plan (`Gnam: spec.<topic>.plan`, Supersedes) 또는 사유를 남긴 gnam chore
 9. `npx gnam run multirun close <id> [--push origin]` — 보존 확인 (G1) 통과 시 clone · open worktree 삭제. 실패 이유가 나오면 그 clone 에서 커밋 · 정리 후 다시
 
 중단: `npx gnam run multirun abort <id>` → report 초안 (Outcome: aborted, `report-message.txt`) 의 `?` 채워 커밋 → close.

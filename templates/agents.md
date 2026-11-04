@@ -8,8 +8,11 @@ npx gnam status    # 설치 · 문제 · 인계 메모 · 요청 · plan 진행 
 ```
 
 ```text
-커밋 종류   chore: · refactor: · spec.<topic>.plan: · spec.<topic>.impl: · spec.<topic>.chore:  (<topic> = specs/<topic>.md)
-작업 순서   spec 확인 → plan 커밋 (본문 Summary: 사람용 한 줄) → 한 단위 구현 → 검증 → impl 커밋 (본문 첫 줄 Plan: <plan hash> <단계>)
+커밋 형식   제목 Conventional Commits + 메시지 끝 trailer 단락 (gnam.json format 2)
+커밋 종류   docs(<topic>) + Gnam: spec.<topic>.plan · feat|fix(<topic>) + Gnam: spec.<topic>.impl · docs(<topic>) + Gnam: spec.<topic>.chore
+            Gnam 없음 = spec 무관 (fix · chore · build · ci · docs · test …) · refactor:  (<topic> = specs/<topic>.md, feat 는 impl 만)
+            format 1 저장소는 제목 접두 spec.<topic>.<kind>: (.agents/skills/gnam/references/commits/kinds.md 'format 1 대응')
+작업 순서   spec 확인 → plan 커밋 (trailer Summary: 사람용 한 줄) → 한 단위 구현 → 검증 → impl 커밋 (trailer Plan: <plan hash> <단계>)
 금지        공동 작성자 줄 · squash · plan.md 같은 별도 계획 파일
 강제        commit-msg hook (.githooks) · CI 는 npx gnam verify
 업그레이드  npx gnam outdated → 업그레이드 명령 실행 → 출력된 이전 항목 수행 (gnam link 도 업그레이드 직후 한 번 출력)

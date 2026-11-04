@@ -16,6 +16,7 @@ sources:
 multi-agent 에서 runner 브랜치를 main 에 `--no-ff` 로 합치는 커밋.
 
 ```text
-제목 접두   spec.<topic>.merge:
+제목        chore(<topic>): …   (format 1: spec.<topic>.merge:)
+trailer     Gnam: spec.<topic>.merge
 본문        multi-agent plugin 사용 시 .agents/skills/multi-agent/workflows/runner-reviewer.md 의 merge 커밋 메시지 형식
 ```

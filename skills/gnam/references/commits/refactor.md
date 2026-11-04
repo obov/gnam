@@ -12,10 +12,10 @@ generated: { by: claude-code/claude-opus-5-5, at: 2026-09-26T00:00:00Z }
 동작이 바뀌면 refactor 가 아니다. spec 에 정의된 동작이면 impl, 그 밖이면 chore.
 
 ```text
-제목 접두   refactor:
+제목        refactor: … · refactor(<scope>): …  (Gnam trailer 없음)
 파일        specs/ 변경 금지 (spec 을 바꾸면 동작이 바뀐 것)
 본문        Goal · Scope · Invariant. Invariant = 유지하는 동작 + 그것을 보증하는 테스트 · 검사
-merge       refactor: 제목 merge 금지. 브랜치의 refactor 커밋을 두고 merge 제목은 chore:
+merge       refactor 제목 merge 금지. 브랜치의 refactor 커밋을 두고 merge 제목은 chore:
 ```
 
 ```text
@@ -34,6 +34,6 @@ Invariant:
 ## 조회
 
 ```bash
-git log --oneline --grep '^refactor: '                  # 구조 변경 이력
-git log --oneline --grep '^refactor: ' -- <경로>        # 한 경로의 구조 변경
+git log --oneline -E --grep '^refactor(\(.*\))?: '              # 구조 변경 이력 (format 1 refactor: 포함)
+git log --oneline -E --grep '^refactor(\(.*\))?: ' -- <경로>    # 한 경로의 구조 변경
 ```

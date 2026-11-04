@@ -11,14 +11,16 @@ spec 파일 첫 줄은 `# <topic> — <사람용 한 줄 설명>` (gnam status �
 
 ## 커밋
 
-제목 접두 `spec.<topic>.<kind>:` 의 `<topic>` = 이 디렉터리의 파일 이름 (확장자 제외).
+제목 scope · trailer `Gnam: spec.<topic>.<kind>` 의 `<topic>` = 이 디렉터리의 파일 이름 (확장자 제외).
 
 ```text
-spec.<topic>.plan:    spec 파일 하나 변경 (없으면 --allow-empty) + 본문 Summary (사람용 한 줄) · Goal · Plan · Blocking (· Scope · Decisions expected · Risks · Open)
-spec.<topic>.impl:    본문 첫 줄 Plan: <plan 커밋 hash> <단계>
-spec.<topic>.chore:   계획 없는 spec 정리. 본문 Goal · Scope
-chore:                spec 과 무관한 변경 (의존성 · 설정 · 도구)
-refactor:             동작 유지 · 구조만 변경. 본문 Goal · Scope · Invariant. specs/ 변경 금지
+docs(<topic>)        Gnam: spec.<topic>.plan   spec 파일 하나 변경 (없으면 --allow-empty). 본문 Goal · Plan (· Scope · Decisions expected · Risks · Open), trailer Summary · Blocking
+feat|fix(<topic>)    Gnam: spec.<topic>.impl   trailer Plan: <plan 커밋 hash> <단계>
+docs(<topic>)        Gnam: spec.<topic>.chore  계획 없는 spec 정리. 본문 Goal · Scope
+fix · chore · …      (Gnam 없음)               spec 과 무관한 변경 (의존성 · 설정 · 도구 · spec 에 없는 동작의 버그). specs/ 변경 금지
+refactor:            (Gnam 없음)               동작 유지 · 구조만 변경. 본문 Goal · Scope · Invariant. specs/ 변경 금지
 ```
+
+format 1 저장소: 제목 접두 `spec.<topic>.<kind>:` · `chore:` · `refactor:`.
 
 상세: `.agents/skills/gnam/references/commits/`

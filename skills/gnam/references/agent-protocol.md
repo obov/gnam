@@ -48,10 +48,10 @@ npx gnam status handoff.content --format raw   # 인계 메모 전체 (아래 '�
 npx gnam status trace.topics.<topic> --format text   # topic 의 spec 표기 · plan 단계별 impl · 미해결
 git log --oneline --decorate -20
 cat lore/README.md 2>/dev/null    # 작업 노하우 인덱스 (lore plugin). 적용 조건이 맞는 파일만 읽는다
-git show -s $(git log -1 -E --grep '^spec\.[^:]+\.chore: [A-Z][0-9]+ 완료' --format=%h)   # 직전 마일스톤 종료 — 남은 일 전체
+git show -s $(git log -1 -E --grep '^docs\([^)]+\): [A-Z][0-9]+ 완료' --grep '^spec\.[^:]+\.chore: [A-Z][0-9]+ 완료' --format=%h)   # 직전 마일스톤 종료 — 남은 일 전체 (format 2 · 1)
 cat specs/<topic>.md              # 현재 규칙
 git log -p -- specs/<topic>.md    # 규칙이 바뀐 과정 + 당시 계획 (필요할 때만)
-git log --oneline --grep '^spec\.<topic>\.plan:'   # 계획 목록 (빈 plan 커밋 포함)
+git log --oneline --grep '^Gnam: spec\.<topic>\.plan$'   # 계획 목록 (빈 plan 커밋 포함). format 1 은 '^spec\.<topic>\.plan: '
 git log -E --grep '^Topics:(.*[ ,])?<topic>([ ,]|$)' --oneline   # 다른 topic 에서 이 topic 을 포함한 수집 plan
 git log -- <topic 관련 소스 경로>   # 아래 '소스 경로'
 git show <commit>                # 결정 · 대안 · 남은 일
@@ -60,7 +60,7 @@ git show <commit>                # 결정 · 대안 · 남은 일
 소스 경로는 가정하지 않고 실제 구조로 판단한다. 기본은 모노레포 `apps/<kind>/<name>/` · `packages/<name>/`.
 시작 단계에서는 `apps/` 나 `packages/` 에 하나만 있거나 한쪽이 비어 있을 수 있다.
 topic 관련 경로는 `ls apps packages` 로 구조를 보고, 그 topic impl 커밋의 변경 파일
-(`git log --stat --grep='^spec\.<topic>\.impl:'`) 로 정한다.
+(`git log --stat --grep='^Gnam: spec\.<topic>\.impl$'`) 로 정한다.
 
 더 깊은 추적 (줄 출처 · 개념 등장 시점 · 계획 → 실행) 은 [추적 명령](reference/git-commands.md).
 요청 의도 · 반영 여부 분석과 개선안 · 후속 작업 제안은 [기록 분석](analysis.md).
@@ -70,10 +70,10 @@ topic 관련 경로는 `ls apps packages` 로 구조를 보고, 그 topic impl �
 ```text
 1. spec 확인
 2. 관련 history 확인
-3. plan 커밋 (`spec.<topic>.plan:`). spec 변경 없으면 빈 커밋. commits/plan.md 착수 가능 조건 확인
+3. plan 커밋 (`docs(<topic>): …` + `Gnam: spec.<topic>.plan`). spec 변경 없으면 빈 커밋. commits/plan.md 착수 가능 조건 확인
 4. 한 단위 구현
 5. 검증
-6. impl 커밋 (`spec.<topic>.impl:` + Plan 필드 + Deviation (계획과 다를 때))
+6. impl 커밋 (`feat|fix(<topic>): …` + `Gnam: spec.<topic>.impl` · `Plan:` trailer + Deviation (계획과 다를 때))
 7. 반복
 ```
 
@@ -111,7 +111,7 @@ push · 배포      저장소 규칙을 따른다. 규칙이 없으면 로컬 �
 
 ```text
 신호       같은 원인의 예외 처리 · 수동 chore 가 반복 (기준: 3회)
-확인       git log --oneline --grep '^chore:' · npx gnam run recall search <원인> (recall plugin)
+확인       git log --oneline --invert-grep --grep '^Gnam: ' (gnam chore · refactor) · npx gnam run recall search <원인> (recall plugin)
 흡수 순서   기존 plugin 개선 → 새 plugin (node_modules/@obov/gnam/README.md 'plugin 작성', 로컬 ./gnam-plugins/<id>)
            검사 · 명령으로 만들 수 없으면 lore · 스킬
 알림       규칙 · plugin 을 바꾸면 사용자에게 한 줄: 무엇이 반복됐고 이제 무엇이 자동인지

@@ -18,14 +18,14 @@ clone 하나에서 plan 전체를 끝까지 구현한다. 작업 방식은 스�
 - 예산 제한 없음
 
 규칙:
-- 커밋은 저장소 규약 그대로 (spec.<topic>.impl: + Plan: {plan-hash} <단계>). 공동 작성자 줄 없음
+- 커밋은 저장소 규약 그대로 (feat|fix(<topic>): … + trailer Gnam: spec.<topic>.impl · Plan: {plan-hash} <단계>). 공동 작성자 줄 없음
 - 커밋 전 {검사 명령} 통과
 - plan 의 Decisions expected 는 각자 정하고 impl 커밋 Decisions 에 번호와 함께
 - 막히면 우회하지 말고 멈추고 보고한다
 
 끝:
 1. {검사 명령} 통과 확인
-2. 빈 커밋 multirun.<topic>.variant: <한 줄 요약>
+2. 빈 커밋 chore(<topic>): <한 줄 요약> + trailer Gnam: multirun.<topic>.variant
    Id: {run-id}
    Approach: <고른 방식 첫 단어> <이유>
    Plugins: <사용한 gnam plugin 또는 없음>

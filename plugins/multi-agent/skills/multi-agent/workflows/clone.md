@@ -1,6 +1,6 @@
 # workflow: clone
 
-**plan 커밋 없는 작업 전용.** spec · plan 커밋을 쓰지 않는 저장소 · 작업 (chore: · refactor: 만) 에서 조정자가 자기 분신 (같은 모델의 새 세션) 에게 작업을 나눠 맡긴다.
+**plan 커밋 없는 작업 전용.** spec · plan 커밋을 쓰지 않는 저장소 · 작업 (gnam chore · refactor 만) 에서 조정자가 자기 분신 (같은 모델의 새 세션) 에게 작업을 나눠 맡긴다.
 plan 커밋이 있는 작업은 runner-reviewer.md 를 쓴다.
 
 역할: roles/runner.md · roles/reviewer.md 의 규칙 중 plan · impl 커밋 관련을 뺀 나머지. 명령: `clone.sh` (Herdr + Claude Code).
@@ -10,7 +10,7 @@ plan 커밋이 있는 작업은 runner-reviewer.md 를 쓴다.
 ```text
 분신      대화 맥락이 없는 새 세션. 지시문이 유일한 맥락 → 배경 (원인 · 재현 · 보고 원문) 을 지시에 직접 적는다
 말투      사용자가 직접 시키는 것처럼 쓴다 ("~해줘"). 조정자 · 워크플로 · 역할 이름은 지시에 쓰지 않는다
-gnam      plan · impl · merge 커밋 형식을 요구하지 않는다. 커밋은 chore: · refactor: (AGENTS.md 저장소 관례가 있으면 그것)
+gnam      plan · impl · merge 커밋 형식을 요구하지 않는다. 커밋은 gnam chore (fix · chore · build …, Gnam 없음) · refactor: (AGENTS.md 저장소 관례가 있으면 그것)
 공유 파일  판 올림 (CHANGELOG · version) · lock 파일 · 병렬 runner 둘 다 필요한 파일은 조정자만
            runner 는 lock 재생성처럼 검사 통과에 필요한 갱신만 (판 번호는 건드리지 않는다)
 검사      {검사 명령} = AGENTS.md 의 커밋 전 검사 (예: npm test · bun run check). 지시문에 그대로 적는다

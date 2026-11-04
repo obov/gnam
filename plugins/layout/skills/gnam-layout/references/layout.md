@@ -1,7 +1,7 @@
 ---
 type: Principle
 title: layout — 폴더 구조 선언
-description: .gnam/layout.json 형식 (eslint-plugin-project-structure folder-structure 호환 부분 집합) · 검사 시점 · 위반 처리 · layout: 커밋
+description: .gnam/layout.json 형식 (eslint-plugin-project-structure folder-structure 호환 부분 집합) · 검사 시점 · 위반 처리 · layout 커밋 (Gnam: layout)
 tags: [gnam, layout]
 generated: { by: claude-code/claude-opus-5-5, at: 2026-11-04T00:00:00Z }
 ---
@@ -15,7 +15,7 @@ generated: { by: claude-code/claude-opus-5-5, at: 2026-11-04T00:00:00Z }
 ```text
 파일 만들기 전   npx gnam run layout where <경로>     허용 · 이동 후보 · 함께 있어야 할 파일
 구조 정하기      npx gnam run layout capture <폴더>   현재 트리 → structure 조각. 다듬어 layout.json 에 넣는다
-                 layout: <구조 결정> 커밋 (layout.json 만, 본문 Goal:)
+                 chore: <구조 결정> + Gnam: layout 커밋 (layout.json 만, 본문 Goal:. format 1 제목 layout: <구조 결정>)
 확인             npx gnam run layout check [<경로>]   작업 트리 전체 위반
                  npx gnam run layout show             structure 트리
 ```
@@ -27,7 +27,7 @@ generated: { by: claude-code/claude-opus-5-5, at: 2026-11-04T00:00:00Z }
 ```text
 (warn)    기본. 커밋은 됐다. 같은 작업 안에서 처리한다
           A 이동: git mv <경로> <이동 후보> → refactor: 커밋
-          B 구조 변경: layout.json 수정 → layout: 커밋 (Goal: 왜 이 위치를 허용하는가)
+          B 구조 변경: layout.json 수정 → layout 커밋 (Gnam: layout, Goal: 왜 이 위치를 허용하는가)
 (없음)    gnam.json "layout": { "enforce": "block" }. 커밋 거부. 파일을 옮기거나 구조를 먼저 바꾼다
 ```
 
@@ -70,7 +70,7 @@ children 일치 순서: 파일 → 폴더, 리터럴 → 파라미터 → `*`. �
 layout/unlisted      어떤 노드와도 맞지 않는 경로
 layout/existence     enforceExistence 가 요구한 경로 없음
 layout/recursion     folderRecursionLimit 초과
-layout/schema        layout.json 형식 (layout: 커밋에서는 항상 거부)
-commit/layout-files  layout: 커밋은 layout.json 만 · layout.json 변경은 layout: 에서만
-commit/layout-goal   layout: 커밋 본문 Goal
+layout/schema        layout.json 형식 (layout 커밋에서는 항상 거부)
+commit/layout-files  layout 커밋은 layout.json 만 · layout.json 변경은 layout 커밋에서만
+commit/layout-goal   layout 커밋 본문 Goal
 ```

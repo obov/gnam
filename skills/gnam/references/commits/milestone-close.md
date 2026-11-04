@@ -18,7 +18,8 @@ sources:
 다음 세션은 이 커밋과 README 구현 상태만 보고 남은 일 전체를 알 수 있어야 한다.
 
 ```text
-제목        spec.<topic>.chore: <마일스톤> 완료 — ...   ("<마일스톤> 완료" 는 grep 기준, 고정)
+제목        docs(<topic>): <마일스톤> 완료 — ...   ("<마일스톤> 완료" 는 grep 기준, 고정)
+trailer     Gnam: spec.<topic>.chore
 Remaining   마일스톤 안 모든 커밋의 Remaining · Deferred 와 spec 의 Deferred: · 미구현: · 미결: 을 빠짐없이 옮긴다
             해소된 항목은 빼고, 남은 항목은 한 줄씩
 README      specs/README.md 구현 상태의 남은 것을 같은 목록으로 맞춘다
@@ -27,6 +28,6 @@ README      specs/README.md 구현 상태의 남은 것을 같은 목록으로 �
 회수 명령:
 
 ```bash
-git log <직전 마일스톤 종료>..HEAD --grep 'spec.<topic>' --format='%h %s%n%b' | grep -A5 -E '^(Remaining|Deferred):'
+git log <직전 마일스톤 종료>..HEAD --grep '^Gnam: spec\.<topic>\.' --format='%h %s%n%b' | grep -A5 -E '^(Remaining|Deferred):'
 git grep -n -E 'Deferred:|미구현:|미결:' -- specs/<topic>.md
 ```

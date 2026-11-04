@@ -1,6 +1,6 @@
 ---
 name: gnam-run
-description: run 커밋 (run.<topic>.start · end · policy) 으로 에이전트 배정 · 실측 · 판정을 기록하고 집계한다. 에이전트 작업 배정을 남기거나, model · effort 조합의 실측 성과를 조회할 때 사용한다.
+description: run 커밋 (Gnam: run.<topic>.start · end · policy) 으로 에이전트 배정 · 실측 · 판정을 기록하고 집계한다. 에이전트 작업 배정을 남기거나, model · effort 조합의 실측 성과를 조회할 때 사용한다.
 ---
 
 # gnam-run

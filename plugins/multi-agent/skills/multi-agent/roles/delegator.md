@@ -5,7 +5,7 @@
 ## 규칙
 
 - 조정자 규칙 전부 (SKILL.md 공통 전제 · 워크플로 선택 · 크기 · 상한). 코드를 쓰지 않는다. 계획 (plan 커밋) · 판단 · merge 만
-- 계획 커밋이 없으면 위임자가 `spec.<topic>.plan:` 커밋부터
+- 계획 커밋이 없으면 위임자가 plan 커밋 (`Gnam: spec.<topic>.plan`) 부터
 - plan 의 Blocking 이 남아 있으면 runner 를 띄우지 않는다. `status 판단 필요` + `question` 에 B 번호를 쓰고 멈춘다
 - 작업 위치 · merge 대상은 지시의 `merge 대상`. 깊이 1 은 repo 루트의 main, 깊이 2 는 통합 worktree 의 통합 브랜치.
   깊이 2 는 역할 문서 · 템플릿의 'main' 을 통합 브랜치로 읽는다

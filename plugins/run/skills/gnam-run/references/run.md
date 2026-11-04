@@ -13,24 +13,29 @@ sources:
 
 # run 커밋 — multi-agent 배정 기록
 
-이 형식은 **일반 작업**의 배정 기록이다. `ept` 실험은 ept plugin (`.agents/skills/gnam-ept/references/experiments.md`)의 파일 기록과 `chore:` 커밋을 사용한다. 실험군을 이 형식으로 억지 변환하지 않고 gnam run run stats 일반 배정 집계에서 분리한다.
+이 형식은 **일반 작업**의 배정 기록이다. `ept` 실험은 ept plugin (`.agents/skills/gnam-ept/references/experiments.md`)의 파일 기록과 gnam chore 커밋 (`chore: …`, Gnam 없음) 을 사용한다. 실험군을 이 형식으로 억지 변환하지 않고 gnam run run stats 일반 배정 집계에서 분리한다.
 
 multi-agent 로 plan 을 실행할 때 남는 meta 정보 (누구에게 어떤 모델 · effort 를 왜 배정했고, 실제로 얼마나 들었고, 배정이 맞았는가).
 작업 내용은 기존대로 plan · impl · merge 커밋이 기록한다. run 커밋은 다음 배정 판단 (자원 배분) 의 근거로만 쓴다.
 분류 기준의 배경은 multi-agent plugin 의 agent-routing (`.agents/skills/agent-routing/references/model-and-effort.md`).
 
 ```text
-spec.<topic>.plan
-  run.<topic>.start     배정한 에이전트 전부의 예상. 첫 에이전트 시작 전
+Gnam: spec.<topic>.plan
+  Gnam: run.<topic>.start     배정한 에이전트 전부의 예상. 첫 에이전트 시작 전
     runner 브랜치의 impl 커밋들
-    spec.<topic>.merge  ×N
-  run.<topic>.end       에이전트 전부의 실측 · 판정. 마지막 merge 뒤, 또는 중단 시
+    Gnam: spec.<topic>.merge  ×N
+  Gnam: run.<topic>.end       에이전트 전부의 실측 · 판정. 마지막 merge 뒤, 또는 중단 시
+```
+
+```text
+제목        chore(<topic>): …   (format 1: run.<topic>.<start|end|policy>: …)
+trailer     Gnam: run.<topic>.<start|end|policy> · 한 줄 필드 (Plan · Reference · Run · Outcome · Merges · Corrects) · Why · Agent
 ```
 
 ```text
 단위        작업 (multi-agent 실행 한 번) 당 start · end 한 쌍. 에이전트별 커밋이 아니다
 파일 수     0 (빈 커밋, main). merge 로 만들지 않는다
-에이전트    한 줄 'Agent: <이름> key=value …'. 본문 마지막 문단에 모으고 그 문단에는 Agent 줄만
+에이전트    한 줄 'Agent: <이름> key=value …'. 메시지 마지막 단락 (trailer 단락) 에 모은다
             git 검색이 줄 단위라 여러 조건을 한 정규식으로 건다. %(trailers:key=Agent) 로도 읽힌다
 키 순서     role from step model effort size difficulty explore session est_min est_out firstpass retries blocked
             cause noise verdict lines active_min out impl_min impl_out wall_min input cache_write cache_read
@@ -45,13 +50,12 @@ reviewer    평가하지 않는다 (놓친 결함을 잴 수 없음). 비용 (ac
 ## start
 
 ```text
-run.workspace.start: S2-S3 병렬 구현
+chore(workspace): S2-S3 병렬 구현
 
+Gnam: run.workspace.start
 Plan: a1b2c3d S2-S3
 Reference: 9f8e7d6 4c5d6e7
-
 Why: runner-1 인터페이스 · 테스트 단언 정해짐 (K1), 예상 M → sonnet · high. 참고 run 실측 18분
-
 Agent: runner-1 role=runner step=S2 model=claude-sonnet-5 effort=high size=M difficulty=K1 explore=no session=6f1e… est_min=20 est_out=150000
 Agent: reviewer-1 role=reviewer step=S2 model=claude-opus-5-5 effort=medium session=0a2b…
 ```
@@ -69,15 +73,14 @@ reviewer    role · step · model · effort · session 만. size · difficulty �
 ## end
 
 ```text
-run.workspace.end: S2-S3 결과
+chore(workspace): S2-S3 결과
 
+Gnam: run.workspace.end
 Run: 1a2b3c4
 Outcome: done
 Merges: 5d6e7f8 9a0b1c2
-
 Why: runner-1 reviewer 막음 1건, 테스트 누락 → effort 부족
 Why: runner-2 runner-1 이 두 번 실패해 opus 로 상향. 첫 시도 통과
-
 Agent: runner-1 role=runner model=claude-sonnet-5 effort=high size=M difficulty=K2 explore=no firstpass=no retries=2 blocked=1 cause=effort noise=none verdict=under lines=0 active_min=31 out=210000 impl_min=22 impl_out=160000 harness=2.1.282 area=packages/workspace
 Agent: runner-2 role=runner from=runner-1 model=claude-opus-5-5 effort=high size=M difficulty=K2 explore=no firstpass=yes retries=0 blocked=0 cause=none noise=api verdict=fit lines=286 active_min=14 out=95000 impl_min=12 impl_out=88000 area=packages/workspace
 Agent: reviewer-1 role=reviewer model=claude-opus-5-5 effort=medium noise=none active_min=7 out=38000
@@ -157,7 +160,7 @@ noise       wait    사람 응답 · 권한 확인 대기
 집계를 매번 하지 않도록 조합별 기본 배정을 요약한다. 급한 배정은 이 커밋 하나만 읽는다.
 
 ```text
-제목    run.README.policy: <요약>
+제목    chore(README): <요약> + Gnam: run.README.policy
 파일 수  0 (빈 커밋)
 Basis   집계 명령과 범위 (npx gnam run run stats table --by size,difficulty,model --min 30)
 Policy  조합별 배정 + 근거 (n · firstpass 구간 · active_min p90). 표본 기준 (--min) 을 통과한 칸만
@@ -171,11 +174,11 @@ npx gnam run run stats table --by model,effort --where size=M,difficulty=K2   # 
 npx gnam run run stats adopted                                                # 주로 반영된 model · effort (merge 줄 수)
 npx gnam run run stats health                                                 # end 없는 start · 미측정 · 노이즈 · 판정 · 추정 정확도 · 재작업
 npx gnam run run stats end <run.start hash>                                   # end 초안 + 추정 대비표
-git show -s $(git log -1 --grep '^run\.[^.]*\.policy:' --format=%h)       # 최신 배정 정책
+git show -s $(git log -1 --grep '^Gnam: run\.[^.]*\.policy$' --format=%h)  # 최신 배정 정책
 git log --oneline -E --grep '^Agent: .*model=claude-sonnet-5 .*verdict=under'   # 한 줄 조건 결합 (키 순서대로)
 ```
 
 조건 여러 개는 `gnam run run stats --where` 가 키 순서와 무관하게 건다. git 정규식은 줄 안 키 순서를 따라 써야 한다.
 
-검색은 줄 시작 (`^run\.` · `^Agent: `) 을 고정한다. 고정하지 않으면 impl 본문의 모델 언급까지 걸린다.
+검색은 줄 시작 (`^Gnam: run\.` · `^Agent: `) 을 고정한다. 고정하지 않으면 impl 본문의 모델 언급까지 걸린다.
 칸마다 표본이 작다 (1000 run 도 칸이 100개면 칸당 수십 건). 구간이 겹치는 차이는 우연일 수 있다. `--min` 미만 칸은 판단 보류.

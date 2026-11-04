@@ -25,7 +25,7 @@ same-task-compare 와 다른 점: 하나를 고르지 않는다. 버린 설계�
 
 ## 절차
 
-1. 계획 — 조정자가 plan 커밋 (`spec.<topic>.plan:`) 으로 쓴다. **결정 잠금과 검증 의무를 여기서 정한다**:
+1. 계획 — 조정자가 plan 커밋 (`docs(<topic>): …` + `Gnam: spec.<topic>.plan`) 으로 쓴다. **결정 잠금과 검증 의무를 여기서 정한다**:
    갈리길 원하는 결정만 열어 두고, 나머지 (산출물 목록, 실물 검증 N회, 테스트 상한) 는 명시. 안 쓰면 runner 가 생략한다
 2. `prepare` N — worktree N 개, 전부 **현재 main** 에서. 계획 hash 는 Step 목록의 출처일 뿐 분기점이 아니다.
    main 에 이미 들어간 Step 은 유지하고 **남은 Step 만** 지시한다. 구현을 되돌려 분산하지 않는다.
@@ -42,8 +42,8 @@ same-task-compare 와 다른 점: 하나를 고르지 않는다. 버린 설계�
    ```
 6. 종합 — 조정자가 비교표로 채택 설계를 정하고 분산 runner N 을 `close`. 그 뒤 runner 하나 (agent-routing 배정) 에게 새 worktree (현재 main) 에서 한 벌로 다시 구현하게 한다
    (roles/runner.md 작업 지시 + 채택 설계 요약). cherry-pick 하지 않는다 (파일명·구조가 달라 충돌).
-   종합 커밋은 `spec.<topic>.impl:` + 본문 `Plan: <plan-hash> <Step>` + `Alternatives` (채택 안 한 설계 N-1 개와 이유)
-   이후 runner-reviewer 4단계 (리뷰) 부터 진행 → `spec.<topic>.merge:` 로 main 에 통합
+   종합 커밋은 `feat|fix(<topic>): …` + trailer `Gnam: spec.<topic>.impl` · `Plan: <plan-hash> <Step>` + 본문 `Alternatives` (채택 안 한 설계 N-1 개와 이유)
+   이후 runner-reviewer 4단계 (리뷰) 부터 진행 → merge 커밋 (`Gnam: spec.<topic>.merge`) 으로 main 에 통합
 7. 정리 — (분산 runner 는 6단계에서 close 됨) runner 브랜치마다 `git tag fanout/<plan-hash 7자>/<runner>` 로 커밋 보존 후 worktree·브랜치 삭제.
    종합 커밋 `Alternatives` 에 각 설계의 tag 이름을 적는다 (squash 금지 원칙: `.agents/skills/gnam/references/commits/commit-unit.md`)
 

@@ -17,17 +17,22 @@ sources:
 요구사항의 의미가 바뀌면 chore 가 아니라 plan 이다.
 
 ```text
-제목 접두   spec.<topic>.chore:
+제목        docs(<topic>): …   (CC type chore 를 쓰지 않는다)
+trailer     Gnam: spec.<topic>.chore
 파일 수     spec 파일 하나
 본문        Goal · Scope 만. 계획 필드 없음
 ```
 
 ```text
-spec.README.chore: workspace.md 인덱스 행 추가
+docs(README): workspace.md 인덱스 행 추가
 
 Goal:
 spec 인덱스가 workspace.md 를 가리키게 한다.
 
 Scope:
 specs/README.md 인덱스 1행
+
+Gnam: spec.README.chore
 ```
+
+format 1 제목: `spec.<topic>.chore: …` (trailer 없음).

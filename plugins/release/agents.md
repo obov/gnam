@@ -5,4 +5,5 @@ release:    버전 변경 커밋. 'Package: <name> <version>' 절 = GitHub Relea
             수준은 직전 release 이후 커밋 근거에서 계산, 호환성 깨짐은 plan · impl 본문 Breaking:
 명령        npx gnam run release status | bump | publish <before> <sha> (CI)
 규약        .agents/skills/gnam-release/references/release.md
+판          format 1 전용 (format 2 + release plugin = 설정 오류). format 2 는 release-please (specs/commit-format.md)
 ```

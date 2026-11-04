@@ -29,7 +29,7 @@ worktree 하나 = 브랜치 하나. 지시된 Step 만 구현·테스트·커밋
 규칙:
 - 순서: 선언 (타입·시그니처. 필요할 때만) → 실패 테스트 → 구현 → {검사 명령} 통과 → 커밋. 범위·완료 조건은 계획 커밋.
   Step 마다 커밋 1개 이상, 결정 하나 = 커밋 하나.
-  커밋 메시지는 spec.<topic>.impl: + 본문 첫 필드 Plan: {plan-hash} {Step}. 공동 작성자 줄 없음
+  커밋 메시지는 feat|fix(<topic>): … + 마지막 단락 trailer Gnam: spec.<topic>.impl · Plan: {plan-hash} {Step}. 공동 작성자 줄 없음
 - {손대지 않을 파일·영역} 은 손대지 않는다 — {다른 runner 이름} 이 병행 중
 - 다른 runner 브랜치와 fanout/* · compare/* tag 는 참조하지 않는다
 - 기존 테스트 {N}개 전부 통과 유지. {읽기 전용 자원} 은 읽기만

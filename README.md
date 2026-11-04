@@ -3,7 +3,7 @@
 파일에는 현재 상태, 커밋에는 상태가 변한 이유. 에이전트 (Claude Code · Codex) 와 사람이 같은 커밋 규약을 쓰도록 commit-msg hook 과 CI 검사로 강제한다.
 
 ```bash
-npx @obov/gnam init                      # 코어만: chore · refactor · spec.<topic>.plan|impl|chore
+npx @obov/gnam init                      # 코어만: Conventional Commits 제목 + Gnam: spec.<topic>.plan|impl|chore trailer
 npx @obov/gnam init --plugins lore,run   # plugin 함께
 ```
 
@@ -13,7 +13,7 @@ Node (>= 20) · Bun (>= 1.2) 모두 지원. 실행 파일은 hook 에서 node �
 
 | 대상 | 내용 |
 |---|---|
-| `gnam.json` | `{ "format": 1, "plugins": [] }`. format 을 바꾼 커밋 = 검사 경계 |
+| `gnam.json` | `{ "format": 2, "plugins": [] }`. format 을 바꾼 커밋 = 검사 경계 |
 | `package.json` | devDependency `@obov/gnam`, `postinstall: gnam link` (clone 후 hook · 링크 복구) |
 | `.githooks/commit-msg` | `git config core.hooksPath .githooks`. 다른 hooksPath 가 있으면 건드리지 않고 안내 |
 | `.agents/skills/gnam` · `.claude/skills/gnam` | `node_modules/@obov/gnam/skills/gnam` symlink (Codex · Claude Code) |
@@ -24,14 +24,28 @@ Node (>= 20) · Bun (>= 1.2) 모두 지원. 실행 파일은 hook 에서 node �
 
 ## 코어 커밋 종류
 
+제목은 Conventional Commits 1.0.0, gnam 종류 · 한 줄 필드는 메시지 끝 trailer 단락 (format 2). release-please · commitlint 같은 표준 도구가 history 를 그대로 읽는다.
+
 ```text
-chore:                spec 과 무관한 변경 (의존성 · 설정 · 도구)
-refactor:             동작 유지 · 구조만. 본문 Goal · Scope · Invariant. specs/ 변경 금지
-spec.<topic>.plan:    spec 파일 하나 (또는 빈 커밋) + 본문 Summary (사람용 한 줄) · Goal · Plan · Blocking
-spec.<topic>.impl:    본문 첫 줄 Plan: <plan hash> <단계>
-spec.<topic>.chore:   계획 없는 spec 정리. 본문 Goal · Scope
-공통                  Co-authored-by 금지 · squash 금지
+docs(<topic>)       Gnam: spec.<topic>.plan    spec 파일 하나 (또는 빈 커밋). 본문 Goal · Plan, trailer Summary (사람용 한 줄) · Blocking
+feat|fix(<topic>)   Gnam: spec.<topic>.impl    trailer Plan: <plan hash> <단계>. type = 수준 (새 합의 feat · 그 밖 fix · Breaking 은 !)
+docs(<topic>)       Gnam: spec.<topic>.chore   계획 없는 spec 정리. 본문 Goal · Scope
+fix · chore · …     (Gnam 없음)                spec 과 무관한 변경 (의존성 · 설정 · 도구 · spec 에 없는 동작의 버그). specs/ 변경 금지
+refactor:           (Gnam 없음)                동작 유지 · 구조만. 본문 Goal · Scope · Invariant. specs/ 변경 금지
+공통                                            feat 는 impl 만 · Co-authored-by 금지 · squash 금지 · 본문 '#' · '---' 줄 금지
 ```
+
+```text
+feat(workspace): 이름을 대소문자 구분 없이 유일하게
+
+Implementation:
+- 조회를 normalized name 기준으로 전환
+
+Gnam: spec.workspace.impl
+Plan: a1b2c3d 1
+```
+
+format 1 (`{ "format": 1 }`) 저장소는 제목 접두 `spec.<topic>.<kind>:` · `chore:` · `refactor:` 그대로. 대응표: `skills/gnam/references/commits/kinds.md`
 
 규약 원본: `skills/gnam/references/`
 
@@ -47,16 +61,16 @@ npx gnam run <plugin> <command>        # plugin 명령
 | 내장 | 추가하는 것 | requires |
 |---|---|---|
 | `lore` | `lore/` 작업 노하우 형식 검사 · 스킬 | - |
-| `merge` | `spec.<topic>.merge:` 커밋 종류 | - |
-| `run` | `run.<topic>.start\|end\|policy:` 커밋 · `usage` · `stats` | - |
-| `release` | `release:` 커밋 · 버전 밖 변경 검사 · `status` · `bump` · `publish` | - |
+| `merge` | `Gnam: spec.<topic>.merge` 커밋 종류 | - |
+| `run` | `Gnam: run.<topic>.start\|end\|policy` 커밋 · `usage` · `stats` | - |
+| `release` | `release:` 커밋 · 버전 밖 변경 검사 · `status` · `bump` · `publish`. format 1 전용 (format 2 는 release-please) | - |
 | `ept` | `experiments/agent-workflows/*/record.json` 검사 | - |
 | `recall` | 커밋 · `specs/` 절 · `lore/` 항목 BM25 검색 (한글 bigram) · `search` | - |
-| `request` | `request:` 요청 원문 · 첨부 커밋 · 작업 커밋 `Request:` 검사 · `open` · `show` | - |
+| `request` | `Gnam: request` 요청 원문 · 첨부 커밋 · 작업 커밋 `Request:` 검사 · `open` · `show` | - |
 | `s3` | 첨부를 S3 호환 저장소에 sha256 key 로 보관 · `put` · `get` · `url` · `check` | - |
 | `harness` | harness-execute 스킬 (에이전트 세션 실행 · adapter · `claude-args.sh`) | - |
 | `multi-agent` | multi-agent · agent-routing 스킬 · `status` | run, merge, harness |
-| `layout` | `.gnam/layout.json` 폴더 구조 선언 · 커밋마다 새 위반 경고 (`enforce: block` 이면 거부) · `layout:` 커밋 · `where` · `check` · `show` · `capture` | - |
+| `layout` | `.gnam/layout.json` 폴더 구조 선언 · 커밋마다 새 위반 경고 (`enforce: block` 이면 거부) · `Gnam: layout` 커밋 · `where` · `check` · `show` · `capture` | - |
 | `multirun` | 같은 plan 을 N 개 clone 에서 변형 실행 · 원본 tag 보존 · report 비교 · `start` · `sync` · `status` · `collect` · `open` · `close` · `abort` | harness |
 | `export` | 하위 폴더를 배포 전용 저장소로 내보내기 (path + include, `Export-Source` trailer) · 버전 태그 · `build` · `push` · `status` | - |
 

@@ -149,7 +149,7 @@ clone (plan 커밋 없는 작업) 은 `run.<영역>.*` · `Plan: 없음`.
 형식 · 분류 · 판정 기준은 `.agents/skills/gnam-run/references/run.md`. 작업 기록 (impl · merge) 은 그대로.
 
 ```text
-1. 배정     정책 커밋 확인: git show -s $(git log -1 --grep '^run\.[^.]*\.policy:' --format=%h)
+1. 배정     정책 커밋 확인: git show -s $(git log -1 --grep '^Gnam: run\.[^.]*\.policy$' --format=%h)
             없으면 ../agent-routing/references/allocation-policy.md 출발점. 비슷한 칸의 실측: npx gnam run run stats table --where size=<S|M|L>,difficulty=<K>
             정책이 있으면 runner 10 번 중 1 번은 한 단계 낮게 + explore=yes
             adapter 의 기본 모델은 배정이 없을 때만

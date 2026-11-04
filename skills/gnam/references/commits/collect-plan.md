@@ -17,18 +17,20 @@ sources:
 수집 plan 도 plan 이다. 일반 plan 본문 규칙에 아래를 더한다.
 
 ```text
-제목        spec.<대표 topic>.plan:   대표 topic = 가장 가까운 spec. 하나로 정하기 어려우면 README
+제목        docs(<대표 topic>): …  + Gnam: spec.<대표 topic>.plan   대표 topic = 가장 가까운 spec. 하나로 정하기 어려우면 README
 파일 수     0 (빈 커밋). spec 변경이 필요하면 그 topic 의 plan 을 먼저 커밋하고 Spec: 으로 가리킨다
-Topics      'Topics: a, b' 한 줄. 쉼표 구분, 대표 topic 포함, 각각 specs/<t>.md 파일 이름
+Topics      'Topics: a, b' trailer 한 줄. 쉼표 구분, 대표 topic 포함, 각각 specs/<t>.md 파일 이름
             Topics · From · Spec 중 하나라도 있으면 수집 plan. 이때 Topics 필수
 단계        수집한 항목만. 단계마다 From: <hash> <단계|Remaining|Deferred> (완료: 와 같은 들여쓰기)
             Spec: <plan hash> (선택) — 단계가 의존하는 spec 규칙. Topics 안 topic 의 plan
+            단계의 From: · Spec: 은 Plan: 본문 절 안 (단계에 붙은 값)
             새 작업은 넣지 않는다. 일반 plan 으로 나눈다
 Dropped     (선택) 버린 항목. <hash> <단계|필드> <이유> 한 줄씩 (계획 교체의 Dropped 와 같은 형식)
 원 커밋     고치지 않는다. 옮겨진 항목은 From: 역참조로 찾는다
 재수집      새 수집 plan 에서 From: <이전 수집 hash> <단계>. 끝난 단계는 impl 기록, 버린 단계는 Dropped
             수집 plan 에는 Supersedes 를 쓰지 않는다 (Supersedes 는 일반 plan 교체 전용)
-impl        spec.<항목의 실제 topic>.impl:  Plan: <수집 plan hash> <단계>. 그 topic 이 Topics 안에 있어야 한다
+impl        feat|fix(<항목의 실제 topic>): …  + Gnam: spec.<항목의 실제 topic>.impl · Plan: <수집 plan hash> <단계>
+            그 topic 이 Topics 안에 있어야 한다
 ```
 
 From: · Spec: 이 가리키는 커밋은 수집 plan 보다 먼저 커밋된 조상이어야 한다.
@@ -37,14 +39,10 @@ From: · Spec: 이 가리키는 커밋은 수집 plan 보다 먼저 커밋된 �
 종료 커밋의 Remaining 도 `From: <종료 hash> Remaining` 으로 가져올 수 있다.
 
 ```text
-spec.workspace.plan: 남은 작업 수집 — 충돌 정책 · 청구 중단
-
-Summary: 이름 충돌이 난 기존 workspace 를 정리하고, 지운 workspace 에는 더 청구하지 않는다
+docs(workspace): 남은 작업 수집 — 충돌 정책 · 청구 중단
 
 Goal:
 a1b2c3d · 9f8e7d6 에 남은 항목을 한 plan 에서 마무리.
-
-Topics: workspace, billing
 
 Plan:
 1. 기존 데이터 normalized 충돌 처리 정책
@@ -60,11 +58,17 @@ packages/workspace/src/ · packages/billing/src/
 
 Dropped:
 a1b2c3d Open 표시용 casing 옵션화. D1 결정으로 불필요
+
+Gnam: spec.workspace.plan
+Summary: 이름 충돌이 난 기존 workspace 를 정리하고, 지운 workspace 에는 더 청구하지 않는다
+Topics: workspace, billing
+Blocking: 없음
 ```
 
 ```text
-spec.billing.impl: workspace 삭제 시 청구 중단
+fix(billing): workspace 삭제 시 청구 중단
 
+Gnam: spec.billing.impl
 Plan: <수집 plan hash> 2
 ```
 

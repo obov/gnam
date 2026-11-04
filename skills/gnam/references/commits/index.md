@@ -1,6 +1,6 @@
 # 커밋 형식
 
-* [커밋 종류](kinds.md) - 제목 접두 spec.<topic>.<kind> · run.<topic>.* · release · chore · refactor 목록과 조회 명령
+* [커밋 종류](kinds.md) - 제목 Conventional Commits · 종류 Gnam trailer. spec.<topic>.<kind> · chore · refactor · plugin 종류, chore 구분, format 1 대응, 조회 명령
 * [커밋 단위](commit-unit.md) - 결정 하나 또는 상태 전환 하나 = 커밋 하나. squash 금지
 
 # 종류별

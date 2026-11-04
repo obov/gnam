@@ -25,7 +25,7 @@ tags: [gnam, request]
 ## 형식
 
 ```text
-request: <요청 요약 한 줄>
+chore: <요청 요약 한 줄>
 
 Text:
 > 원문 그대로. 원문 안 빈 줄은 '>' 한 글자
@@ -37,8 +37,11 @@ Described:
 Attachments:
 <이름>  sha256:<hex>  <위치>  [← <원래 경로>]
 
+Gnam: request
 Refines: <이전 request hash>
 ```
+
+format 1 제목: `request: <요청 요약 한 줄>`, Refines: 는 본문 필드.
 
 ```bash
 git commit --allow-empty -F <메시지 파일>
@@ -59,7 +62,7 @@ git commit --allow-empty -F <메시지 파일>
 ## 연결
 
 ```text
-plan · spec chore · chore · refactor   Request: <hash>[, <hash>]
+plan · spec chore · chore · refactor   trailer Request: <hash>[, <hash>]
 에이전트 발의                           Request: 없음 (<근거>)   예: 반복 chore 3회 → 규칙 개선
 impl                                   적지 않는다 (Plan: 으로 이어짐)
 ```
@@ -69,6 +72,6 @@ impl                                   적지 않는다 (Plan: 으로 이어짐)
 ```bash
 npx gnam run request open            # 미착수 요청. 후속 작업 제안의 입력
 npx gnam run request show <hash>     # 요청 · Refines 체인 · 가리키는 커밋
-git log --oneline --grep '^request: '
+git log --oneline --grep '^Gnam: request$'          # format 1: '^request: '
 git log --oneline --grep '^Request: .*<hash>'
 ```

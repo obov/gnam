@@ -21,24 +21,25 @@ spec 파일을 추가하거나 수정하는 커밋. 본문에 **그 spec을 구�
 규칙:
 
 ```text
-제목 접두   spec.<topic>.plan:
+제목        docs(<topic>): …
+trailer     Gnam: spec.<topic>.plan · Summary · Blocking · Supersedes (대체할 때) · Breaking (해당할 때)
 파일 수     spec 파일 하나 또는 0 (빈 커밋). 여러 spec 파일 동시 커밋 금지
-본문        Summary · Goal · Plan · Scope · Blocking · Decisions expected · Risks · Open · Supersedes (대체할 때) · Breaking (해당할 때)
+본문        Goal · Plan · Scope · Decisions expected · Risks · Open · Dropped
 ```
 
 본문 필드:
 
 ```text
-Summary             사람용 한 줄 (120자 이하). 이 계획이 끝나면 사용하는 사람에게 무엇이 달라지는가. 필수 (commit/plan-summary)
+Summary             (trailer) 사람용 한 줄 (120자 이하). 이 계획이 끝나면 사용하는 사람에게 무엇이 달라지는가. 필수 (commit/plan-summary)
 Goal                이 계획이 끝나면 무엇이 참이 되는가
 Plan                단계 목록. 단계마다 완료: 조건
 Scope               바꿀 실제 경로. 범위 밖은 명시
-Blocking            착수 전에 사람이 확정해야 하는 결정 (B1…). 없으면 'Blocking: 없음' 한 줄
+Blocking            (trailer) 착수 전에 사람이 확정해야 하는 결정. 'Blocking: 없음' 또는 항목마다 'Blocking: B<n> <내용>' 반복
 Decisions expected  구현자가 정해도 되는 결정 (D1…). 결과는 impl 커밋 Decisions 에 번호와 함께
 Risks               구현이 잘못될 수 있는 지점 (R1…)
 Open                이 계획 범위 밖의 미결. 이 계획의 착수를 막지 않는다
-Supersedes          이 계획이 대체하는 이전 plan hash (아래 계획 교체)
-Breaking            쓰는 쪽이 코드 · 설정 · 절차를 바꿔야 하는 변경. 무엇이 깨지는지 · 쓰는 쪽이 할 일. 릴리스 major 근거 (release plugin)
+Supersedes          (trailer) 이 계획이 대체하는 이전 plan hash (아래 계획 교체)
+Breaking            (trailer) 쓰는 쪽이 코드 · 설정 · 절차를 바꿔야 하는 변경. 쓰는 쪽이 할 일 한 줄. 이 plan 을 따르는 impl 은 ! + BREAKING CHANGE (major 근거). plan 자체는 릴리스를 만들지 않는다
 ```
 
 Summary 는 진행 상황을 보는 사람이 읽는다 (specs/human-summary.md). 파일 · 함수 · 내부 용어 대신 결과를 한 줄로.
@@ -75,8 +76,8 @@ Goal 은 구현자용 완료 근거로 그대로 쓴다. Summary 가 Goal 을 �
 (확정 내용은 그 커밋에서 spec 에 반영, 본문 `Blocking: 없음`).
 
 ```text
-Supersedes   이전 plan hash. 같은 topic 의 plan
-Dropped      (선택) 이전 plan 에서 버린 단계. <hash> <단계> <이유> 한 줄씩
+Supersedes   (trailer) 이전 plan hash. 같은 topic 의 plan
+Dropped      (선택, 본문) 이전 plan 에서 버린 단계. <hash> <단계> <이유> 한 줄씩
              끝난 단계는 적지 않는다 (impl 의 Plan: 기록이 있음)
 impl         새 impl 은 새 plan 을 가리킨다. 이미 들어간 impl 은 이전 plan 을 가리킨 채로 둔다
 ```
@@ -86,9 +87,7 @@ git log --grep 'Supersedes: <plan-hash>' --oneline   # 이 plan 을 대체한 pl
 ```
 
 ```text
-spec.workspace.plan: 이름을 대소문자 구분 없이 유일하게 만든다
-
-Summary: 대소문자만 다른 이름으로 workspace 가 둘 생기지 않는다
+docs(workspace): 이름을 대소문자 구분 없이 유일하게 만든다
 
 Goal:
 동일 이름의 대소문자 변형이 서로 다른 workspace로 생성되는 문제 제거.
@@ -110,11 +109,15 @@ Decisions expected:
 D1. 표시용 원본 casing 유지 여부
 D2. check-then-insert vs DB 제약 의존
 
-Blocking: 없음
-
 Risks:
 R1. 기존 데이터의 normalized 충돌로 마이그레이션 실패
 
 Open:
 삭제된 workspace 이름의 재사용 허용 여부 (삭제 lifecycle 범위)
+
+Gnam: spec.workspace.plan
+Summary: 대소문자만 다른 이름으로 workspace 가 둘 생기지 않는다
+Blocking: 없음
 ```
+
+format 1 제목: `spec.<topic>.plan: …`, Summary · Blocking · Supersedes · Breaking 은 본문 필드.
