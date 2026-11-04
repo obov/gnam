@@ -201,6 +201,7 @@ rules          이 plugin 의 검사 규칙 id · why → rules
 recall        search 명령 data = [{ ref · kind · title · score · supersededBy }]
 lore          sections.entries = lore/README.md 인덱스의 [{ file · summary }]
 layout        summary = 작업 트리 위반 수 · 등급. sections.rules = [{ id · owner · name }] (탭), violations (deep) = [{ rule · path · level }]
+export        summary = 미반영 커밋이 있는 대상마다 한 줄. sections.targets = [{ id · path · repo · tag · version · lastSource · pending }]
 release       summary = 대상별 다음 release 수준 (release status 와 같은 계산)
 multi-agent   summary = 진행 중 run 수 · 판단 필요 노드 수. sections.runs = 위임 상태 트리 (multi-agent status 와 같은 데이터)
 ```
