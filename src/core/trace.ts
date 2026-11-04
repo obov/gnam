@@ -65,6 +65,8 @@ export interface Topic {
   exists: boolean
   /** spec 첫 줄 '# <topic> — <설명>' 의 설명. 없으면 null (specs/human-summary.md) */
   summary: string | null
+  /** spec 첫 줄 다음 첫 비어 있지 않은 줄 '문제: …' 의 값. 없으면 null (specs/human-summary.md) */
+  problem: string | null
   unimplemented: Marker[]
   open: Marker[]
   plans: Plan[]
@@ -112,6 +114,16 @@ export function specSummaryOf(name: string, text: string): string | null {
   const title = heading.replace(/^#\s+/, "").trim()
   const rest = title.startsWith(name) ? title.slice(name.length) : title
   const match = /^\s*[—:–-]\s*(.+)$/.exec(rest)
+  return match === null ? null : (match[1] ?? "").trim() || null
+}
+
+/** spec 첫 '# ' 줄 다음 첫 비어 있지 않은 줄이 '문제:' 로 시작하면 그 값. 다른 줄 · 빈 값 · 첫 줄 없음이면 null */
+export function specProblemOf(text: string): string | null {
+  const lines = text.split("\n")
+  const heading = lines.findIndex((line) => /^#\s/.test(line))
+  if (heading < 0) return null
+  const next = lines.slice(heading + 1).find((line) => line.trim() !== "")
+  const match = next === undefined ? null : /^문제:\s*(.*)$/.exec(next.trim())
   return match === null ? null : (match[1] ?? "").trim() || null
 }
 
@@ -336,7 +348,7 @@ export function collectTrace(cwd: string, since?: string): Trace {
     const topicPlans = [...plans.values()].filter((p) => p.topics.includes(name) && planKept(p)).map(({ topics: _, ...p }) => p)
     const topicChores = (chores.get(name) ?? []).filter((c) => inRange(c.sha))
     if (range !== null && topicPlans.length === 0 && topicChores.length === 0) continue
-    topics[name] = { path, exists, summary: specSummaryOf(name, text), unimplemented: markers(text, "미구현"), open, plans: topicPlans, chores: topicChores }
+    topics[name] = { path, exists, summary: specSummaryOf(name, text), problem: specProblemOf(text), unimplemented: markers(text, "미구현"), open, plans: topicPlans, chores: topicChores }
   }
   const decisionsBlocking = [...plans.values()]
     .filter((p) => p.supersededBy === null && p.blocking.length > 0 && inRange(p.sha))

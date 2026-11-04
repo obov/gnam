@@ -230,7 +230,7 @@ test("--schema: 최상위 키 · trace 하위 키 · plugin 섹션이 schema 에
     expect(section.description).toBe("가벼운 정보")
     const plan = JSON.parse(repo.gnam("status", "trace.topics.a.plans.0.status", "--schema").out) as { enum: string[] }
     expect(plan.enum).toEqual(["superseded", "done", "partial", "not-started"])
-    for (const path of ["trace.topics.a.summary", "trace.topics.a.plans.0.summary"]) {
+    for (const path of ["trace.topics.a.summary", "trace.topics.a.problem", "trace.topics.a.plans.0.summary"]) {
       const node = JSON.parse(repo.gnam("status", path, "--schema").out) as { type: string[] }
       expect(node.type).toEqual(["string", "null"])
     }
