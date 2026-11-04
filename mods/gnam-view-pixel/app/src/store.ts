@@ -17,15 +17,20 @@ export const TABS: Tab[] = [
 
 /**
  * 이 모델에서 보이는 탭 (순서 = 숫자 키 1-9, 10번째부터 Tab · ←/→):
- * 고정 탭 → 사용자 정의 view (프로젝트 · plugin) → plugin (켜진 plugin 이 있을 때)
+ * 고정 탭 → 사용자 정의 view (프로젝트 · plugin) → plugin (켜진 plugin 이 있을 때) → 설정
  */
 export function tabsOf(m: Model | null): Tab[] {
   return [
     ...TABS.filter(t => t.id !== 'requests' || m?.hasRequests === true),
     ...(m?.views ?? []).map(v => ({ id: `view:${v.id}`, label: v.title })),
     ...(m?.plugins.length ? [{ id: 'plugins', label: 'plugin' }] : []),
+    { id: 'settings', label: '설정' },
   ]
 }
+
+/** 설정 탭의 행 (j/k 로 스크롤): 설치 5 · 설정 문제 · plugin · 커밋 종류 */
+export const INSTALL_ROWS = 5
+export const settingsRowCount = (m: Model): number => INSTALL_ROWS + m.problems.length + m.plugins.length + m.setup.kinds.length
 
 /** view 탭에 그리는 최대 행 */
 export const VIEW_ROWS = 200
@@ -135,6 +140,8 @@ export function rowCount(s: State, tab: TabId = s.tab): number {
       return requestRows(s).length
     case 'plugins':
       return m.plugins.length
+    case 'settings':
+      return settingsRowCount(m)
   }
   const def = viewOf(m, tab)
   if (def) return Math.min(VIEW_ROWS, viewRows(m, def)?.rows.length ?? 0)

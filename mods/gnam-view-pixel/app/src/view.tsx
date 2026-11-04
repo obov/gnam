@@ -1,5 +1,5 @@
 // 화면. 첫 화면 = 목적 → 진행 → 지금 → 다음 → 구현된 기능, topic 펼침 = 문제 → 해결 → 이력 → 세부.
-import { useEffect, useRef, useSyncExternalStore, type ReactNode } from 'react'
+import { Fragment, useEffect, useRef, useSyncExternalStore, type ReactNode } from 'react'
 
 import { getPath, show, signals, type Commit, type Decision, type Item, type Model, type Plan, type Topic, type ViewDef } from './model.ts'
 import { Box, Text, type Color, type NodeHandle, type Style } from './pixel.ts'
@@ -966,6 +966,94 @@ function Plugins({ th, s, c }: { th: Theme; s: State; c: Controller }) {
   )
 }
 
+// ---------- 설정 (읽기 전용) ----------
+
+function Settings({ th, s, c }: { th: Theme; s: State; c: Controller }) {
+  const m = s.model!
+  const st = m.setup
+  let index = 0
+  const row = (id: string, cells: ReactNode[]) => {
+    const i = index++
+    return (
+      <ListRow key={id} th={th} index={i} id={`row:setting:${id}`} selected={s.tab === 'settings' && cursorOf(s) === i} onClick={() => c.moveTo(i)}>
+        <Box style={{ flexDirection: 'row', gap: th.space, alignItems: 'center', width: '100%' }}>
+          {cells.map((x, k) => (
+            <Fragment key={k}>{x}</Fragment>
+          ))}
+        </Box>
+      </ListRow>
+    )
+  }
+  const mark = (ok: boolean | null) => (
+    <T th={th} size="small" color={ok === null ? th.faint : ok ? th.green : th.red} bold mono style={{ width: th.size.small }}>
+      {ok === null ? '·' : ok ? '✓' : '✗'}
+    </T>
+  )
+  // 표시 없는 행도 같은 열에 맞춘다
+  const blank = <Box style={{ width: th.size.small, flexShrink: 0 }} />
+  const name = (text: string) => (
+    <T th={th} size="small" line style={{ width: th.size.small * 9 }}>
+      {text}
+    </T>
+  )
+  const note = (text: string, color = th.muted) => (
+    <T th={th} size="small" color={color} line grow>
+      {text}
+    </T>
+  )
+  const okSkills = st.skills.filter(k => k.ok).length
+  const broken = st.skills.filter(k => !k.ok)
+  const install: [string, boolean | null, string, string][] = [
+    ['hook', st.hooksOk, 'commit-msg hook', st.hooksOk ? (st.hooksPath ?? '') : `core.hooksPath ${st.hooksPath ?? '없음'} · 기대 ${st.hooksExpected ?? '.githooks'}`],
+    ['skills', broken.length === 0, 'skill 링크', `${okSkills}/${st.skills.length}${broken.length ? ` · 깨짐 ${broken.map(k => `${k.dir}/${k.name}`).join(', ')}` : ''}`],
+    ['agents', st.agentsMd.exists && st.agentsMd.inSync, 'AGENTS.md', st.agentsMd.exists ? (st.agentsMd.inSync ? 'gnam 블록 일치' : 'gnam 블록 불일치 (gnam sync)') : '없음'],
+    ['claude', st.claudeMd.exists && st.claudeMd.importsAgents, 'CLAUDE.md', st.claudeMd.exists ? (st.claudeMd.importsAgents ? '@AGENTS.md 가져옴' : '@AGENTS.md 없음') : '없음'],
+    ['handoff', null, '인계 메모', m.hasHandoff ? `있음 · ${m.handoffPath ?? ''}` : '없음'],
+  ]
+  return (
+    <Box style={{ flexDirection: 'column', gap: 2 }}>
+      <SectionHead th={th} title="설치" id="settings:install" note={`gnam ${m.gnamVersion ?? '?'} · ${st.source} · format ${st.format} · 읽기 전용 (고치기는 gnam init · sync · link)`} />
+      {install.map(([id, ok, label, text]) => row(`install:${id}`, [mark(ok), name(label), note(text, ok === false ? th.red : th.muted)]))}
+      <SectionHead th={th} title="설정 문제" count={m.problems.length} id="settings:problems" />
+      {m.problems.length === 0 ? (
+        <T th={th} size="small" color={th.faint}>
+          문제 없음
+        </T>
+      ) : (
+        m.problems.map((p, k) => row(`problem:${k}`, [mark(false), name(p.source ?? '-'), note(p.text, th.fg)]))
+      )}
+      <SectionHead th={th} title="plugin" count={m.plugins.length} id="settings:plugins" note={m.plugins.length ? '켜진 plugin · 버전 · 종류 (자세히는 plugin 탭)' : undefined} />
+      {m.plugins.length === 0 ? (
+        <T th={th} size="small" color={th.faint}>
+          없음 (코어 규약만)
+        </T>
+      ) : (
+        m.plugins.map(p => row(`plugin:${p.id}`, [blank, name(p.id), note(`v${p.version} · ${p.kind}`)]))
+      )}
+      <Box id="settings:config" style={{ flexDirection: 'column', gap: 2, padding: { top: th.space * 0.6, bottom: 0, left: th.space * 2.5 + th.size.small, right: 0 } }}>
+        <T th={th} size="tiny" color={th.faint} line>
+          {`꺼진 내장 plugin: ${st.inactive.length ? st.inactive.join(', ') : '없음'}`}
+        </T>
+        <T th={th} size="tiny" color={th.faint} line>
+          {`gnam.json 추가 키: ${st.extraConfig.length ? st.extraConfig.join(', ') : '없음'}`}
+        </T>
+      </Box>
+      <SectionHead th={th} title="커밋 종류" count={st.kinds.length} id="settings:kinds" note="제목 (format 1) 또는 Gnam trailer (format 2)" />
+      {st.kinds.map((k, i) =>
+        row(`kind:${i}`, [
+          blank,
+          <T th={th} size="tiny" mono line grow>
+            {k.label}
+          </T>,
+          <T th={th} size="small" color={k.owner === 'core' ? th.faint : th.muted} line>
+            {k.owner}
+          </T>,
+        ]),
+      )}
+    </Box>
+  )
+}
+
 const ITEM_LABEL: Record<string, string> = { risk: '위험', remaining: '남은 일', deferred: '미룸', open: '미결', blocking: '막힘' }
 
 const ITEM_COLOR = (th: Theme, kind: string): Rgba =>
@@ -1089,6 +1177,7 @@ export function App({ controller, now = Date.now }: { controller: Controller; no
   else if (s.tab === 'commits') body = <Commits th={th} s={s} c={controller} now={t} />
   else if (s.tab === 'requests') body = <Requests th={th} s={s} c={controller} />
   else if (s.tab === 'plugins') body = <Plugins th={th} s={s} c={controller} />
+  else if (s.tab === 'settings') body = <Settings th={th} s={s} c={controller} />
   else if (viewOf(s.model, s.tab)) body = <ViewTab th={th} s={s} c={controller} d={viewOf(s.model, s.tab)!} />
   else body = <Items th={th} s={s} c={controller} />
 

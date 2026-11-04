@@ -183,7 +183,7 @@ async function openPane($: EngineInterface, theme: string): Promise<{ ok: boolea
   }
   if (state.region) await post($, '/open', state.region)
   else state.pendingOpen = true
-  return { ok: true, text: 'gnam pane 을 열었습니다 (클릭 후 j/k · Enter · 1-5)' }
+  return { ok: true, text: 'gnam pane 을 열었습니다 (클릭 후 j/k · Enter · 1-9 탭)' }
 }
 
 async function closePane($: EngineInterface): Promise<void> {

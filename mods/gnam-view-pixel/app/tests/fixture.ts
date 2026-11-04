@@ -49,6 +49,16 @@ export const STATUS = {
     { id: 'lore', active: false, requires: [] },
     { id: 'run', active: true, requires: [] },
   ],
+  config: { raw: { format: 2, plugins: ['@gnam/run'], view: { tabs: [] } } },
+  install: {
+    hooks: { hooksPath: '.githooks', expected: '.githooks', commitMsg: true },
+    skills: [
+      { dir: '.agents/skills', name: 'gnam', target: '../../skills/gnam', ok: true },
+      { dir: '.claude/skills', name: 'gnam-run', target: '../../x', ok: false },
+    ],
+    agentsMd: { exists: true, inSync: false },
+    claudeMd: { exists: true, importsAgents: true },
+  },
   problems: [],
   handoff: { path: '/repo/.git/gnam/handoff.md', exists: false, content: null, modifiedAt: null },
   env: { branch: 'main' },

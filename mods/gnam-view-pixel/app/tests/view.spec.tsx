@@ -227,7 +227,7 @@ test('요청 탭: 상태 분포 · 필터 (f · 누름) · sha · ×by, 요청 0
 test('사용자 정의 view 탭 (list · table · progress · 데이터 없음) · plugin 탭, 탭 10개 넘으면 숫자 없음', async () => {
   const { tree, c, key } = await mount()
   const tabIds = nodes(tree).filter(n => String(n.props.id).startsWith('tab:')).map(n => n.props.id)
-  assert.deepEqual(tabIds, ['tab:overview', 'tab:decisions', 'tab:requests', 'tab:history', 'tab:commits', 'tab:items', 'tab:view:risks', 'tab:view:builtins', 'tab:view:run-goals', 'tab:view:gone', 'tab:plugins'])
+  assert.deepEqual(tabIds, ['tab:overview', 'tab:decisions', 'tab:requests', 'tab:history', 'tab:commits', 'tab:items', 'tab:view:risks', 'tab:view:builtins', 'tab:view:run-goals', 'tab:view:gone', 'tab:plugins', 'tab:settings'])
   assert.equal(textOf(byId(tree, 'tab:view:gone')!), '사라짐', '10번째 탭은 숫자 없음')
   assert.equal(textOf(byId(tree, 'tab:view:run-goals')!), '9 목표')
   const rows = () => nodes(tree).filter(n => String(n.props.id).startsWith('row:view:'))
@@ -305,6 +305,31 @@ test('항목 탭: 종류 분포 · 종류 필터 · 해결 여부 미판정 안�
   assert.ok(texts({ toJSON: () => rows()[0]! } as ReactTestRenderer).includes('토큰 만료'))
   await key('f')
   assert.equal(rows().length, 3, 'risk 다음은 전체')
+})
+
+test('설정 탭 (읽기 전용): 설치 상태 · 설정 문제 · plugin · 꺼진 내장 · 추가 키 · 커밋 종류', async () => {
+  const { tree, c, key } = await mount(variant(s => (s.problems = [{ source: 'install', message: 'core.hooksPath = /x, 기대 .githooks' }])))
+  await key('tab', { shift: true })
+  assert.equal(c.getState().tab, 'settings', '마지막 탭')
+  const row = (id: string) => texts({ toJSON: () => byId(tree, `row:setting:${id}`)! } as ReactTestRenderer)
+  assert.deepEqual(row('install:hook'), ['✓', 'commit-msg hook', '.githooks'])
+  assert.deepEqual(row('install:skills'), ['✗', 'skill 링크', '1/2 · 깨짐 .claude/skills/gnam-run'])
+  assert.deepEqual(row('install:agents'), ['✗', 'AGENTS.md', 'gnam 블록 불일치 (gnam sync)'])
+  assert.deepEqual(row('install:claude'), ['✓', 'CLAUDE.md', '@AGENTS.md 가져옴'])
+  assert.deepEqual(row('install:handoff'), ['·', '인계 메모', '없음'])
+  assert.deepEqual(row('problem:0'), ['✗', 'install', 'core.hooksPath = /x, 기대 .githooks'])
+  assert.deepEqual(row('plugin:run'), ['run', 'v0.1.0 · builtin'])
+  assert.deepEqual(row('kind:3'), ['run.<topic>.<start|end|policy>: …', 'run'])
+  const config = texts({ toJSON: () => byId(tree, 'settings:config')! } as ReactTestRenderer)
+  assert.deepEqual(config, ['꺼진 내장 plugin: lore', 'gnam.json 추가 키: view'])
+  assert.equal(nodes(tree).filter(n => String(n.props.id).startsWith('row:setting:kind:')).length, 4, 'kinds 행 수')
+  // 경고 묶음의 설정 문제를 누르면 설정 탭
+  await key('1')
+  await act(async () => byId(tree, 'signal:problems')!.props.onClick())
+  assert.equal(c.getState().tab, 'settings')
+  // j/k 로 설정 행 이동 (스크롤)
+  await key('j')
+  assert.equal(c.getState().cursor.settings, 1)
 })
 
 test('r 은 강제 새로고침, 읽기 실패 시 기존 화면 + 오류 1줄', async () => {

@@ -119,8 +119,28 @@ export type ViewDef = {
   owner: string
 }
 
+/** 설정 · 설치 상태 (읽기 전용) */
+export type Setup = {
+  /** gnam 실행 출처 (package · checkout …) */
+  source: string
+  format: number
+  /** 꺼진 내장 plugin */
+  inactive: string[]
+  /** gnam.json 의 format · plugins 밖 키 */
+  extraConfig: string[]
+  hooksOk: boolean
+  hooksPath: string | null
+  hooksExpected: string | null
+  skills: { dir: string; name: string; ok: boolean }[]
+  agentsMd: { exists: boolean; inSync: boolean }
+  claudeMd: { exists: boolean; importsAgents: boolean }
+  /** 커밋 종류 (status kinds) */
+  kinds: { label: string; owner: string }[]
+}
+
 export type Model = {
   project: string
+  setup: Setup
   /** 켜진 plugin (status plugins) */
   plugins: PluginInfo[]
   /** 사용자 정의 탭 (프로젝트 먼저, 그다음 plugin) */
@@ -506,7 +526,24 @@ export function buildModel(raw: Raw): Model {
   let purpose = parsePurpose(raw.readme, raw.readmePath)
   if (!purpose.text && raw.pkgDescription) purpose = { ...purpose, text: raw.pkgDescription, from: 'package.json' }
 
+  const raw0: Json = s.config?.raw ?? {}
+  const hooks: Json = s.install?.hooks ?? {}
+  const setup: Setup = {
+    source: String(s.gnam?.source ?? '?'),
+    format: Number(raw0.format ?? s.gnam?.format ?? 0),
+    inactive: arr(s.builtins).filter(b => b.active === false).map(b => String(b.id)),
+    extraConfig: Object.keys(raw0).filter(k => k !== 'format' && k !== 'plugins'),
+    hooksOk: hooks.hooksPath === hooks.expected && hooks.commitMsg === true,
+    hooksPath: str(hooks.hooksPath),
+    hooksExpected: str(hooks.expected),
+    skills: arr(s.install?.skills).map(k => ({ dir: String(k.dir ?? ''), name: String(k.name ?? ''), ok: k.ok === true })),
+    agentsMd: { exists: s.install?.agentsMd?.exists === true, inSync: s.install?.agentsMd?.inSync === true },
+    claudeMd: { exists: s.install?.claudeMd?.exists === true, importsAgents: s.install?.claudeMd?.importsAgents === true },
+    kinds: arr(s.kinds).map(k => ({ label: String(k.label ?? ''), owner: String(k.owner ?? '') })),
+  }
+
   return {
+    setup,
     plugins: Object.entries((s.plugins ?? {}) as Record<string, Json>).map(([id, p]) => ({
       id,
       version: String(p?.version ?? '?'),
