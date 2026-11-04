@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import { Controller } from '../src/store.ts'
+import { Controller, pollMs, POLL_MS, startPolling, type Timer } from '../src/store.ts'
 import { fakeRepo } from './fixture.ts'
 
 test('갱신: 같은 HEAD 면 gnam status 0회, 바뀌면 1회, 실패 시 기존 topic 유지', async () => {
@@ -45,4 +45,51 @@ test('선택한 topic 은 갱신 뒤에도 이름으로 유지', async () => {
   await c.refresh()
   assert.equal(c.getState().expanded, 'web')
   assert.equal(c.getState().cursor.overview, 1)
+})
+
+test('독립 모드 주기 갱신: 같은 상태면 gnam status 0회, HEAD 바뀌면 1회', async () => {
+  const { repo, loader } = fakeRepo()
+  const c = new Controller(loader)
+  await c.refresh()
+  assert.equal(loader.statusCalls, 1)
+
+  let tick: (() => void) | null = null
+  let every = 0
+  let cleared = false
+  const timer: Timer = {
+    set: (fn, ms) => {
+      tick = fn
+      every = ms
+      return 7
+    },
+    clear: h => {
+      cleared = h === 7
+    },
+  }
+  const stop = startPolling(c, POLL_MS, timer)
+  assert.equal(every, 5_000)
+  const poll = async () => {
+    tick!()
+    await c.refresh() // 진행 중인 읽기를 기다린다 (없으면 같은 서명 확인 한 번 더)
+  }
+
+  await poll()
+  await poll()
+  assert.equal(loader.statusCalls, 1, '같은 HEAD · gnam.json · specs/ → gnam status 0회')
+
+  repo.head = 'h2'
+  await poll()
+  assert.equal(loader.statusCalls, 2, 'HEAD 바뀜 → 1회')
+  await poll()
+  assert.equal(loader.statusCalls, 2)
+
+  stop()
+  assert.ok(cleared)
+})
+
+test('GNAM_VIEW_POLL_MS: 1000 이상 숫자만, 아니면 기본 5초', () => {
+  assert.equal(pollMs(undefined), 5_000)
+  assert.equal(pollMs('2000'), 2_000)
+  assert.equal(pollMs('10'), 5_000)
+  assert.equal(pollMs('abc'), 5_000)
 })

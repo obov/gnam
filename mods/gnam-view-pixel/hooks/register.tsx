@@ -2,11 +2,14 @@
 // gnam-view-pixel: /gnam-pixel → bridge launch (process.run) → state long-poll ($.http.fetch)
 // → frame (POSIX shm) 을 Image · $.ui.blit 으로 그림, Client surface 로 키 · 마우스 전달.
 // 구조는 terminal-browser claude-code-plugin/hooks/register.tsx (MIT) 를 따른다.
+// herdr 안 (HERDR_ENV=1) 에서는 Claude Code pane 의 Image 가 그려지지 않으므로 (libghostty: kitty placeholder 미지원)
+// herdr 분할 pane 을 만들어 pixel 앱을 직접 (PIXEL_EMBED 없이) 실행한다: split.ts.
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
 import type { BridgeState, Frame, PixelNotice } from '../types'
 import { isBridgeState, isInputMessage, isLaunchReport, isSizeMessage } from './protocol.ts'
+import { closeSplit, herdrContext, openSplit } from './split.ts'
 import { MAX_IMAGE_CELLS } from './surface.tsx'
 
 const PANE = 'gnam-pixel'
@@ -44,6 +47,10 @@ function themeOf(options: Record<string, unknown>): string {
   return t === 'dark' || t === 'light' ? t : 'auto'
 }
 
+function directionOf(options: Record<string, unknown>): 'right' | 'down' {
+  return options.split === 'down' ? 'down' : 'right'
+}
+
 async function setNotice($: EngineInterface, next: PixelNotice): Promise<void> {
   await update($, notice, () => next)
   $.ui.invalidate('ui.render')
@@ -70,7 +77,8 @@ async function startBridge($: EngineInterface, theme: string): Promise<boolean> 
   state.port = report.port
   state.token = report.token
   await setNotice($, null)
-  void watchBridge($)
+  // 환경이 내려가면 (reload · 종료) 대기 중인 sleep 이 거절된다: 버린다
+  void watchBridge($).catch(() => {})
   return true
 }
 
@@ -189,6 +197,7 @@ async function closePane($: EngineInterface): Promise<void> {
 
 export const register: Register = (on, options) => {
   const theme = themeOf(options as Record<string, unknown>)
+  const direction = directionOf(options as Record<string, unknown>)
 
   on('session.start', async ($, e, next) => {
     const r = await next(e)
@@ -212,7 +221,15 @@ export const register: Register = (on, options) => {
       await update($, notice, () => null)
       return { text: 'setup 끝: /gnam-pixel 로 열기' }
     }
-    if (arg === 'close' || (!arg && state.open && !(await read($, notice)))) {
+    if (arg === 'close') {
+      const split = await closeSplit($, await herdrContext($))
+      if (state.open || !split) {
+        await $.ui.close({ id: PANE })
+        await closePane($)
+      }
+      return { text: split ? 'gnam herdr pane 을 닫았습니다' : 'gnam pane 을 닫았습니다' }
+    }
+    if (!arg && state.open && !(await read($, notice))) {
       await $.ui.close({ id: PANE })
       await closePane($)
       return { text: 'gnam pane 을 닫았습니다' }
@@ -223,6 +240,8 @@ export const register: Register = (on, options) => {
       await $.ui.open({ id: PANE, title: TITLE })
       return { text: `gnam-pixel 은 터미널에서만 그립니다 — ${FALLBACK}` }
     }
+    const herdr = await herdrContext($)
+    if (herdr) return { text: (await openSplit($, herdr, { cwd: await $.session.cwd(), theme, direction })).text }
     const opened = await openPane($, theme)
     return { text: opened.text }
   })
@@ -307,6 +326,8 @@ export const register: Register = (on, options) => {
 
   on('session.end', async ($, e, next) => {
     const r = await next(e)
+    // 분할 pane 의 앱이 세션보다 오래 남지 않게 닫는다
+    await closeSplit($, await herdrContext($))
     await post($, '/close')
     state.port = null
     return r

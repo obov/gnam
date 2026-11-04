@@ -23,6 +23,8 @@ import { isFrame, isInputEvent, isSize, type BridgeState, type Frame, type Launc
 const APP_DIR = path.resolve(__dirname, '..')
 const APP_ENTRY = path.join(APP_DIR, 'dist', 'main.cjs')
 const PIXEL_BIN = path.join(APP_DIR, 'node_modules', '@zenbu-labs', 'pixel', 'dist', 'bin.js')
+/** 사용자가 셸에서 실행하는 pixel CLI (독립 실행) */
+const PIXEL_CLI = path.join(APP_DIR, 'node_modules', '.bin', 'pixel')
 const ELECTRON_MARKER = path.join(APP_DIR, 'node_modules', '@zenbu-labs', 'pixel', 'electron', 'dist', '.zenbu-electron-sha256')
 const STATE_DIR = path.join(process.env.XDG_STATE_HOME ?? path.join(os.homedir(), '.local', 'state'), 'gnam-view-pixel')
 const LOG_FILE = path.join(STATE_DIR, 'bridge.log')
@@ -65,7 +67,7 @@ export function callerTty(): string | null {
 
 /** 설치 상태 문제 (없으면 null) */
 export function installProblem(): string | null {
-  if (!fs.existsSync(PIXEL_BIN) || !fs.existsSync(ELECTRON_MARKER)) return `pixel 런타임 없음: (cd ${APP_DIR} && npm run setup)`
+  if (!fs.existsSync(PIXEL_BIN) || !fs.existsSync(PIXEL_CLI) || !fs.existsSync(ELECTRON_MARKER)) return `pixel 런타임 없음: (cd ${APP_DIR} && npm run setup)`
   if (!fs.existsSync(APP_ENTRY)) return `앱 빌드 없음: (cd ${APP_DIR} && npm run build)`
   return null
 }
@@ -463,8 +465,13 @@ if (require.main === module) {
   const [mode, ...rest] = process.argv.slice(2)
   if (mode === 'launch') void launch(rest)
   else if (mode === 'serve') serve(rest)
-  else {
-    process.stderr.write('usage: bridge.cjs launch|serve ...\n')
+  else if (mode === 'check') {
+    // 독립 실행 (herdr 분할 pane) 전 설치 확인: { pixel, entry } 또는 { error, code: 'install' }
+    const problem = installProblem()
+    if (problem) report({ error: problem, code: 'install' }, 2)
+    process.stdout.write(JSON.stringify({ pixel: PIXEL_CLI, entry: APP_ENTRY }) + '\n')
+  } else {
+    process.stderr.write('usage: bridge.cjs launch|serve|check ...\n')
     process.exit(2)
   }
 }
