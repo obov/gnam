@@ -161,6 +161,20 @@ export function allowedVersions(state: ReleaseState, date: Date): string[] {
   return [...new Set(versions.filter((v) => v !== null))]
 }
 
+/** export plugin 의 version 파일 (release 이름 export:<id>). specs/export.md 'release 연동' */
+export interface ExportVersion {
+  name: string
+  file: string
+  /** 이 커밋 (또는 작업 트리) 의 값. 파일이 없으면 null */
+  current: string | null
+  /** 부모 커밋의 값. 없으면 null */
+  before: string | null
+  /** 직전 release 커밋의 이 항목 버전 */
+  last: string | null
+}
+
+export const EXPORT_PREFIX = "export:"
+
 export interface Problem {
   rule: string
   why: string
@@ -171,6 +185,81 @@ export interface Problem {
 const WHY_VERSION =
   "릴리스 버전은 직전 release 이후 커밋의 근거에서 계산한다 (.agents/skills/gnam-release/references/release.md). 낮추면 호환성 신호가 사라진다."
 
+type Add = (rule: string, why: string, current: string, fix: string) => void
+
+/** package 대상 항목. 대상이 아니면 false */
+function packageEntryProblems(
+  name: string,
+  version: string,
+  states: ReleaseState[],
+  date: Date,
+  allowedFiles: Set<string>,
+  add: Add,
+): boolean {
+  const state = states.find((s) => s.name === name)
+  if (state === undefined) {
+    add(
+      "release-target",
+      "릴리스 대상은 gnam.json release.targets 가 정한다.",
+      name,
+      `대상 package name 중 하나를 쓴다: ${states.map((s) => s.name).join(" · ") || "(없음)"}`,
+    )
+    return false
+  }
+  if (state.scheme !== "openapi") allowedFiles.add(`${state.dir}/package.json`)
+  const allowed = allowedVersions(state, date)
+  if (!allowed.includes(version)) {
+    const evidence = state.scheme === "semver" && state.last !== null ? state.evidence() : []
+    add(
+      "release-version",
+      WHY_VERSION,
+      `${name} ${version} (직전 ${state.last?.version ?? "없음"}${evidence.length > 0 ? `, 근거 ${evidence.map((e) => `${e.hash.slice(0, 7)} ${e.level}`).join(" · ")}` : ""})`,
+      allowed.length === 0
+        ? "직전 release 이후 변경이 없다. 이 대상을 제목에서 뺀다."
+        : `허용 버전: ${allowed.join(" · ")}. gnam run release bump 가 계산한다.`,
+    )
+  } else if (state.current !== version)
+    add(
+      "release-version",
+      "제목 버전과 실제 버전이 같아야 태그가 코드와 맞는다.",
+      `${name}: 제목 ${version}, ${state.scheme === "openapi" ? "active spec info.version" : `${state.dir}/package.json`} ${state.current}`,
+      state.scheme === "openapi"
+        ? "info.version 은 check:api 가 정한다. 제목을 그 값으로 쓴다."
+        : `${state.dir}/package.json version 을 ${version} 으로 바꾼다 (gnam run release bump).`,
+    )
+  return true
+}
+
+/** export:<id> 항목 = version 파일 값, 직전 release 보다 큼. 대상이 아니면 false */
+function exportEntryProblems(
+  name: string,
+  version: string,
+  exports: ExportVersion[],
+  allowedFiles: Set<string>,
+  add: Add,
+): boolean {
+  const target = exports.find((e) => e.name === name)
+  if (target === undefined) {
+    add(
+      "release-target",
+      "export:<id> 는 gnam.json export.targets 중 version 이 있는 대상이다.",
+      name,
+      `있는 대상: ${exports.map((e) => e.name).join(" · ") || "(없음)"}`,
+    )
+    return false
+  }
+  allowedFiles.add(target.file)
+  const order = target.last === null ? 1 : compareVersions(version, target.last)
+  if (target.current !== version || order === null || order <= 0)
+    add(
+      "release-version",
+      "제목 버전 = version 파일 값이어야 배포 저장소 태그가 코드와 맞는다. 직전 release 보다 커야 한다.",
+      `${name}: 제목 ${version}, ${target.file} ${target.current ?? "없음"} (직전 ${target.last ?? "없음"})`,
+      `${target.file} 에 직전보다 큰 MAJOR.MINOR.PATCH 를 쓰고 제목을 그 값으로 쓴다.`,
+    )
+  return true
+}
+
 /** release: 커밋 검사. files = 이 커밋이 바꾼 파일 */
 export function releaseProblems(
   subject: string,
@@ -178,9 +267,10 @@ export function releaseProblems(
   files: string[] | null,
   states: ReleaseState[],
   date: Date,
+  exports: ExportVersion[] = [],
 ): Problem[] {
   const problems: Problem[] = []
-  const add = (rule: string, why: string, current: string, fix: string) => problems.push({ rule, why, current, fix })
+  const add: Add = (rule, why, current, fix) => problems.push({ rule, why, current, fix })
   const parsed = entriesOf(subject)
   if (parsed === null) return problems
   const { entries, invalid } = parsed
@@ -198,37 +288,10 @@ export function releaseProblems(
   const sections = sectionsOf(body)
   const allowedFiles = new Set<string>()
   for (const { name, version } of entries) {
-    const state = states.find((s) => s.name === name)
-    if (state === undefined) {
-      add(
-        "release-target",
-        "릴리스 대상은 gnam.json release.targets 가 정한다.",
-        name,
-        `대상 package name 중 하나를 쓴다: ${states.map((s) => s.name).join(" · ") || "(없음)"}`,
-      )
-      continue
-    }
-    if (state.scheme !== "openapi") allowedFiles.add(`${state.dir}/package.json`)
-    const allowed = allowedVersions(state, date)
-    if (!allowed.includes(version)) {
-      const evidence = state.scheme === "semver" && state.last !== null ? state.evidence() : []
-      add(
-        "release-version",
-        WHY_VERSION,
-        `${name} ${version} (직전 ${state.last?.version ?? "없음"}${evidence.length > 0 ? `, 근거 ${evidence.map((e) => `${e.hash.slice(0, 7)} ${e.level}`).join(" · ")}` : ""})`,
-        allowed.length === 0
-          ? "직전 release 이후 변경이 없다. 이 대상을 제목에서 뺀다."
-          : `허용 버전: ${allowed.join(" · ")}. gnam run release bump 가 계산한다.`,
-      )
-    } else if (state.current !== version)
-      add(
-        "release-version",
-        "제목 버전과 실제 버전이 같아야 태그가 코드와 맞는다.",
-        `${name}: 제목 ${version}, ${state.scheme === "openapi" ? "active spec info.version" : `${state.dir}/package.json`} ${state.current}`,
-        state.scheme === "openapi"
-          ? "info.version 은 check:api 가 정한다. 제목을 그 값으로 쓴다."
-          : `${state.dir}/package.json version 을 ${version} 으로 바꾼다 (gnam run release bump).`,
-      )
+    const known = name.startsWith(EXPORT_PREFIX)
+      ? exportEntryProblems(name, version, exports, allowedFiles, add)
+      : packageEntryProblems(name, version, states, date, allowedFiles, add)
+    if (!known) continue
     const section = sections.get(name)
     if (section === undefined || section.version !== version || section.notes === "")
       add(
@@ -257,8 +320,20 @@ export function releaseProblems(
   return problems
 }
 
-/** release 가 아닌 커밋이 대상 버전을 바꿨는가 */
-export function outsideProblems(states: ReleaseState[]): Problem[] {
+/** release 가 아닌 커밋이 대상 버전 (package.json · export version 파일) 을 바꿨는가 */
+export function outsideProblems(states: ReleaseState[], exports: ExportVersion[] = []): Problem[] {
+  const files = exports
+    .filter((e) => e.before !== null && e.before !== e.current)
+    .map((e) => ({
+      rule: "version-outside",
+      why: "버전은 release 커밋에서만 바뀐다. 그래야 버전 변경마다 근거와 태그가 남는다.",
+      current: `${e.file} ${e.before} → ${e.current ?? "(삭제)"} (${e.name})`,
+      fix: `버전 변경을 되돌리고 'release: ${e.name} <version>' 커밋 (본문 Package: ${e.name} <version> 절) 에서 바꾼다.`,
+    }))
+  return [...files, ...packageOutside(states)]
+}
+
+function packageOutside(states: ReleaseState[]): Problem[] {
   return states
     .filter((s) => s.scheme !== "openapi" && s.before !== null && s.before !== s.current)
     .map((s) => ({

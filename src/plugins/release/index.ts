@@ -7,11 +7,21 @@ import type { Violation } from "../../core/violation.ts"
 import { releaseConfigOf, releaseConfigProblems } from "./config.ts"
 import { outsideProblems, RELEASE_SUBJECT, releaseProblems } from "./model.ts"
 import { releaseCli, releaseSummary } from "./release.ts"
-import { releaseStates } from "./repo.ts"
+import { exportVersions, releaseStates } from "./repo.ts"
+import { exportConfigOf } from "../export/config.ts"
 
 const stateOf = (ctx: CommitContext) => {
   const config = releaseConfigOf(ctx.config["release"])
   return config === null ? null : releaseStates(ctx.cwd, config, ctx.view)
+}
+
+/** export plugin 이 켜져 있으면 version 이 있는 대상의 버전 파일 */
+const exportsOf = (ctx: CommitContext) => {
+  const release = releaseConfigOf(ctx.config["release"])
+  const config = ctx.plugins.includes("export") ? exportConfigOf(ctx.config["export"]) : null
+  if (release === null || config === null) return []
+  const versions = Object.entries(config.targets).flatMap(([id, t]) => (t.version === null ? [] : [{ id, file: t.version }]))
+  return exportVersions(ctx.cwd, release, versions, ctx.view)
 }
 
 const toViolation = (p: { rule: string; why: string; current: string; fix: string }): Violation => ({
@@ -41,14 +51,14 @@ export default definePlugin({
               fix: "gnam.json 에 release.targets 를 설정하거나 (.agents/skills/gnam-release/references/release.md) 제목을 chore: 로 쓴다.",
             },
           ]
-        return releaseProblems(ctx.subject, ctx.body, ctx.files, release.states, release.date).map(toViolation)
+        return releaseProblems(ctx.subject, ctx.body, ctx.files, release.states, release.date, exportsOf(ctx)).map(toViolation)
       },
     },
   ],
   everyCommit(ctx, owner) {
     if (ctx.merge || owner === "release" || owner === "run") return []
     const release = stateOf(ctx)
-    return release === null ? [] : outsideProblems(release.states).map(toViolation)
+    return release === null ? [] : outsideProblems(release.states, exportsOf(ctx)).map(toViolation)
   },
   rules: [
     { id: "commit/release-subject", why: "release 제목 형식" },

@@ -18,6 +18,7 @@ import {
   bump,
   draftMessage,
   entriesOf,
+  EXPORT_PREFIX,
   isSemver,
   LEVELS,
   type Level,
@@ -134,7 +135,8 @@ export function publish(cwd: string, range: string, run: Gh = gh): string[] {
     const body = gitOrThrow(cwd, ["log", "-1", "--format=%b", hash])
     const sections = sectionsOf(body)
     for (const { name, version } of entriesOf(subject)?.entries ?? []) {
-      if (!isSemver(version)) continue
+      // export:<id> 의 태그 · 본문은 배포 저장소에 export push 가 만든다
+      if (!isSemver(version) || name.startsWith(EXPORT_PREFIX)) continue
       const tag = tagOf(name, version)
       if (run(["release", "view", tag]).ok) {
         log.push(`${tag} 있음`)

@@ -9,7 +9,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import * as core from "../../core/git.ts"
 import { infoVersion, type ReleaseConfig } from "./config.ts"
-import { classify, type Commit, entriesOf, type ReleaseState } from "./model.ts"
+import { classify, type Commit, entriesOf, EXPORT_PREFIX, type ExportVersion, type ReleaseState } from "./model.ts"
 
 export type View = { kind: "worktree" } | { kind: "index" } | { kind: "commit"; sha: string }
 
@@ -151,4 +151,32 @@ export function releaseStates(
     }
   })
   return { states, date }
+}
+
+/**
+ * export plugin 대상 중 version 이 있는 것의 버전 파일 (specs/export.md 'release 연동').
+ * release 대상 package.json 과 같은 파일은 이미 package 로 검사하므로 뺀다. 부모가 없으면 []
+ */
+export function exportVersions(
+  cwd: string,
+  release: ReleaseConfig,
+  versions: { id: string; file: string }[],
+  view: View,
+): ExportVersion[] {
+  const parent = parentOf(cwd, view)
+  if (parent === null) return []
+  const read = reader(cwd, view, parent)
+  const packages = new Set(Object.keys(release.targets).map((dir) => `${dir}/package.json`))
+  return versions
+    .filter((v) => !packages.has(v.file))
+    .map(({ id, file }) => {
+      const name = `${EXPORT_PREFIX}${id}`
+      return {
+        name,
+        file,
+        current: read.now(file)?.trim() ?? null,
+        before: read.before(file)?.trim() ?? null,
+        last: lastRelease(cwd, parent, name)?.version ?? null,
+      }
+    })
 }
