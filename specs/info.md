@@ -51,6 +51,7 @@ gnam       version · root (설치 위치) · source (package | checkout) · for
 project    저장소 루트 절대 경로
 config     path · raw (gnam.json 원문, 없거나 깨지면 null) · effective (plugin 기본값을 합친 값)
 plugins    id → plugin 객체 (아래)
+views      탭 정의 (gnam.json view.tabs · plugin 섹션 view). specs/view.md
 builtins   내장 plugin 전부. id · active · requires
 kinds      활성 커밋 종류. label · subject (정규식 원문) · owner (core | plugin id)
 rules      검사 규칙. id · owner · why
@@ -180,7 +181,7 @@ text      사람용 들여쓰기 트리 (key: value)
 plugin 은 `definePlugin` 에 아래를 더해 자기 상태 · 데이터 · 검색 · 출력 형식을 함께 세팅한다. plugin 을 추가하면 요약 · 트리 · `--keys` · `--schema` · `--format` 에 그대로 나타난다.
 
 ```text
-status.sections  섹션 이름 → { describe · deep? · schema? · collect(ctx) }   → plugins.<id>.sections.<섹션>
+status.sections  섹션 이름 → { describe · deep? · schema? · collect(ctx) · view? }   → plugins.<id>.sections.<섹션>, view 는 views 의 탭
 status.summary   (ctx) → 요약에 넣을 줄 목록 (빈 목록이면 생략)
 commands.data  명령의 구조화 결과 (args, ctx) → JSON 값. 있으면 gnam run … --json · --format 이 이 값을 출력 계층에 넘긴다
 commands.schema  data 결과의 JSON Schema
