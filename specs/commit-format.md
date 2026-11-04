@@ -1,5 +1,7 @@
 # commit-format — 제목은 Conventional Commits, gnam 종류는 trailer
 
+문제: 표준 릴리스 도구가 gnam 커밋을 읽지 못해 버전 · 변경 기록 · 배포를 손으로 만든다
+
 커밋 제목을 Conventional Commits 1.0.0 으로 쓰고, gnam 종류 · 연결 필드는 메시지 끝 trailer 로 옮긴다.
 release-please · semantic-release · git-cliff · commitlint 같은 표준 도구가 gnam 저장소의 history 를 그대로 읽는다.
 spec → plan → impl 흐름과 본문 필드의 의미는 바꾸지 않는다. 바뀌는 것은 표기 위치뿐이다.
