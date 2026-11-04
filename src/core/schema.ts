@@ -69,6 +69,7 @@ const TRACE = obj(
           path: str(),
           exists: bool,
           summary: strOrNull("spec 첫 줄 '# <topic> — <설명>' 의 설명"),
+          problem: strOrNull("spec 첫 줄 다음 문단 첫 줄 '문제: …' 의 값"),
           unimplemented: arr(marker),
           open: arr(marker),
           plans: arr(PLAN),

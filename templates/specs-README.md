@@ -7,7 +7,13 @@
 <파일명>.md  <한 줄 설명>
 ```
 
-spec 파일 첫 줄은 `# <topic> — <사람용 한 줄 설명>` (gnam status 의 trace.topics.<topic>.summary).
+spec 파일 첫 줄은 해결하는 기능, 다음 문단 첫 줄은 해결하는 문제 (사람용, 각 한 줄. 구현 용어 대신 사람이 겪는 일을 쓴다).
+
+```text
+# <topic> — <사람용 한 줄 설명>              gnam status 의 trace.topics.<topic>.summary
+
+문제: <이 기능이 없으면 사람이 겪는 불편>     trace.topics.<topic>.problem (문제 줄 뒤는 빈 줄, 본문은 그 다음 문단부터)
+```
 
 ## 커밋
 

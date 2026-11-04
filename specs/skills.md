@@ -1,4 +1,6 @@
-# skills — plugin 의 외부 스킬 의존
+# skills — plugin 이 쓰는 외부 스킬을 버전을 고정해 프로젝트에 함께 받는다
+
+문제: plugin 에 필요한 외부 스킬을 사람마다 따로 설치해, 버전이 어긋나거나 clone 만으로는 작업 환경이 갖춰지지 않는다
 
 plugin 이 GitHub 에 배포된 스킬에 의존할 때, `gnam plugin add` 가 그 스킬을 commit 으로 고정해 받아 **프로젝트에** 넣고 링크한다.
 전역 (`~/.claude/skills` · `~/.agents/skills`) 은 건드리지 않는다. 받은 파일은 저장소에 커밋한다 (clone 만으로 복원).

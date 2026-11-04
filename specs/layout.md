@@ -1,5 +1,7 @@
 # layout — 폴더 구조를 선언하고 어긋난 파일을 커밋 때 알린다
 
+문제: 정해 둔 폴더 구조를 사람 · 에이전트가 잊고 엉뚱한 곳에 파일을 두어도 한참 뒤에야 알아챈다
+
 작업 중 정한 폴더 구조를 `.gnam/layout.json` 에 트리로 선언한다. 커밋마다 새로 생긴 위반을 hook 출력으로 알리고 (기본 경고, 설정으로 차단),
 구조를 정한 이유는 `layout:` 커밋에 남긴다. 형식은 eslint-plugin-project-structure 의 folder-structure 규칙 (projectStructure.json) 과 키 · 문법을 맞춘 부분 집합이다.
 

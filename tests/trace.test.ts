@@ -2,7 +2,7 @@ import { writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { test } from "node:test"
 import { expect } from "./expect.ts"
-import { collectTrace, specSummaryOf, stepNumbers, stepsOf, TraceError } from "../src/core/trace.ts"
+import { collectTrace, specProblemOf, specSummaryOf, stepNumbers, stepsOf, TraceError } from "../src/core/trace.ts"
 import { tempRepo } from "./helpers.ts"
 import { fixture } from "./trace-fixture.ts"
 
@@ -151,6 +151,29 @@ test("trace: topic summary = spec 첫 줄 설명, plan summary = 본문 Summary:
     expect(trace.topics["a"]?.summary).toBe("사람용 설명")
     expect(trace.topics["a"]?.plans.map((p) => p.summary)).toEqual(["목록이 한 번에 보인다", null])
     expect(trace.topics["b"]?.summary).toBe(null)
+  } finally {
+    repo.cleanup()
+  }
+})
+
+test("trace: topic problem = spec 첫 줄 다음 첫 비어 있지 않은 줄의 '문제:' 값 (specs/human-summary.md)", () => {
+  expect(specProblemOf("# a — 설명\n\n문제: 사람이 겪는 불편\n\n본문")).toBe("사람이 겪는 불편")
+  expect(specProblemOf("# a — 설명\n문제:  바로 다음 줄  \n본문")).toBe("바로 다음 줄")
+  expect(specProblemOf("# a — 설명\n\n본문 첫 줄\n문제: 첫 문단 안 다른 줄")).toBe(null)
+  expect(specProblemOf("# a — 설명\n\n본문")).toBe(null)
+  expect(specProblemOf("# a — 설명\n\n문제:\n\n본문")).toBe(null)
+  expect(specProblemOf("문제: 제목 없음")).toBe(null)
+  expect(specProblemOf("# a")).toBe(null)
+  const repo = tempRepo(null)
+  try {
+    repo.commit("gnam.json", "chore: base")
+    repo.commit("specs/a.md", "spec.a.chore: a\n\nGoal:\ng\n\nScope:\ns")
+    repo.commit("specs/b.md", "spec.b.chore: b\n\nGoal:\ng\n\nScope:\ns")
+    writeFileSync(join(repo.root, "specs/a.md"), "# a — 설명\n\n문제: 목록을 손으로 모은다\n\n본문\n")
+    writeFileSync(join(repo.root, "specs/b.md"), "# b — 설명\n\n본문\n")
+    const trace = collectTrace(repo.root)
+    expect(trace.topics["a"]?.problem).toBe("목록을 손으로 모은다")
+    expect(trace.topics["b"]?.problem).toBe(null)
   } finally {
     repo.cleanup()
   }

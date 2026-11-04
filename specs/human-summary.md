@@ -1,5 +1,7 @@
 # human-summary — 사람이 한 줄로 읽는 plan · spec 설명
 
+문제: 에이전트 기록은 길고 전문 용어가 많아, 사람이 계획 · 기능마다 무엇을 하려는지 한눈에 알 수 없다
+
 에이전트용 기록 (Goal · Plan · 단계) 은 정확하지만 길고 구현 용어가 많다. 사람이 한눈에 "이 계획이 무엇을 하려는지" 를 읽도록
 plan 커밋마다 사람용 한 줄 `Summary:` 를 남기고, spec 파일 첫 줄에 사람용 한 줄 설명, 그 다음 줄에 해결하는 문제를 둔다. `gnam status` 는 셋을 그대로 낸다.
 
@@ -71,7 +73,6 @@ trace.topics.<topic>.plans[].summary  plan 의 Summary: 값 (없으면 null)
 
 - `--since` 와 무관하게 현재 spec 파일 · 해당 plan 본문에서 읽는다
 - 스키마 (`--schema`) 에 세 키 추가. schema 판은 그대로 (키 추가)
-- 미구현: `problem` 키 · 스키마 · 이 저장소 spec 의 문제 줄
 
 ## 이전
 
