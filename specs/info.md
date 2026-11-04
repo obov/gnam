@@ -116,7 +116,6 @@ impls       sha · subject · step · deviation · decisions · remaining · def
 
 - 단계 줄 (plan Plan: 절) = `1. 제목` 또는 `S1 제목` · `S1. 제목` (마일스톤 규약의 S 번호, skills/gnam/references/commits/milestone-close.md). n 은 숫자 부분
 - impl Plan: 의 단계 참조 = `3` · `1-3` · `S3` · `S1-S3` · `S1-3` · 하위 단계 `S3a` (단계 3 을 가리킨다). 쉼표 · 공백으로 여러 개
-- 미구현: 단계 줄 · 단계 참조의 S 형식
 - summary 두 키의 형식 · 검사: specs/human-summary.md
 - chores = 그 topic 의 spec.<topic>.chore 커밋 sha · subject · requests. topic 없는 chore · refactor 는 trace.topics."" 아래
 - Topics: 로 여러 topic 을 묶은 수집 plan 은 각 topic 의 plans 에 모두 나타난다

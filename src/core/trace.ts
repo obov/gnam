@@ -142,23 +142,27 @@ function readCommits(cwd: string, boundary: string | null): Commit[] {
   return commits.reverse()
 }
 
-/** '1' · '1-2' · '2, 4' → 단계 번호 */
+/** '1' · '1-2' · '2, 4' · 'S3' · 'S1-S3' · 'S1-3' · 'S3a' (하위 단계 → 3) → 단계 번호 */
 export function stepNumbers(text: string): number[] {
   const numbers: number[] = []
   for (const part of text.split(/[,\s]+/)) {
-    const range = /^(\d+)-(\d+)$/.exec(part)
+    const range = /^S?(\d+)-S?(\d+)$/.exec(part)
+    const single = /^(?:(\d+)|S(\d+)[a-z]?)$/.exec(part)
     if (range !== null) for (let n = Number(range[1]); n <= Number(range[2]); n++) numbers.push(n)
-    else if (/^\d+$/.test(part)) numbers.push(Number(part))
+    else if (single !== null) numbers.push(Number(single[1] ?? single[2]))
   }
   return numbers
 }
+
+/** Plan: 절의 단계 줄 (들여쓰기 없음): '1. 제목' · 'S1 제목' · 'S1. 제목'. 'S1:' · 하위 단계 'S1a.' 는 단계 줄 아님 */
+const STEP_LINE = /^(?:(\d+)\.|S(\d+)\.?)\s+(.*)$/
 
 /** Plan: 절의 번호 단계. 완료: 줄부터 단계 끝까지가 done */
 export function stepsOf(lines: string[] | undefined): Omit<Step, "impls">[] {
   const steps: { n: number; title: string; rest: string[] }[] = []
   for (const line of lines ?? []) {
-    const m = /^(\d+)\.\s+(.*)$/.exec(line)
-    if (m !== null) steps.push({ n: Number(m[1]), title: (m[2] ?? "").trim(), rest: [] })
+    const m = STEP_LINE.exec(line)
+    if (m !== null) steps.push({ n: Number(m[1] ?? m[2]), title: (m[3] ?? "").trim(), rest: [] })
     else steps.at(-1)?.rest.push(line)
   }
   return steps.map(({ n, title, rest }) => {

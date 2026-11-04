@@ -4,7 +4,7 @@ import { test } from "node:test"
 import { expect } from "./expect.ts"
 import { collectTrace, specProblemOf, specSummaryOf, stepNumbers, stepsOf, TraceError } from "../src/core/trace.ts"
 import { tempRepo } from "./helpers.ts"
-import { fixture } from "./trace-fixture.ts"
+import { commit, fixture } from "./trace-fixture.ts"
 
 test("단계 해석: 번호 · 범위 · 완료 줄", () => {
   expect(stepNumbers("1-3")).toEqual([1, 2, 3])
@@ -13,6 +13,50 @@ test("단계 해석: 번호 · 범위 · 완료 줄", () => {
     { n: 1, title: "파서", done: "테스트\n통과" },
     { n: 2, title: "출력", done: null },
   ])
+})
+
+test("단계 해석: S 번호 단계 줄 · 단계 참조 (specs/info.md)", () => {
+  expect(stepNumbers("3")).toEqual([3])
+  expect(stepNumbers("S3")).toEqual([3])
+  expect(stepNumbers("S1-S3")).toEqual([1, 2, 3])
+  expect(stepNumbers("S1-3")).toEqual([1, 2, 3])
+  expect(stepNumbers("S3a")).toEqual([3])
+  expect(stepNumbers("S1, S4b 리뷰 반영")).toEqual([1, 4])
+  expect(stepNumbers("S4 (d) D3")).toEqual([4])
+  expect(stepsOf(["S1. 파서", "   완료: 테스트", "S2 출력", "1. 숫자", "   완료: 숫자 테스트"])).toEqual([
+    { n: 1, title: "파서", done: "테스트" },
+    { n: 2, title: "출력", done: null },
+    { n: 1, title: "숫자", done: "숫자 테스트" },
+  ])
+  // 들여쓰기 · 'S1:' · 하위 단계 줄 · S 뒤 공백 없음은 단계 줄 아님 (앞 단계 본문)
+  expect(stepsOf(["S1 파서", "    S3 버킷", "S2: 파일", "S4a. 하위", "S5x"])).toEqual([{ n: 1, title: "파서", done: null }])
+})
+
+test("trace: S 단계 plan + S 참조 impl → steps[].impls · status done · partial", () => {
+  const repo = tempRepo(null)
+  try {
+    commit(repo, "chore: gnam 도입", { "gnam.json": JSON.stringify({ format: 1, plugins: [] }) })
+    const sPlan = (title: string) =>
+      [`spec.a.plan: ${title}`, "", "Plan:", "S1. 파서", "   완료: 파서 테스트", "S2 출력", "S3. 문서", "", "Blocking: 없음"].join("\n")
+    const p1 = commit(repo, sPlan("전부"))
+    const i1 = commit(repo, `spec.a.impl: 파서 · 출력\n\nPlan: ${p1.slice(0, 7)} S1-S2`)
+    const i2 = commit(repo, `spec.a.impl: 문서 일부\n\nPlan: ${p1.slice(0, 7)} S3a`)
+    const p2 = commit(repo, sPlan("일부"))
+    const i3 = commit(repo, `spec.a.impl: 출력\n\nPlan: ${p2.slice(0, 7)} S2`)
+    const plans = collectTrace(repo.root).topics["a"]?.plans
+    expect(plans?.map((p) => [p.sha, p.status])).toEqual([
+      [p1, "done"],
+      [p2, "partial"],
+    ])
+    expect(plans?.[0]?.steps).toEqual([
+      { n: 1, title: "파서", done: "파서 테스트", impls: [i1] },
+      { n: 2, title: "출력", done: null, impls: [i1] },
+      { n: 3, title: "문서", done: null, impls: [i2] },
+    ])
+    expect(plans?.[1]?.steps.map((s) => s.impls)).toEqual([[], [i3], []])
+  } finally {
+    repo.cleanup()
+  }
 })
 
 test("trace: plan status 4종 · 단계별 impl · supersededBy · 수집 plan", () => {

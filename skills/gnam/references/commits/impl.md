@@ -21,6 +21,7 @@ plan 커밋의 계획을 실제로 실행한 커밋. 어느 계획을 따르는�
 제목          feat|fix(<topic>)[!]: …   type = 수준 (아래 '제목 type')
 trailer       Gnam: spec.<topic>.impl
               Plan: <plan 커밋 hash> <단계> (한 줄). 같은 spec 에 계획이 여러 번 쌓여도 어느 것인지 고정
+              <단계> = `3` · `1-3` · `S3` · `S1-S3` · `S1-3` · 하위 단계 `S3a` (= 단계 3). 쉼표 · 공백으로 여러 개
               Plan 은 같은 topic 의 plan, 또는 Topics 에 이 topic 을 포함한 수집 plan (commits/collect-plan.md)
               그 plan 은 Blocking: 없음 (착수 가능 조건 1)
 spec          반영한 요구사항의 미구현: 표기를 같은 커밋에서 지운다
