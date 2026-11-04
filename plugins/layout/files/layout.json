@@ -1,0 +1,6 @@
+{
+  "structure": [
+    { "name": "*" },
+    { "name": "*", "children": [] }
+  ]
+}

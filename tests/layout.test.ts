@@ -304,3 +304,67 @@ test("커밋 검사: 새 위반만 · warn / block · 필수 파일 삭제 · la
     repo.cleanup()
   }
 })
+
+test("명령 · status: plugin add scaffold · where (없는 경로) · capture → check 0 · rules 탭 · enforce 형식", async () => {
+  const { existsSync, mkdirSync, readFileSync, writeFileSync } = await import("node:fs")
+  const { dirname, join } = await import("node:path")
+  const { tempRepo } = await import("./helpers.ts")
+  const repo = tempRepo()
+  const write = (path: string) => {
+    mkdirSync(dirname(join(repo.root, path)), { recursive: true })
+    writeFileSync(join(repo.root, path), path)
+  }
+  try {
+    writeFileSync(join(repo.root, ".gitignore"), "node_modules\n")
+    expect(repo.gnam("plugin", "add", "layout").status).toBe(0)
+    expect(existsSync(join(repo.root, ".gnam/layout.json"))).toBe(true)
+    expect(readFileSync(join(repo.root, "AGENTS.md"), "utf8")).toContain("### layout (폴더 구조)")
+    for (const f of ["src/plugins/lore/index.ts", "src/plugins/lore/lore.ts", "src/plugins/run/index.ts", "src/plugins/run/usage.ts", "src/cli.ts"]) write(f)
+
+    const captured = repo.gnam("run", "layout", "capture", "src")
+    expect(captured.status).toBe(0)
+    const fragment = JSON.parse(captured.out) as unknown[]
+    expect(fragment).toEqual([
+      {
+        name: "src",
+        children: [
+          { name: "cli.ts" },
+          { name: "plugins", children: [{ name: "{kebab-case}", enforceExistence: ["index.ts"], children: [{ name: "{kebab-case}.ts" }] }] },
+        ],
+      },
+    ])
+    writeFileSync(
+      join(repo.root, ".gnam/layout.json"),
+      JSON.stringify({ structureRoot: "src", structure: { children: (fragment[0] as { children: unknown[] }).children } }),
+    )
+    const check = repo.gnam("run", "layout", "check")
+    expect(check.out).toBe("layout 위반 없음\n")
+    expect(check.status).toBe(0)
+
+    const where = repo.gnam("run", "layout", "where", "src/plugins/lore/utils/x.ts")
+    expect(where.status).toBe(1)
+    expect(where.out).toContain("허용 안 함 (layout/unlisted)")
+    expect(where.out).toContain("이동 후보: src/plugins/lore/x.ts")
+    const okWhere = JSON.parse(repo.gnam("run", "layout", "where", "src/plugins/new-one/a.ts", "--json").out) as Record<string, unknown>
+    expect(okWhere["ok"]).toBe(true)
+    expect(okWhere["requires"]).toEqual(["src/plugins/new-one/index.ts"])
+    expect(repo.gnam("run", "layout", "show").out).toContain("{kebab-case}/   requires index.ts")
+
+    write("src/plugins/Bad.md")
+    const status = JSON.parse(repo.gnam("status", "--json", "--deep").out) as {
+      plugins: { layout: { sections: { rules: unknown; violations: unknown } } }
+      views: { id: string }[]
+    }
+    expect(status.plugins.layout.sections.rules).toEqual([])
+    expect(status.plugins.layout.sections.violations).toEqual([{ rule: "layout/unlisted", path: "src/plugins/Bad.md", level: "warn" }])
+    expect(status.views.map((v) => v.id)).toContain("layout-rules")
+    expect(repo.gnam("status").out).toContain("layout 위반 1 (warn)")
+
+    writeFileSync(join(repo.root, "gnam.json"), JSON.stringify({ format: 1, plugins: ["@gnam/layout"], layout: { enforce: "stop" } }))
+    const bad = repo.gnam("run", "layout", "check")
+    expect(bad.status).not.toBe(0)
+    expect(bad.err).toContain('layout: enforce = "warn" | "block"')
+  } finally {
+    repo.cleanup()
+  }
+})
