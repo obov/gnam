@@ -224,6 +224,47 @@ test('요청 탭: 상태 분포 · 필터 (f · 누름) · sha · ×by, 요청 0
   assert.equal(on.tree.root.findAll(n => n.props.id === 'tab:requests').length, 1)
 })
 
+test('사용자 정의 view 탭 (list · table · progress · 데이터 없음) · plugin 탭, 탭 10개 넘으면 숫자 없음', async () => {
+  const { tree, c, key } = await mount()
+  const tabIds = nodes(tree).filter(n => String(n.props.id).startsWith('tab:')).map(n => n.props.id)
+  assert.deepEqual(tabIds, ['tab:overview', 'tab:decisions', 'tab:requests', 'tab:history', 'tab:commits', 'tab:items', 'tab:view:risks', 'tab:view:builtins', 'tab:view:run-goals', 'tab:view:gone', 'tab:plugins'])
+  assert.equal(textOf(byId(tree, 'tab:view:gone')!), '사라짐', '10번째 탭은 숫자 없음')
+  assert.equal(textOf(byId(tree, 'tab:view:run-goals')!), '9 목표')
+  const rows = () => nodes(tree).filter(n => String(n.props.id).startsWith('row:view:'))
+
+  // list: where kind=risk → 1행, badge · title · meta
+  await key('7')
+  assert.equal(c.getState().tab, 'view:risks')
+  assert.equal(rows().length, 1)
+  const risk = texts({ toJSON: () => rows()[0]! } as ReactTestRenderer)
+  assert.deepEqual(risk, ['risk', '토큰 만료', 'aaaaaaa1'])
+  assert.match(textOf(byId(tree, 'view:source')!), /trace\.items · kind=risk · 전체 3 중/)
+
+  // table: 열 머리 2개, 행 = builtins 수, 칸 값
+  await key('8')
+  assert.deepEqual(texts({ toJSON: () => byId(tree, 'view:columns')! } as ReactTestRenderer), ['id', 'active'])
+  assert.equal(rows().length, 2)
+  assert.deepEqual(texts({ toJSON: () => rows()[0]! } as ReactTestRenderer), ['lore', 'false'])
+  await key('j')
+  assert.equal(c.getState().cursor['view:builtins'], 1)
+
+  // progress: 행마다 done/total
+  await key('9')
+  assert.equal(rows().length, 2)
+  assert.deepEqual(texts({ toJSON: () => rows()[0]! } as ReactTestRenderer), ['측정', '1/2'])
+
+  // 데이터 없음 (plugin 꺼짐)
+  await key('right')
+  assert.equal(c.getState().tab, 'view:gone')
+  assert.match(textOf(byId(tree, 'view:missing')!), /데이터 없음: plugins\.lore\.sections\.entries/)
+
+  // plugin 탭: 버전 · 종류 · 명령 describe · 섹션 트리
+  await key('right')
+  assert.equal(c.getState().tab, 'plugins')
+  const run = texts({ toJSON: () => byId(tree, 'row:plugin:run')! } as ReactTestRenderer)
+  for (const x of ['run', 'v0.1.0', 'builtin', 'stats', 'table | health  run 커밋 집계', '섹션 goals', '├─ 2개', '└─ 집계 · done=3 · total=3']) assert.ok(run.includes(x), x)
+})
+
 test('r 은 강제 새로고침, 읽기 실패 시 기존 화면 + 오류 1줄', async () => {
   const { tree, c, repo, key } = await mount()
   repo.fail = true

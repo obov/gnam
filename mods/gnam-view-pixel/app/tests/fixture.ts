@@ -24,7 +24,21 @@ export const STATUS = {
   schema: 1,
   gnam: { version: '0.8.0', root: '/repo', source: 'package', format: 2 },
   project: '/repo',
-  plugins: { run: { kind: 'builtin', version: '0.1.0', commands: [{ name: 'stats', describe: 'table | health  run 커밋 집계', json: false }] } },
+  plugins: {
+    run: {
+      kind: 'builtin',
+      version: '0.1.0',
+      commands: [{ name: 'stats', describe: 'table | health  run 커밋 집계', json: false }],
+      skills: ['gnam-run'],
+      sections: { goals: [{ name: '측정', done: 1, total: 2 }, { name: '집계', done: 3, total: 3 }] },
+    },
+  },
+  views: [
+    { id: 'risks', title: '위험', source: 'trace.items', where: { kind: 'risk' }, view: 'list', fields: { title: 'text', badge: 'kind', meta: 'sha' }, icon: null, owner: 'project' },
+    { id: 'builtins', title: '내장', source: 'builtins', where: {}, view: 'table', fields: { columns: ['id', 'active'] }, icon: null, owner: 'project' },
+    { id: 'run-goals', title: '목표', source: 'plugins.run.sections.goals', where: {}, view: 'progress', fields: { title: 'name' }, icon: null, owner: 'run' },
+    { id: 'gone', title: '사라짐', source: 'plugins.lore.sections.entries', where: {}, view: 'list', fields: {}, icon: null, owner: 'lore' },
+  ],
   builtins: [
     { id: 'lore', active: false, requires: [] },
     { id: 'run', active: true, requires: [] },

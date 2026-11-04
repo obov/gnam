@@ -1,5 +1,5 @@
 // 화면 상태 · 키 처리 · 갱신. React 밖의 작은 store (useSyncExternalStore 로 읽는다).
-import type { Loader, Model, Request } from './model.ts'
+import { applyWhere, rowsOf, type Loader, type Model, type Request, type ViewDef } from './model.ts'
 import { makeTheme, type TerminalColors, type Theme } from './theme.ts'
 
 export type TabId = string
@@ -15,9 +15,31 @@ export const TABS: Tab[] = [
   { id: 'items', label: '항목' },
 ]
 
-/** 이 모델에서 보이는 탭 (순서 = 숫자 키) */
+/**
+ * 이 모델에서 보이는 탭 (순서 = 숫자 키 1-9, 10번째부터 Tab · ←/→):
+ * 고정 탭 → 사용자 정의 view (프로젝트 · plugin) → plugin (켜진 plugin 이 있을 때)
+ */
 export function tabsOf(m: Model | null): Tab[] {
-  return TABS.filter(t => t.id !== 'requests' || m?.hasRequests === true)
+  return [
+    ...TABS.filter(t => t.id !== 'requests' || m?.hasRequests === true),
+    ...(m?.views ?? []).map(v => ({ id: `view:${v.id}`, label: v.title })),
+    ...(m?.plugins.length ? [{ id: 'plugins', label: 'plugin' }] : []),
+  ]
+}
+
+/** view 탭에 그리는 최대 행 */
+export const VIEW_ROWS = 200
+
+export function viewOf(m: Model | null, tab: TabId): ViewDef | null {
+  return tab.startsWith('view:') ? (m?.views.find(v => `view:${v.id}` === tab) ?? null) : null
+}
+
+/** view 의 행 (where 적용). data 가 없으면 null */
+export function viewRows(m: Model, def: ViewDef): { all: number; rows: unknown[] } | null {
+  const data = m.viewData[def.id]
+  if (data === undefined) return null
+  const all = rowsOf(data)
+  return { all: all.length, rows: applyWhere(all, def.where) }
 }
 
 /** 요청 상태 (순서 = 필터 순환) */
@@ -92,7 +114,11 @@ export function rowCount(s: State, tab: TabId = s.tab): number {
       return m.items.length
     case 'requests':
       return requestRows(s).length
+    case 'plugins':
+      return m.plugins.length
   }
+  const def = viewOf(m, tab)
+  if (def) return Math.min(VIEW_ROWS, viewRows(m, def)?.rows.length ?? 0)
   return 0
 }
 

@@ -90,12 +90,39 @@ export type Problem = { source: string | null; text: string }
 
 export type Purpose = { title: string | null; tagline: string | null; text: string | null; from: string | null }
 
-export type PluginInfo = { id: string; version: string; kind: string }
+export type SectionRow = { name: string; lines: string[] }
+export type PluginInfo = {
+  id: string
+  version: string
+  kind: string
+  commands: { name: string; describe: string }[]
+  skills: string[]
+  /** status 섹션을 몇 줄로 요약 (트리) */
+  sections: SectionRow[]
+  error: string | null
+}
+
+/** 탭 정의 (status views, specs/view.md) */
+export type ViewDef = {
+  id: string
+  title: string
+  source: string
+  where: Record<string, string | number | boolean | null>
+  view: 'list' | 'table' | 'progress'
+  fields: Record<string, string | string[]>
+  icon: string | null
+  /** project (gnam.json) | <plugin id> */
+  owner: string
+}
 
 export type Model = {
   project: string
   /** 켜진 plugin (status plugins) */
   plugins: PluginInfo[]
+  /** 사용자 정의 탭 (프로젝트 먼저, 그다음 plugin) */
+  views: ViewDef[]
+  /** view id → source 값 (없으면 undefined: plugin 꺼짐 · 경로 바뀜) */
+  viewData: Record<string, unknown>
   branch: string | null
   head: string | null
   gnamVersion: string | null
@@ -242,6 +269,85 @@ export function specDetail(text: string | null): string | null {
   return out.length ? out.join(' ').replace(/\*\*|__|`/g, '') : null
 }
 
+/** 점 경로 (숫자 = 배열 인덱스). 없으면 undefined */
+export function getPath(value: unknown, path: string): unknown {
+  let cur: unknown = value
+  for (const key of path.split('.').filter(Boolean)) {
+    if (cur === null || typeof cur !== 'object') return undefined
+    cur = (cur as Json)[key]
+  }
+  return cur
+}
+
+/** 원소 목록: 배열은 그대로, 객체는 { key, ...값 } (값이 스칼라면 { key, value }) */
+export function rowsOf(data: unknown): unknown[] {
+  if (Array.isArray(data)) return data
+  if (data !== null && typeof data === 'object')
+    return Object.entries(data as Json).map(([key, v]) => (v !== null && typeof v === 'object' && !Array.isArray(v) ? { key, ...(v as Json) } : { key, value: v }))
+  return []
+}
+
+/** gnam status --where 와 같은 비교: JSON 스칼라의 문자열 표현 */
+export function applyWhere(rows: unknown[], where: ViewDef['where']): unknown[] {
+  const entries = Object.entries(where)
+  if (entries.length === 0) return rows
+  return rows.filter(row => entries.every(([k, v]) => String(getPath(row, k) ?? null) === String(v)))
+}
+
+/** 값 한 줄: 스칼라는 첫 줄, 배열은 'N개', 객체는 대표 문자열 키 */
+export function show(x: unknown): string {
+  if (x === null || x === undefined) return ''
+  if (typeof x !== 'object') return String(x).split('\n')[0] ?? ''
+  if (Array.isArray(x)) return `${x.length}개`
+  const o = x as Json
+  const head = ['title', 'subject', 'summary', 'text', 'name', 'id', 'file', 'key'].find(k => typeof o[k] === 'string')
+  return head ? String(o[head]) : `{${Object.keys(o).length}}`
+}
+
+/** plugin 섹션 원소 한 줄 (모양과 무관) */
+function oneLine(x: unknown): string {
+  if (x === null || x === undefined) return '-'
+  if (typeof x !== 'object') return String(x)
+  if (Array.isArray(x)) return `${x.length}개`
+  const o = x as Json
+  const head = ['title', 'subject', 'summary', 'text', 'name', 'id', 'file', 'topic'].find(k => typeof o[k] === 'string')
+  const rest = Object.entries(o)
+    .filter(([k, v]) => k !== head && (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') && String(v).length < 40)
+    .slice(0, 3)
+    .map(([k, v]) => `${k}=${v}`)
+  return [head ? String(o[head]) : null, ...rest].filter(Boolean).join(' · ') || `{${Object.keys(o).length}}`
+}
+
+function sectionRows(sections: unknown): SectionRow[] {
+  if (sections === null || typeof sections !== 'object') return []
+  return Object.entries(sections as Json).map(([name, v]) => {
+    if (Array.isArray(v)) return { name, lines: [`${v.length}개`, ...v.slice(0, 12).map(oneLine)] }
+    if (v !== null && typeof v === 'object') return { name, lines: Object.entries(v as Json).slice(0, 12).map(([k, x]) => `${k}: ${oneLine(x)}`) }
+    return { name, lines: [oneLine(v)] }
+  })
+}
+
+const VIEW_KINDS = ['list', 'table', 'progress']
+
+/** status views, 없으면 (gnam 0.4 이하) gnam.json view.tabs 원문을 느슨하게 */
+function viewDefs(s: Json): ViewDef[] {
+  const norm = (t: Json, owner: string): ViewDef | null =>
+    t && typeof t.id === 'string' && typeof t.title === 'string' && typeof t.source === 'string'
+      ? {
+          id: t.id,
+          title: t.title,
+          source: t.source,
+          where: t.where && typeof t.where === 'object' ? t.where : {},
+          view: VIEW_KINDS.includes(t.view) ? t.view : 'list',
+          fields: t.fields && typeof t.fields === 'object' ? t.fields : {},
+          icon: typeof t.icon === 'string' ? t.icon : null,
+          owner: typeof t.owner === 'string' ? t.owner : owner,
+        }
+      : null
+  const list = Array.isArray(s.views) ? s.views : arr(s.config?.raw?.view?.tabs)
+  return list.map((t: Json) => norm(t, 'project')).filter((x: ViewDef | null): x is ViewDef => x !== null)
+}
+
 const DECISION_LINE = /^\s*[-*]?\s*(D\d+\s*[:.].*)$/
 
 function decisionLines(text: unknown): string[] {
@@ -378,11 +484,22 @@ export function buildModel(raw: Raw): Model {
   const requests: Request[] = arr(trace.requests).map(r => ({ sha: String(r.sha ?? ''), subject: stripPrefix(String(r.subject ?? '')), status: String(r.status ?? 'open'), by: Array.isArray(r.by) ? r.by.length : 0 }))
   const stepsLive = [...now, ...next].filter(n => !topics[n]!.needsPlan).map(n => topics[n]!.progress)
 
+  const views = viewDefs(s)
   let purpose = parsePurpose(raw.readme, raw.readmePath)
   if (!purpose.text && raw.pkgDescription) purpose = { ...purpose, text: raw.pkgDescription, from: 'package.json' }
 
   return {
-    plugins: Object.entries((s.plugins ?? {}) as Record<string, Json>).map(([id, p]) => ({ id, version: String(p?.version ?? '?'), kind: String(p?.kind ?? '?') })),
+    plugins: Object.entries((s.plugins ?? {}) as Record<string, Json>).map(([id, p]) => ({
+      id,
+      version: String(p?.version ?? '?'),
+      kind: String(p?.kind ?? '?'),
+      commands: arr(p?.commands).map(c => ({ name: String(c.name ?? ''), describe: String(c.describe ?? '') })),
+      skills: strs(p?.skills).length ? strs(p?.skills) : arr(p?.skills).map(x => String(x.name ?? x.id ?? '')),
+      sections: sectionRows(p?.sections),
+      error: str(p?.error),
+    })),
+    views,
+    viewData: Object.fromEntries(views.map(v => [v.id, getPath(s, v.source)])),
     project: (typeof s.project === 'string' ? s.project : raw.cwd).split('/').filter(Boolean).at(-1) ?? raw.cwd,
     branch: str(s.env?.branch),
     head: str(trace.head),

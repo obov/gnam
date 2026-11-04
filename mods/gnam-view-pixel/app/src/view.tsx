@@ -1,9 +1,9 @@
 // 화면. 첫 화면 = 목적 → 진행 → 지금 → 다음 → 구현된 기능, topic 펼침 = 문제 → 해결 → 이력 → 세부.
 import { useEffect, useRef, useSyncExternalStore, type ReactNode } from 'react'
 
-import { signals, type Commit, type Decision, type Item, type Model, type Plan, type Topic } from './model.ts'
+import { getPath, show, signals, type Commit, type Decision, type Item, type Model, type Plan, type Topic, type ViewDef } from './model.ts'
 import { Box, Text, type Color, type NodeHandle, type Style } from './pixel.ts'
-import { COMMIT_ROWS, REQUEST_STATUSES, cursorOf, filterOf, filterValues, overviewRows, requestRows, tabsOf, type Controller, type State } from './store.ts'
+import { COMMIT_ROWS, REQUEST_STATUSES, VIEW_ROWS, cursorOf, filterOf, filterValues, overviewRows, requestRows, tabsOf, viewOf, viewRows, type Controller, type State } from './store.ts'
 import type { Rgba, Theme } from './theme.ts'
 
 const SANS = ['sans-serif']
@@ -707,6 +707,191 @@ function Requests({ th, s, c }: { th: Theme; s: State; c: Controller }) {
   )
 }
 
+// ---------- 사용자 정의 view (specs/view.md: list · table · progress) ----------
+
+const scalarKeys = (row: unknown): string[] =>
+  row !== null && typeof row === 'object' ? Object.keys(row as Record<string, unknown>).filter(k => { const v = (row as Record<string, unknown>)[k]; return v === null || typeof v !== 'object' }) : []
+const firstStringKey = (row: unknown): string | undefined =>
+  row !== null && typeof row === 'object' ? Object.keys(row as Record<string, unknown>).find(k => typeof (row as Record<string, unknown>)[k] === 'string') : undefined
+const fieldOf = (d: ViewDef, name: string): string | undefined => (typeof d.fields[name] === 'string' ? (d.fields[name] as string) : undefined)
+const num = (x: unknown): number => (Array.isArray(x) ? x.length : typeof x === 'number' ? x : typeof x === 'boolean' ? Number(x) : Number(x) || 0)
+/** 글자 폭 (em 합) */
+const textEm = (s: string) => [...s].reduce((a, ch) => a + charEm(ch), 0)
+
+function ViewTab({ th, s, c, d }: { th: Theme; s: State; c: Controller; d: ViewDef }) {
+  const m = s.model!
+  const data = viewRows(m, d)
+  const where = Object.entries(d.where).map(([k, v]) => `${k}=${String(v)}`).join(', ')
+  const owner = d.owner === 'project' ? '프로젝트 (gnam.json)' : `plugin ${d.owner}`
+  const head = (
+    <Box style={{ flexDirection: 'column', gap: 2 }}>
+      <SectionHead th={th} title={d.title} count={data?.rows.length} id="view:head" note={`${owner} · ${d.view}`} />
+      <T th={th} size="tiny" color={th.faint} mono line id="view:source">
+        {`${d.source}${where ? ` · ${where}` : ''}${data && data.rows.length !== data.all ? ` · 전체 ${data.all} 중` : ''}`}
+      </T>
+    </Box>
+  )
+  if (!data)
+    return (
+      <Box style={{ flexDirection: 'column', gap: th.space }}>
+        {head}
+        <T th={th} size="small" color={th.yellow} id="view:missing">
+          {`데이터 없음: ${d.source} (plugin 이 꺼졌거나 경로가 바뀜)`}
+        </T>
+      </Box>
+    )
+  const rows = data.rows.slice(0, VIEW_ROWS)
+  const more = data.rows.length - rows.length
+  const sel = (i: number) => s.tab === `view:${d.id}` && cursorOf(s) === i
+  let body: ReactNode
+  if (rows.length === 0)
+    body = (
+      <T th={th} size="small" color={th.faint}>
+        항목 없음
+      </T>
+    )
+  else if (d.view === 'table') {
+    const columns = Array.isArray(d.fields.columns) ? (d.fields.columns as string[]) : scalarKeys(rows[0]).slice(0, 4)
+    // 열 폭 = 머리 · 앞 50행 값 중 가장 긴 것 (4-36 em) 비율. 넘치는 칸은 말줄임
+    const weight = columns.map(col => Math.min(36, Math.max(4, textEm(col), ...rows.slice(0, 50).map(r => textEm(show(getPath(r, col)))))))
+    const cells = (vals: string[], opts: { bold?: boolean; color?: Rgba }) =>
+      vals.map((v, k) => (
+        <Box key={k} style={{ flexGrow: weight[k]!, flexShrink: 1, flexBasis: 0, minWidth: 0 }}>
+          <T th={th} size="small" color={opts.color} bold={opts.bold} line>
+            {v}
+          </T>
+        </Box>
+      ))
+    body = (
+      <Box id="view:table" style={{ flexDirection: 'column', gap: 2 }}>
+        <Box id="view:columns" style={{ flexDirection: 'row', gap: th.space * 2, padding: { top: 0, bottom: th.space * 0.6, left: th.space * 1.5, right: th.space * 1.5 }, border: { bottom: [1, th.hairline] } }}>
+          {cells(columns, { bold: true, color: th.muted })}
+        </Box>
+        {rows.map((r, i) => (
+          <ListRow key={i} th={th} index={i} id={`row:view:${i}`} selected={sel(i)} onClick={() => c.moveTo(i)}>
+            <Box style={{ flexDirection: 'row', gap: th.space * 2, width: '100%' }}>{cells(columns.map(col => show(getPath(r, col))), {})}</Box>
+          </ListRow>
+        ))}
+      </Box>
+    )
+  } else if (d.view === 'progress') {
+    const titleKey = fieldOf(d, 'title') ?? firstStringKey(rows[0]) ?? 'key'
+    body = rows.map((r, i) => {
+      const done = num(getPath(r, fieldOf(d, 'done') ?? 'done'))
+      const total = Math.max(done, num(getPath(r, fieldOf(d, 'total') ?? 'total')))
+      return (
+        <ListRow key={i} th={th} index={i} id={`row:view:${i}`} selected={sel(i)} onClick={() => c.moveTo(i)}>
+          <Box style={{ flexDirection: 'row', gap: th.space * 1.5, alignItems: 'center', width: '100%' }}>
+            <T th={th} size="small" line grow>
+              {show(getPath(r, titleKey))}
+            </T>
+            <Bar th={th} done={done} total={total} width={th.size.body * 8} color={total > 0 && done >= total ? th.green : th.accent} />
+            <Box style={{ width: th.size.small * 3.4, flexShrink: 0, flexDirection: 'row', justifyContent: 'end' }}>
+              <T th={th} size="small" color={th.faint} mono>
+                {`${done}/${total}`}
+              </T>
+            </Box>
+          </Box>
+        </ListRow>
+      )
+    })
+  } else {
+    const titleKey = fieldOf(d, 'title') ?? firstStringKey(rows[0])
+    const badgeKey = fieldOf(d, 'badge')
+    const metaKey = fieldOf(d, 'meta')
+    const detailKey = fieldOf(d, 'detail')
+    body = rows.map((r, i) => {
+      const badge = badgeKey ? show(getPath(r, badgeKey)) : ''
+      const detail = detailKey ? show(getPath(r, detailKey)) : ''
+      return (
+        <ListRow key={i} th={th} index={i} id={`row:view:${i}`} selected={sel(i)} onClick={() => c.moveTo(i)}>
+          <Box style={{ flexDirection: 'row', gap: th.space, alignItems: 'center', width: '100%' }}>
+            {badge ? <Chip th={th} text={badge} fg={th.muted} bg={th.card} /> : null}
+            <T th={th} size="small" line grow>
+              {titleKey ? show(getPath(r, titleKey)) : show(r)}
+            </T>
+            {metaKey ? (
+              <T th={th} size="tiny" color={th.faint} mono line>
+                {show(getPath(r, metaKey))}
+              </T>
+            ) : null}
+          </Box>
+          {detail ? (
+            <T th={th} size="tiny" color={th.muted} line>
+              {detail}
+            </T>
+          ) : null}
+        </ListRow>
+      )
+    })
+  }
+  return (
+    <Box style={{ flexDirection: 'column', gap: 2 }}>
+      {head}
+      <Box style={{ flexDirection: 'column', gap: 2, margin: { top: th.space, bottom: 0, left: 0, right: 0 } }}>{body}</Box>
+      {more > 0 ? (
+        <T th={th} size="tiny" color={th.faint}>
+          {`… 외 ${more}개`}
+        </T>
+      ) : null}
+    </Box>
+  )
+}
+
+// ---------- plugin ----------
+
+function Plugins({ th, s, c }: { th: Theme; s: State; c: Controller }) {
+  const m = s.model!
+  return (
+    <Box style={{ flexDirection: 'column', gap: th.space * 0.6 }}>
+      <SectionHead th={th} title="켜진 plugin" count={m.plugins.length} id="plugins:head" note="gnam.json plugins · 명령은 gnam run <plugin> <명령>" />
+      {m.plugins.map((p, i) => (
+        <ListRow key={p.id} th={th} index={i} id={`row:plugin:${p.id}`} selected={s.tab === 'plugins' && cursorOf(s) === i} onClick={() => c.moveTo(i)}>
+          <Box style={{ flexDirection: 'row', gap: th.space, alignItems: 'center', width: '100%' }}>
+            <T th={th} bold mono line>
+              {p.id}
+            </T>
+            <T th={th} size="tiny" color={th.faint} mono line>
+              {`v${p.version}`}
+            </T>
+            <Chip th={th} text={p.kind} fg={th.muted} bg={th.card} />
+            <T th={th} size="tiny" color={th.faint} line grow>
+              {p.skills.length ? `skill ${p.skills.join(' · ')}` : ''}
+            </T>
+          </Box>
+          {p.error ? (
+            <T th={th} size="small" color={th.red} block>
+              {p.error}
+            </T>
+          ) : null}
+          {p.commands.map(cmd => (
+            <Box key={cmd.name} style={{ flexDirection: 'row', gap: th.space * 1.5, width: '100%', padding: { top: 0, bottom: 0, left: th.space * 2, right: 0 } }}>
+              <T th={th} size="small" mono line style={{ width: th.size.small * 6 }}>
+                {cmd.name}
+              </T>
+              <T th={th} size="small" color={th.muted} line grow>
+                {cmd.describe}
+              </T>
+            </Box>
+          ))}
+          {p.sections.map(sec => (
+            <Box key={sec.name} style={{ flexDirection: 'column', gap: 1, width: '100%', padding: { top: th.space * 0.4, bottom: 0, left: th.space * 2, right: 0 } }}>
+              <T th={th} size="tiny" color={th.faint} bold>
+                {`섹션 ${sec.name}`}
+              </T>
+              {sec.lines.map((l, k) => (
+                <T key={k} th={th} size="tiny" color={th.muted} mono line>
+                  {`${k === sec.lines.length - 1 ? '└─' : '├─'} ${l}`}
+                </T>
+              ))}
+            </Box>
+          ))}
+        </ListRow>
+      ))}
+    </Box>
+  )
+}
+
 const ITEM_LABEL: Record<string, string> = { risk: '위험', remaining: '남은 일', deferred: '미룸', open: '미결', blocking: '막힘' }
 
 function Items({ th, s, c }: { th: Theme; s: State; c: Controller }) {
@@ -819,6 +1004,8 @@ export function App({ controller, now = Date.now }: { controller: Controller; no
   else if (s.tab === 'history') body = <History th={th} s={s} c={controller} now={t} />
   else if (s.tab === 'commits') body = <Commits th={th} s={s} c={controller} now={t} />
   else if (s.tab === 'requests') body = <Requests th={th} s={s} c={controller} />
+  else if (s.tab === 'plugins') body = <Plugins th={th} s={s} c={controller} />
+  else if (viewOf(s.model, s.tab)) body = <ViewTab th={th} s={s} c={controller} d={viewOf(s.model, s.tab)!} />
   else body = <Items th={th} s={s} c={controller} />
 
   return (
