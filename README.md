@@ -77,8 +77,33 @@ export default definePlugin({
   ],
   agentsMd: "agents.md",                     // AGENTS.md gnam 블록에 들어갈 조각
   scaffold: { "docs/README.md": "files/README.md" },
+  status: { sections: { pages: {             // gnam status 의 plugins.docs.sections.pages
+    describe: "문서 목록",
+    collect: (ctx) => [{ path: "docs/a.md", state: "draft" }],
+    view: { title: "문서", view: "list", fields: { title: "path", badge: "state" } },  // 탭 정의 (specs/view.md)
+  } } },
 })
 ```
+
+### 탭 정의 (view)
+
+`gnam status` 의 `views` 가 화면 도구 (gnam-view 등) 에 보여 줄 탭 목록이다. plugin 은 섹션의 `view` 로, 프로젝트는 gnam.json `view.tabs` 로 더한다.
+
+```json
+{ "view": { "tabs": [
+  { "id": "risks", "title": "위험", "source": "trace.items", "where": { "kind": "risk" }, "view": "list",
+    "fields": { "title": "text", "badge": "kind", "meta": "sha" } }
+] } }
+```
+
+| 키 | 내용 |
+|---|---|
+| `source` | status 경로 (`gnam status <경로>` 문법) |
+| `where` | 거르기 `{ 키: 스칼라 }` (AND, `--where` 와 같은 비교) |
+| `view` | `list` · `table` · `progress` |
+| `fields` | `title` · `badge` · `meta` · `detail` · `done` · `total` · `columns` |
+
+잘못된 정의는 `views` 에서 빠지고 `problems` 에 남는다. 커밋 검사에는 영향 없음. 탭 보이기 · 순서 같은 개인 화면 설정은 화면 도구가 저장한다.
 
 ```bash
 npx gnam plugin add ./gnam-plugins/docs
