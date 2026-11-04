@@ -76,7 +76,7 @@ function planSteps(body: string): string[] {
   return steps.map((step) => step.join("\n"))
 }
 
-export type Lookup = Omit<CommitContext, "message" | "subject" | "body" | "plugins" | "cwd" | "view" | "config"> &
+export type Lookup = Omit<CommitContext, "message" | "subject" | "body" | "plugins" | "active" | "cwd" | "view" | "config"> &
   Partial<Pick<CommitContext, "cwd" | "view" | "config">>
 
 /** 커밋 하나 검사. plugins = 활성 plugin (loader.ts) */
@@ -90,6 +90,7 @@ export function validateCommit(input: Lookup & { message: string }, plugins: Gna
     subject,
     body: rest.join("\n").trim(),
     plugins: plugins.map((p) => p.id),
+    active: plugins,
   }
   const violations: Violation[] = []
   for (const line of ctx.message.split("\n")) {

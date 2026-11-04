@@ -79,7 +79,7 @@ async function verify(project: string, args: string[]): Promise<number> {
     if (violations.some(isError)) failed = true
   }
   const files = nulList(gitOrThrow(["ls-files", "-z", "--cached", "--others", "--exclude-standard"], project))
-  const fileViolations: Violation[] = plugins.flatMap((p) => p.verify?.(project, files, config) ?? [])
+  const fileViolations: Violation[] = plugins.flatMap((p) => p.verify?.(project, files, config, plugins) ?? [])
   if (fileViolations.length > 0) report.push(format(fileViolations))
   if (fileViolations.some(isError)) failed = true
   if (report.length > 0) console.error(report.join("\n\n===\n\n"))

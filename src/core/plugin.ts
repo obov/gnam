@@ -36,6 +36,8 @@ export interface CommitContext {
   isAncestor: (hash: string) => boolean
   /** 활성 plugin id 목록 */
   plugins: string[]
+  /** 활성 plugin (validateCommit 이 채운다). 다른 plugin 이 준 선언 (layout 규칙 등) 을 읽을 때 */
+  active?: GnamPlugin[]
   /**
    * plan 의 Summary: 를 검사하는가. hook · 범위 verify = true,
    * 전체 verify = 조상에 Summary 가 있는 plan 이 있을 때만 (도입 전 history 면제). 없으면 true
@@ -108,8 +110,8 @@ export interface GnamPlugin {
   kinds?: CommitKind[]
   /** 모든 커밋에 덧붙이는 검사. owner = 그 커밋 제목을 맡은 종류의 소유자 ("core" 또는 plugin id) */
   everyCommit?(ctx: CommitContext, owner: string): Violation[]
-  /** gnam verify 의 저장소 파일 검사. files = git 추적 · 미추적 (무시 제외) 파일 */
-  verify?(cwd: string, files: string[], config: GnamConfig): Violation[]
+  /** gnam verify 의 저장소 파일 검사. files = git 추적 · 미추적 (무시 제외) 파일, plugins = 활성 plugin */
+  verify?(cwd: string, files: string[], config: GnamConfig, plugins: GnamPlugin[]): Violation[]
   /** gnam.json 의 이 plugin 설정 (config[id]) 형식 문제 */
   configProblems?(value: unknown): string[]
   /** gnam run <id> <name> */
@@ -133,6 +135,20 @@ export interface GnamPlugin {
   configDefaults?: unknown
   /** 이 plugin 이 내는 검사 규칙 (gnam status rules) */
   rules?: RuleMeta[]
+  /** layout plugin 에 주는 재사용 규칙 · 정규식 파라미터. 참조 = <plugin id>.<이름> (specs/layout.md) */
+  layout?: {
+    rules?: Record<string, LayoutRule>
+    regexParameters?: Record<string, string>
+  }
+}
+
+/** .gnam/layout.json 의 노드 (specs/layout.md 'Rule') */
+export interface LayoutRule {
+  name?: string
+  children?: LayoutRule[]
+  enforceExistence?: string | string[]
+  ruleId?: string
+  folderRecursionLimit?: number
 }
 
 export function definePlugin(plugin: GnamPlugin): GnamPlugin {
