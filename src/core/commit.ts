@@ -30,6 +30,34 @@ export function readyOf(body: string): boolean | null {
   return (match[1] ?? "").trim() === "없음"
 }
 
+export const SUMMARY_MAX = 120
+
+/**
+ * plan 본문 Summary: 검사. 문제 설명 · 없으면 null.
+ * 한 줄 = 'Summary: 값' 다음 줄부터 빈 줄 · 다음 필드 머리 전까지 내용이 없어야 한다
+ */
+export function summaryProblem(body: string): string | null {
+  const lines = body.split("\n")
+  const at = lines.findIndex((line) => /^Summary:/.test(line))
+  if (at < 0) return "본문에 Summary: 없음"
+  const value = (lines[at] ?? "").replace(/^Summary:/, "").trim()
+  if (value === "") return "Summary: 값이 비어 있음"
+  for (const line of lines.slice(at + 1)) {
+    if (line.trim() === "" || /^[A-Z][A-Za-z ]*:/.test(line)) break
+    return `Summary: 가 한 줄이 아님 (다음 줄: ${line.trim()})`
+  }
+  const length = [...value].length
+  if (length > SUMMARY_MAX) return `Summary: ${length}자 (${SUMMARY_MAX}자 이하)`
+  return null
+}
+
+/** 'Summary: 값' 한 줄. 없으면 null */
+export function planSummaryOf(body: string): string | null {
+  const match = /^Summary:[ \t]*(.*)$/m.exec(body)
+  const value = (match?.[1] ?? "").trim()
+  return value === "" ? null : value
+}
+
 /** 들여쓴 '<name>: <값>' 줄의 첫 값 전부 */
 const refsOf = (body: string, name: string) =>
   [...body.matchAll(new RegExp(`^[ \\t]*${name}:[ \\t]*(\\S*)`, "gm"))].map((m) => m[1] ?? "")
@@ -179,6 +207,16 @@ function validateCore(ctx: CommitContext, plugins: GnamPlugin[]): Violation[] | 
             : `본문에 ${name}: 필드를 추가한다.`,
         )
       }
+    }
+
+    const summary = ctx.requireSummary === false ? null : summaryProblem(body)
+    if (summary !== null) {
+      add(
+        "plan-summary",
+        "Summary: 는 사람이 진행 상황을 볼 때 이 계획을 한 줄로 이해하는 문장이다 (specs/human-summary.md). Goal 은 구현자용으로 그대로 둔다.",
+        summary,
+        `본문에 'Summary: <이 계획이 끝나면 사용하는 사람에게 무엇이 달라지는가>' 한 줄 (${SUMMARY_MAX}자 이하, 파일 · 함수 이름 대신 결과) 을 쓴다.`,
+      )
     }
 
     for (const hash of refsOf(body, "Supersedes")) {

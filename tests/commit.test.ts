@@ -1,5 +1,6 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
+import { validateCommit } from "../src/core/commit.ts"
 import { historyArgs, cleanMessage, pushRange } from "../src/core/history.ts"
 import { fakeLookup, ruleRunner } from "./helpers.ts"
 
@@ -35,13 +36,30 @@ test("공동 작성자 줄은 대소문자 무관 거부", () => {
 })
 
 test("plan 은 같은 topic 의 spec 파일 하나 또는 빈 커밋, 본문 Goal · Plan · Blocking", () => {
-  const body = "spec.workspace.plan: 계획\n\nGoal:\nx\n\nPlan:\n1. y\n\nBlocking: 없음"
+  const body = "spec.workspace.plan: 계획\n\nSummary: s\n\nGoal:\nx\n\nPlan:\n1. y\n\nBlocking: 없음"
   eq(rules(body, []), [])
   eq(rules(body, ["specs/workspace.md"]), [])
   eq(rules(body, ["specs/other.md"]), ["commit/plan-files"])
   eq(rules(body, ["specs/workspace.md", "src/a.ts"]), ["commit/plan-files"])
-  eq(rules("spec.workspace.plan: 계획\n\nGoal:\nx\n\nBlocking: 없음"), ["commit/plan-body"])
-  eq(rules("spec.workspace.plan: 계획\n\nGoal:\nx\n\nPlan:\n1. y"), ["commit/plan-body"])
+  eq(rules("spec.workspace.plan: 계획\n\nSummary: s\n\nGoal:\nx\n\nBlocking: 없음"), ["commit/plan-body"])
+  eq(rules("spec.workspace.plan: 계획\n\nSummary: s\n\nGoal:\nx\n\nPlan:\n1. y"), ["commit/plan-body"])
+})
+
+test("plan Summary: 한 줄 · 120자 이하, 수집 plan 포함 (specs/human-summary.md)", () => {
+  const plan = (summary: string) => `spec.workspace.plan: 계획\n\n${summary}Goal:\nx\n\nPlan:\n1. y\n\nBlocking: 없음`
+  eq(rules(plan("Summary: 같은 이름의 workspace 가 둘 생기지 않는다\n\n")), [])
+  eq(rules(plan("Summary: 다음 줄이 바로 필드\n")), [])
+  eq(rules(plan(`Summary: ${"가".repeat(120)}\n\n`)), [])
+  eq(rules(plan("")), ["commit/plan-summary"])
+  eq(rules(plan("Summary:\n\n")), ["commit/plan-summary"])
+  eq(rules(plan("Summary: 첫 줄\n둘째 줄\n\n")), ["commit/plan-summary"])
+  eq(rules(plan(`Summary: ${"가".repeat(121)}\n\n`)), ["commit/plan-summary"])
+  const gatherNoSummary = "spec.workspace.plan: 수집\n\nGoal:\nx\n\nTopics: workspace\n\nPlan:\n1. a\n   From: abc1234 1\n\nBlocking: 없음"
+  eq(rules(gatherNoSummary), ["commit/plan-summary"])
+  // 전체 verify 의 도입 전 plan 면제
+  eq(validateCommit({ message: plan(""), files: [], merge: false, requireSummary: false, ...lookup }).map((v) => v.rule), [])
+  // impl · chore 는 검사하지 않음
+  eq(rules("spec.workspace.impl: 구현\n\nPlan: abc1234 1"), [])
 })
 
 test("impl 본문 첫 줄 Plan: 은 같은 topic 의 plan 커밋", () => {
@@ -52,7 +70,7 @@ test("impl 본문 첫 줄 Plan: 은 같은 topic 의 plan 커밋", () => {
 })
 
 const gather = (steps: string, topics = "Topics: workspace, billing") =>
-  `spec.workspace.plan: 남은 작업 수집\n\nGoal:\nx\n\n${topics}\n\nPlan:\n${steps}\n\nScope:\ny\n\nBlocking: 없음`
+  `spec.workspace.plan: 남은 작업 수집\n\nSummary: s\n\nGoal:\nx\n\n${topics}\n\nPlan:\n${steps}\n\nScope:\ny\n\nBlocking: 없음`
 
 test("수집 plan: Topics · 빈 커밋 · 단계마다 From:", () => {
   const steps = "1. 충돌 정책\n   From: abc1234 3\n   완료: a\n2. 청구 중단\n   From: bbb2222 Remaining\n   Spec: ccc3333"
@@ -85,7 +103,7 @@ test("impl 은 Blocking 이 남은 plan 을 따를 수 없다. Blocking 없는 �
 })
 
 test("Supersedes 는 먼저 커밋된 같은 topic plan, 수집 plan 에는 금지", () => {
-  const plan = (extra: string) => `spec.workspace.plan: 확정\n\nGoal:\nx\n\nPlan:\n1. y\n\nBlocking: 없음\n\n${extra}`
+  const plan = (extra: string) => `spec.workspace.plan: 확정\n\nSummary: s\n\nGoal:\nx\n\nPlan:\n1. y\n\nBlocking: 없음\n\n${extra}`
   eq(rules(plan("Supersedes: eee5555")), [])
   eq(rules(plan("Supersedes: fff9999")), ["commit/supersedes-ref"])
   eq(rules(plan("Supersedes: ccc3333")), ["commit/supersedes-ref"])
@@ -111,7 +129,7 @@ test("refactor 본문 Goal · Scope · Invariant, specs/ 변경 금지", () => {
 test("merge 커밋은 일반 chore 제목만 (refactor · spec 종류 거부)", () => {
   eq(rules("chore: 도구 브랜치 통합", [], true), [])
   eq(rules(refactor, [], true), ["commit/merge-kind"])
-  eq(rules("spec.workspace.plan: x\n\nGoal:\na\n\nPlan:\nb\n\nBlocking: 없음", [], true), ["commit/merge-kind"])
+  eq(rules("spec.workspace.plan: x\n\nSummary: s\n\nGoal:\na\n\nPlan:\nb\n\nBlocking: 없음", [], true), ["commit/merge-kind"])
 })
 
 test("git cleanup 처럼 주석 줄과 scissors 이후를 버린다", () => {

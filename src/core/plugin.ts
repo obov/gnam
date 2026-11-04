@@ -36,6 +36,11 @@ export interface CommitContext {
   isAncestor: (hash: string) => boolean
   /** 활성 plugin id 목록 */
   plugins: string[]
+  /**
+   * plan 의 Summary: 를 검사하는가. hook · 범위 verify = true,
+   * 전체 verify = 조상에 Summary 가 있는 plan 이 있을 때만 (도입 전 history 면제). 없으면 true
+   */
+  requireSummary?: boolean
 }
 
 /** 커밋 종류 하나. 제목이 subject 에 맞으면 이 종류가 커밋 검사를 맡는다 */

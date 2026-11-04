@@ -83,7 +83,7 @@ test("요약: 문제 · 인계 메모 · 요청 · plan (최근부터 · 외 N) 
   try {
     const f = fixture(repo)
     writeFileSync(join(repo.root, "gnam.json"), JSON.stringify({ format: 1, plugins: [] }))
-    for (let i = 0; i < 5; i++) commit(repo, `spec.c.plan: 추가 ${i}\n\nGoal:\ng\n\nPlan:\n1. x\n\nBlocking: 없음`)
+    for (let i = 0; i < 5; i++) commit(repo, `spec.c.plan: 추가 ${i}\n\nSummary: s\n\nGoal:\ng\n\nPlan:\n1. x\n\nBlocking: 없음`)
     mkdirSync(join(repo.root, ".git", "gnam"), { recursive: true })
     writeFileSync(join(repo.root, ".git", "gnam", "handoff.md"), "State:\n진행 중\n\nNext:\nrequest 2단계\n")
     const text = await summaryOf(repo.root)

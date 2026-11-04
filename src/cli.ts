@@ -1,9 +1,9 @@
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
-import { validateCommit } from "./core/commit.ts"
+import { PLAN_SUBJECT, validateCommit } from "./core/commit.ts"
 import { readConfig, requireConfig, writeConfig } from "./core/config.ts"
 import { git, gitOrThrow, lines, nulList } from "./core/git.ts"
-import { boundaryOf, cleanMessage, commitInput, gitLookup, historyArgs, pushRange } from "./core/history.ts"
+import { boundaryOf, cleanMessage, commitInput, gitLookup, historyArgs, pushRange, summaryRequirement } from "./core/history.ts"
 import { builtinIds, loadPlugins, PACKAGE_ROOT } from "./core/loader.ts"
 import type { GnamPlugin } from "./core/plugin.ts"
 import { OutputError, output, type OutputOptions, render, type Renderer } from "./core/output.ts"
@@ -66,10 +66,12 @@ async function verify(project: string, args: string[]): Promise<number> {
   const shas = git(["rev-parse", "-q", "--verify", "HEAD"], project).ok
     ? lines(gitOrThrow(["rev-list", "--reverse", ...historyArgs(range, boundary)], project))
     : []
+  const summaryRequired = range.includes("..") ? () => true : summaryRequirement(project, range)
   for (const sha of shas) {
     const input = commitInput(project, sha)
+    const requireSummary = PLAN_SUBJECT.test(input.message) ? summaryRequired(sha) : true
     const violations = validateCommit(
-      { ...input, cwd: project, view: { kind: "commit", sha }, config, ...gitLookup(project, sha) },
+      { ...input, cwd: project, view: { kind: "commit", sha }, config, requireSummary, ...gitLookup(project, sha) },
       plugins,
     )
     if (violations.length > 0) report.push(`${sha.slice(0, 7)} ${input.message.split("\n")[0]}\n\n${format(violations)}`)

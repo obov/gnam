@@ -113,7 +113,7 @@ test("verify: From 이 이후 커밋이면 조상 아님, 먼저 커밋된 plan 
   mkdirSync(join(repo.root, "specs"))
   const plan = repo.commit("specs/review.md", planMessage)
   const gather = (from: string) =>
-    `spec.review.plan: 수집\n\nGoal:\na\n\nTopics: review\n\nPlan:\n1. b\n   From: ${from} 1\n\nBlocking: 없음`
+    `spec.review.plan: 수집\n\nSummary: s\n\nGoal:\na\n\nTopics: review\n\nPlan:\n1. b\n   From: ${from} 1\n\nBlocking: 없음`
   repo.git("commit", "-q", "--no-verify", "--allow-empty", "-m", gather(plan))
   assert.equal(repo.gnam("verify", "--range", "HEAD~1..HEAD").status, 0)
   repo.git("checkout", "-q", "-b", "side", "HEAD~1")
@@ -123,6 +123,28 @@ test("verify: From 이 이후 커밋이면 조상 아님, 먼저 커밋된 plan 
   const r = repo.gnam("verify", "--range", "HEAD~1..HEAD")
   assert.notEqual(r.status, 0)
   assert.match(r.err, /조상 아님/)
+})
+
+test("verify: Summary 없는 plan 은 도입 (첫 Summary plan) 전이면 전체 history 에서 면제, 범위 검사는 항상", () => {
+  repo = tempRepo()
+  const plan = (summary: string) => `spec.review.plan: 계획\n\n${summary}Goal:\na\n\nPlan:\n1. b\n\nBlocking: 없음`
+  const empty = (message: string) => {
+    repo!.git("commit", "-q", "--no-verify", "--allow-empty", "-m", message)
+    return repo!.git("rev-parse", "HEAD").out.trim()
+  }
+  repo.commit("base.txt", "chore: base")
+  empty(plan(""))
+  assert.equal(repo.gnam("verify").status, 0, "도입 전: Summary plan 이 없으면 면제")
+  const r1 = repo.gnam("verify", "--range", "HEAD~1..HEAD")
+  assert.notEqual(r1.status, 0)
+  assert.match(r1.err, /commit\/plan-summary/)
+  empty(plan("Summary: 리뷰 요청이 한 번에 모인다\n\n"))
+  assert.equal(repo.gnam("verify").status, 0, "첫 Summary plan 과 그 앞 plan 통과")
+  const late = empty(plan(""))
+  const r2 = repo.gnam("verify")
+  assert.notEqual(r2.status, 0)
+  assert.ok(r2.err.startsWith(late.slice(0, 7)), r2.err)
+  assert.equal(r2.err.match(/commit\/plan-summary/g)?.length, 1, "도입 전 plan 은 보고하지 않음")
 })
 
 test("plugin add: 빠진 내장 의존 자동 추가, remove: 의존 있으면 거부 · --cascade", () => {

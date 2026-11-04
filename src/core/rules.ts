@@ -12,6 +12,7 @@ export const CORE_RULES: RuleMeta[] = [
   { id: "commit/refactor-body", why: "refactor 본문 Goal · Scope · Invariant" },
   { id: "commit/plan-files", why: "plan 은 spec 파일 하나 또는 빈 커밋" },
   { id: "commit/plan-body", why: "plan 본문 Goal · Plan · Blocking" },
+  { id: "commit/plan-summary", why: "plan 마다 사람용 한 줄 Summary (120자 이하)" },
   { id: "commit/supersedes-ref", why: "Supersedes 는 먼저 커밋된 같은 topic plan" },
   { id: "commit/gather-topics", why: "수집 plan 의 Topics 는 대표 topic 포함 · specs/ 파일 이름" },
   { id: "commit/gather-files", why: "수집 plan 은 빈 커밋" },

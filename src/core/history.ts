@@ -22,6 +22,20 @@ export function historyArgs(range: string, boundary: string | null): string[] {
   return [range, "--not", `${boundary}^@`]
 }
 
+/**
+ * 전체 history verify 에서 plan 의 Summary 검사 여부 (specs/human-summary.md '검사').
+ * 조상 중 Summary: 가 있는 plan 커밋이 있으면 true. 그보다 앞선 plan 은 도입 전 기록이라 면제
+ */
+export function summaryRequirement(cwd: string, rev: string): (sha: string) => boolean {
+  const out = git(["log", "--format=%H%x1f%s", "--grep=^Summary:", rev], cwd).out
+  const plans = out
+    .split("\n")
+    .map((line) => line.split("\x1f"))
+    .filter(([sha, subject]) => sha !== undefined && sha !== "" && /^spec\.[A-Za-z0-9_-]+\.plan: /.test(subject ?? ""))
+    .map(([sha]) => sha as string)
+  return (sha) => plans.some((plan) => plan !== sha && git(["merge-base", "--is-ancestor", plan, sha], cwd).ok)
+}
+
 /** 커밋 하나의 검사 입력. root 는 빈 tree 대비 (--root), merge 는 첫 부모 대비 */
 export function commitInput(cwd: string, sha: string) {
   const parents = gitOrThrow(["rev-list", "--parents", "-n", "1", sha], cwd).trim().split(" ").length - 1

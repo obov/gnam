@@ -73,7 +73,7 @@ test("첨부 줄 해석: 큰따옴표 이름 · 원래 경로 · 저장소 위�
 })
 
 test("Request 필드: plan · spec chore · chore · refactor 에 필수, impl 은 제외", () => {
-  const plan = "spec.x.plan: p\n\nGoal:\ng\n\nPlan:\n1. a\n   완료: b\n\nBlocking: 없음"
+  const plan = "spec.x.plan: p\n\nSummary: s\n\nGoal:\ng\n\nPlan:\n1. a\n   완료: b\n\nBlocking: 없음"
   expect(rules(plan, [])).toEqual(["commit/request-link"])
   expect(rules(`${plan}\n\nRequest: ${R1}`, [])).toEqual([])
   expect(rules("chore: c\n\nRequest: 없음 (반복 chore 3회 → 규칙 개선)", [])).toEqual([])

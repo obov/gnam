@@ -20,7 +20,7 @@ const rules = ruleRunner(lookup, [run, merge])
 test("merge plugin: spec.<topic>.merge 제목 허용, merge 커밋에서도 허용", () => {
   expect(rules("spec.workspace.merge: runner-1 통합")).toEqual([])
   expect(rules("spec.workspace.merge: runner-1 통합", [], true)).toEqual([])
-  expect(rules("spec.workspace.plan: x\n\nGoal:\na\n\nPlan:\nb\n\nBlocking: 없음", [], true)).toEqual(["commit/merge-kind"])
+  expect(rules("spec.workspace.plan: x\n\nSummary: s\n\nGoal:\na\n\nPlan:\nb\n\nBlocking: 없음", [], true)).toEqual(["commit/merge-kind"])
 })
 
 test("run 커밋은 merge 로 만들지 않는다", () => {

@@ -82,7 +82,7 @@ test("multirun.report: Start · Outcome · Variants · Decision 대기 · start 
 })
 
 test("결정 커밋 Multirun: report hash · 변형 · combine · discard", () => {
-  const plan = (field: string) => `spec.workspace.plan: 조합 재진행\n\nGoal:\na\n\nPlan:\n1. b\n   완료: c\n\nBlocking: 없음\n\n${field}`
+  const plan = (field: string) => `spec.workspace.plan: 조합 재진행\n\nSummary: s\n\nGoal:\na\n\nPlan:\n1. b\n   완료: c\n\nBlocking: 없음\n\n${field}`
   expect(rules(plan("Multirun: eee0002 combine"))).toEqual([])
   expect(rules("spec.workspace.merge: v1 채택\n\nMultirun: eee0002 v1")).toEqual([])
   expect(rules("spec.workspace.merge: v3 채택\n\nMultirun: eee0002 v3")).toEqual(["commit/multirun-decision"])
@@ -99,7 +99,7 @@ import { join } from "node:path"
 import { spawnSync } from "node:child_process"
 import { PACKAGE, type Repo, tempRepo } from "./helpers.ts"
 
-const PLAN = "spec.workspace.plan: 이름 유일성\n\nGoal:\na\n\nPlan:\n1. b\n   완료: c\n\nBlocking: 없음"
+const PLAN = "spec.workspace.plan: 이름 유일성\n\nSummary: s\n\nGoal:\na\n\nPlan:\n1. b\n   완료: c\n\nBlocking: 없음"
 
 /** setup = 설치 흉내 (node_modules/@obov/gnam → 이 패키지) */
 const INSTALL = `mkdir -p node_modules/@obov && ln -s '${PACKAGE}' node_modules/@obov/gnam`
@@ -182,7 +182,7 @@ test("start: plan 검사 · clone (remote 없음 · 브랜치 vN · tag 없음) 
 test("start: Blocking 남은 plan · setup 실패 → exit 1, clone · 상태 없음", () => {
   const t = setupRun({ format: 1, plugins: ["@gnam/harness", "@gnam/multirun"], multirun: { setup: "echo 설치오류; exit 3" } })
   try {
-    t.repo.git("commit", "-q", "--no-verify", "--allow-empty", "-m", "spec.workspace.plan: 설계\n\nGoal:\na\n\nBlocking:\nB1. 정책")
+    t.repo.git("commit", "-q", "--no-verify", "--allow-empty", "-m", "spec.workspace.plan: 설계\n\nSummary: s\n\nGoal:\na\n\nBlocking:\nB1. 정책")
     const blocked = t.repo.gnam("run", "multirun", "start", "HEAD", "-n", "2")
     expect(blocked.status).toBe(1)
     expect(blocked.err).toContain("Blocking")
