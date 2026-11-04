@@ -35,6 +35,8 @@ export type State = {
   expanded: string | null
   theme: Theme
   loadedAt: number
+  /** 화면 폭 (px, 모르면 0). 문단 말줄임 추정에 쓴다 */
+  width: number
 }
 
 export type Key = { key: string; mods?: { shift?: boolean; ctrl?: boolean; alt?: boolean; super?: boolean } }
@@ -84,6 +86,7 @@ export class Controller {
       expanded: null,
       theme: makeTheme(null, this.basePx, themePref),
       loadedAt: 0,
+      width: 0,
     }
   }
 
@@ -108,6 +111,10 @@ export class Controller {
     if (!px || px === this.basePx) return
     this.basePx = px
     this.set({ theme: makeTheme(this.colors, px, this.themePref) })
+  }
+
+  setWidth(px: number): void {
+    if (px > 0 && px !== this.state.width) this.set({ width: px })
   }
 
   /** 다시 읽기. force 가 아니면 HEAD · gnam.json · specs/ 가 그대로일 때 아무것도 안 함. 실패는 기존 화면 유지 */

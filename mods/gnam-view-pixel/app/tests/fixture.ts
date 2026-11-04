@@ -24,6 +24,7 @@ export const STATUS = {
   schema: 1,
   gnam: { version: '0.8.0', root: '/repo', source: 'package', format: 2 },
   project: '/repo',
+  plugins: { run: { kind: 'builtin', version: '0.1.0', commands: [{ name: 'stats', describe: 'table | health  run 커밋 집계', json: false }] } },
   builtins: [
     { id: 'lore', active: false, requires: [] },
     { id: 'run', active: true, requires: [] },
@@ -59,7 +60,7 @@ export const STATUS = {
             decisionsExpected: ['D1. 캐시 위치', 'D2. 페이지 크기'],
           }),
         ],
-        chores: [],
+        chores: [{ sha: 'c1api000', subject: 'spec.api.chore: 오타', requests: [] }],
       },
       web: {
         path: 'specs/web.md',
@@ -171,6 +172,18 @@ npm i
 \`\`\`
 `
 
+export const API_SPEC = `# api — 앱이 쓰는 외부 API
+
+문제: 앱마다 API 를 따로 불러 느리다
+
+목록 · 상세를 한 번에 받는 묶음 API.
+앱은 화면마다 한 번만 부른다.
+
+미결: 보존 기간
+
+## 판
+`
+
 export type FakeRepo = {
   head: string
   status: unknown
@@ -178,10 +191,12 @@ export type FakeRepo = {
   calls: string[][]
   /** 경로 → 수정 시각 (gnam.json · specs/ 밖) */
   mtimes: Record<string, number>
+  /** 경로 → 내용 (null = 없음) */
+  files: Record<string, string | null>
 }
 
 export function fakeRepo(): { repo: FakeRepo; loader: Loader } {
-  const repo: FakeRepo = { head: 'h1', status: STATUS, fail: false, calls: [], mtimes: { '/repo/README.md': 1 } }
+  const repo: FakeRepo = { head: 'h1', status: STATUS, fail: false, calls: [], mtimes: { '/repo/README.md': 1 }, files: { '/repo/README.md': README, '/repo/package.json': '{"name":"repo","description":"할 일 앱과 서버"}', '/repo/specs/api.md': API_SPEC } }
   const exec = async (argv: string[]): Promise<ExecResult> => {
     repo.calls.push(argv)
     if (argv[0] === 'git' && argv[1] === 'rev-parse') return { code: 0, stdout: `${repo.head}\n`, stderr: '' }
@@ -196,7 +211,7 @@ export function fakeRepo(): { repo: FakeRepo; loader: Loader } {
     return { code: 127, stdout: '', stderr: 'unknown' }
   }
   const files: Files = {
-    read: async p => (p === '/repo/README.md' ? README : p === '/repo/package.json' ? '{"name":"repo"}' : null),
+    read: async p => repo.files[p] ?? null,
     mtime: async p => (p === '/repo/gnam.json' || p.startsWith('/repo/specs/') ? 1 : (repo.mtimes[p] ?? null)),
     list: async d => (d === '/repo/specs' ? ['api.md', 'web.md', 'sync.md', 'export.md', 'lore.md', 'docs.md', 'README.md'] : null),
   }

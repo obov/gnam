@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import { buildModel, gnamKind, parseLog, parsePurpose } from '../src/model.ts'
-import { LOG, README, STATUS, withoutProblem } from './fixture.ts'
+import { buildModel, gnamKind, parseLog, parsePurpose, specDetail } from '../src/model.ts'
+import { API_SPEC, LOG, README, STATUS, fakeRepo, withoutProblem } from './fixture.ts'
 
 const build = (status: unknown = STATUS) => buildModel({ cwd: '/repo', status: status as Record<string, unknown>, readme: README, readmePath: 'README.md', log: LOG })
 
@@ -86,4 +86,22 @@ test('README 목적 · 로그 파싱', () => {
   const log = parseLog(LOG)
   assert.equal(log.length, 9)
   assert.deepEqual(log[0], { sha: 'i2api000', subject: 'feat(api): 목록 단계 1', time: 1_700_000_000 - 100, topic: 'api', kind: 'impl', files: ['src/api.ts', 'tests/api.test.ts'] })
+})
+
+test('spec 설명 (문제 줄 제외 첫 문단)', async () => {
+  assert.equal(specDetail(API_SPEC), '목록 · 상세를 한 번에 받는 묶음 API. 앱은 화면마다 한 번만 부른다.')
+  assert.equal(specDetail('# x\n\n```sh\na\n```\n'), null)
+  const { loader } = fakeRepo()
+  const m = (await loader.load())!
+  assert.equal(m.topics.api!.detail, '목록 · 상세를 한 번에 받는 묶음 API. 앱은 화면마다 한 번만 부른다.')
+  assert.equal(m.topics.web!.detail, null)
+})
+
+test('README 첫 문단이 없으면 package.json description 이 목적', async () => {
+  const { repo, loader } = fakeRepo()
+  repo.files['/repo/README.md'] = null
+  const m = (await loader.load())!
+  assert.deepEqual([m.purpose.text, m.purpose.from], ['할 일 앱과 서버', 'package.json'])
+  const { loader: withReadme } = fakeRepo()
+  assert.equal((await withReadme.load())!.purpose.from, 'README.md')
 })

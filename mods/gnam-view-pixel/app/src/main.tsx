@@ -43,12 +43,14 @@ const root = createRoot({
   onColors(colors) {
     controller.setColors(colors as TerminalColors)
   },
-  onResize({ basePx }) {
+  onResize({ basePx, width }) {
     controller.setBasePx(basePx)
+    controller.setWidth(width)
   },
 })
 
 controller.setBasePx(root.info.basePx)
+controller.setWidth(root.info.width)
 if (root.info.colors?.background || root.info.colors?.foreground) controller.setColors(root.info.colors as TerminalColors)
 root.render(<App controller={controller} />)
 void controller.refresh()

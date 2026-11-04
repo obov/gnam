@@ -4,7 +4,7 @@ import { test } from 'node:test'
 import { act, create, type ReactTestRenderer, type ReactTestRendererJSON } from 'react-test-renderer'
 
 import { Controller } from '../src/store.ts'
-import { App } from '../src/view.tsx'
+import { App, clampText } from '../src/view.tsx'
 import { NOW_MS, fakeRepo, variant } from './fixture.ts'
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -86,6 +86,8 @@ test('첫 화면: 목적 → 진행 → 지금 → 다음 → 구현된 기능, 
   // 꺼진 plugin 기능 표시
   assert.ok(texts({ toJSON: () => byId(tree, 'topic:lore')! } as ReactTestRenderer).includes('plugin 꺼짐'))
   assert.ok(!texts({ toJSON: () => byId(tree, 'topic:sync')! } as ReactTestRenderer).includes('plugin 꺼짐'))
+  // 헤더 plugin 목록 1줄
+  assert.equal(textOf(byId(tree, 'plugins-line')!), 'plugin run')
   // 하단 키 안내 1줄
   assert.match(textOf(byId(tree, 'keys')!), /j\/k/)
 })
@@ -145,7 +147,9 @@ test('j · enter 로 세 번째 topic 펼침 (문제 → 해결 → 이력 → �
   const api = texts({ toJSON: () => byId(tree, 'topic:api')! } as ReactTestRenderer)
   assert.ok(api.includes('앱마다 API 를 따로 불러 느리다'))
   assert.ok(api.includes('대체됨'))
-  assert.ok(api.includes('커밋 3'))
+  assert.ok(api.includes('커밋 3 · 정리 커밋 1'))
+  // 해결 아래 spec 설명 (문제 줄 제외)
+  assert.equal(textOf(byId(tree, 'topic-detail')!), '목록 · 상세를 한 번에 받는 묶음 API. 앱은 화면마다 한 번만 부른다.')
   assert.ok(api.includes('src/api.ts'))
   assert.ok(api.includes('막힘 1'))
   // 다른 topic 펼치면 앞의 것은 접힘 (1단)
@@ -193,4 +197,12 @@ test('r 은 강제 새로고침, 읽기 실패 시 기존 화면 + 오류 1줄',
   repo.fail = false
   await act(() => c.refresh(true))
   assert.equal(byId(tree, 'error-line'), undefined)
+})
+
+test('목적 문단: 두 줄을 넘을 것 같으면 끝에 …, 폭을 모르면 그대로', () => {
+  const long = '가'.repeat(100)
+  const cut = clampText(long, 10, 100, 2)
+  assert.ok(cut.endsWith('…') && cut.length < long.length)
+  assert.equal(clampText('짧은 목적', 10, 400, 2), '짧은 목적')
+  assert.equal(clampText(long, 10, 0, 2), long)
 })

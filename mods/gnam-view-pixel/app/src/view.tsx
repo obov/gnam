@@ -91,6 +91,26 @@ export function ago(time: number | null, now: number): string {
 
 const short = (sha: string) => sha.slice(0, 7)
 
+/** 글자 폭 추정 (em): 한글 · CJK 0.92, 공백 0.28, 그 밖 0.52 */
+const charEm = (ch: string) => (/[\u1100-\u11ff\u2e80-\ua4cf\uac00-\ud7a3\uf900-\ufaff\uff00-\uffef]/.test(ch) ? 0.92 : ch === ' ' ? 0.28 : 0.52)
+
+/**
+ * 폭 width (px) 에 fontSize 로 lines 줄을 넘을 것 같으면 잘라 '…'. width 를 모르면 (0) 그대로.
+ * 줄바꿈 손실을 감안해 줄마다 95% 만 쓴다고 본다
+ */
+export function clampText(text: string, fontSize: number, width: number, lines: number): string {
+  if (width <= 0) return text
+  const budget = (width / fontSize) * 0.95 * lines
+  let used = 0
+  let i = 0
+  for (const ch of text) {
+    used += charEm(ch)
+    if (used > budget) return `${[...text].slice(0, Math.max(0, i - 1)).join('').trimEnd()}…`
+    i++
+  }
+  return text
+}
+
 function statusLook(th: Theme, status: string): { text: string; fg: Rgba; bg: Rgba } {
   switch (status) {
     case 'done':
@@ -126,8 +146,10 @@ function SectionHead({ th, title, count, id, note }: { th: Theme; title: string;
 
 // ---------- 개요 ----------
 
-function Purpose({ th, m }: { th: Theme; m: Model }) {
+function Purpose({ th, m, width }: { th: Theme; m: Model; width: number }) {
   const p = m.purpose
+  // 본문 폭 = 화면 - 좌우 여백 - 스크롤 여백
+  const textWidth = width > 0 ? width - th.space * 7 - 4 : 0
   return (
     <Box style={{ flexDirection: 'column', gap: th.space * 0.75 }}>
       <SectionHead th={th} title="목적" id="section:purpose" note={p.from ?? undefined} />
@@ -137,11 +159,10 @@ function Purpose({ th, m }: { th: Theme; m: Model }) {
         </T>
       ) : null}
       {p.text ? (
-        <Box style={{ maxHeight: Math.round(th.size.body * 2.9), overflow: 'hidden' }}>
-          <T th={th} color={th.muted} block>
-            {p.text}
-          </T>
-        </Box>
+        // 두 줄까지, 넘치면 끝에 '…'
+        <T th={th} color={th.muted} block id="purpose-text" style={{ maxHeight: Math.round(th.size.body * 2.4), overflow: 'hidden' }}>
+          {clampText(p.text, th.size.body, textWidth, 2)}
+        </T>
       ) : (
         <T th={th} color={th.faint}>
           README 첫 문단 없음
@@ -305,6 +326,11 @@ function TopicDetail({ th, t, now }: { th: Theme; t: Topic; now: number }) {
         <T th={th} bold block>
           {t.summary ?? '(spec 첫 줄 설명 없음)'}
         </T>
+        {t.detail ? (
+          <T th={th} color={th.muted} block id="topic-detail">
+            {t.detail}
+          </T>
+        ) : null}
         {t.planSummary ? (
           <T th={th} color={th.muted} block>
             {`최근 plan · ${t.planSummary}`}
@@ -347,7 +373,7 @@ function TopicDetail({ th, t, now }: { th: Theme; t: Topic; now: number }) {
               ))}
             </Box>
           ))}
-        <SubHead th={th} text={`커밋 ${t.commits.length}`} />
+        <SubHead th={th} text={`커밋 ${t.commits.length}${t.chores ? ` · 정리 커밋 ${t.chores}` : ''}`} />
         {t.commits.map(c => (
           <CommitLine key={c.sha} th={th} c={c} now={now} />
         ))}
@@ -454,7 +480,7 @@ function Overview({ th, s, c, now }: { th: Theme; s: State; c: Controller; now: 
   const nameWidth = Math.ceil(longest * th.size.body * 0.62)
   return (
     <Box style={{ flexDirection: 'column' }}>
-      <Purpose th={th} m={m} />
+      <Purpose th={th} m={m} width={s.width} />
       <Progress th={th} m={m} />
       <Signals th={th} m={m} c={c} />
       <TopicSection th={th} s={s} c={c} names={m.now} title="지금" id="section:now" start={0} nameWidth={nameWidth} now={now} />
@@ -622,15 +648,25 @@ export function keysHint(s: State): string {
 function Header({ th, s, c }: { th: Theme; s: State; c: Controller }) {
   const m = s.model
   const meta = [m?.branch, m?.gnamVersion ? `gnam ${m.gnamVersion}` : null].filter(Boolean).join(' · ')
+  const plugins = m ? (m.plugins.length ? `plugin ${m.plugins.map(p => p.id).join(' · ')}` : 'plugin 없음 (코어 규약만)') : ''
   return (
-    <Box style={{ flexDirection: 'row', alignItems: 'center', gap: th.space * 1.5, padding: { top: 0, bottom: th.space * 1.5, left: 0, right: 0 } }}>
-      <T th={th} size="title" bold line>
-        {m?.purpose.title ?? m?.project ?? 'gnam'}
-      </T>
-      <T th={th} size="small" color={th.faint} line grow>
-        {meta}
-      </T>
-      <Box style={{ flexDirection: 'row', gap: th.space * 0.5, flexShrink: 0 }}>
+    <Box style={{ flexDirection: 'column', gap: th.space * 1.2, padding: { top: 0, bottom: th.space * 0.5, left: 0, right: 0 } }}>
+      <Box style={{ flexDirection: 'row', alignItems: 'center', gap: th.space * 1.5 }}>
+        <T th={th} size="title" bold line>
+          {m?.purpose.title ?? m?.project ?? 'gnam'}
+        </T>
+        <Box style={{ flexDirection: 'column', gap: 1, flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0 }}>
+          <T th={th} size="small" color={th.faint} line>
+            {meta}
+          </T>
+          {plugins ? (
+            <T th={th} size="tiny" color={th.faint} line id="plugins-line">
+              {plugins}
+            </T>
+          ) : null}
+        </Box>
+      </Box>
+      <Box style={{ flexDirection: 'row', gap: th.space * 0.5, overflow: 'hidden' }}>
         {tabsOf(m).map((t, i) => {
           const on = s.tab === t.id
           return (
@@ -647,7 +683,7 @@ function Header({ th, s, c }: { th: Theme; s: State; c: Controller }) {
               }}
             >
               <T th={th} size="small" color={on ? th.accent : th.muted} bold={on} line>
-                {`${i + 1} ${t.label}`}
+                {i < 9 ? `${i + 1} ${t.label}` : t.label}
               </T>
             </Box>
           )

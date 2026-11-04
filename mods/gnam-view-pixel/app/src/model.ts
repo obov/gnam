@@ -52,6 +52,8 @@ export type Topic = {
   problem: string | null
   /** spec 첫 줄 설명 (해결하는 기능) */
   summary: string | null
+  /** spec 제목 · 문제 줄 다음 첫 문단 (설명) */
+  detail: string | null
   /** 최근 (대체 안 된) plan 의 Summary */
   planSummary: string | null
   /** 목록 한 줄: planSummary → summary → 최근 plan 제목 */
@@ -73,6 +75,8 @@ export type Topic = {
   blocking: string[]
   /** 최근 plan 은 끝났지만 미구현 · 미결 · 막힘이 남음 → '지금' 묶음, '다음 계획 필요' */
   needsPlan: boolean
+  /** 정리 커밋 (spec.<topic>.chore) 수 */
+  chores: number
   /** 마지막 커밋 시각 */
   lastTime: number | null
 }
@@ -86,8 +90,12 @@ export type Problem = { source: string | null; text: string }
 
 export type Purpose = { title: string | null; tagline: string | null; text: string | null; from: string | null }
 
+export type PluginInfo = { id: string; version: string; kind: string }
+
 export type Model = {
   project: string
+  /** 켜진 plugin (status plugins) */
+  plugins: PluginInfo[]
   branch: string | null
   head: string | null
   gnamVersion: string | null
@@ -210,6 +218,30 @@ export function parsePurpose(readme: string | null, from: string): Purpose {
   return { title, tagline, text, from }
 }
 
+/** spec 본문: 첫 '# ' 제목 · '문제:' 줄 다음 첫 문단 (빈 줄 · 제목 · 코드 · 목록 · 표 · '미구현:' 전까지) 을 한 줄로 */
+export function specDetail(text: string | null): string | null {
+  if (!text) return null
+  const rows = text.split('\n')
+  const h1 = rows.findIndex(l => /^#\s/.test(l))
+  const out: string[] = []
+  let fence = false
+  for (const l of rows.slice(h1 + 1)) {
+    const t = l.trim()
+    if (t.startsWith('```')) fence = !fence
+    if (fence || t.startsWith('```')) {
+      if (out.length) break
+      continue
+    }
+    const stop = t === '' || /^(#|```|[-*|>]\s|\d+\.\s|<)/.test(t) || /^(문제|미구현|미결|Problem):/.test(t)
+    if (stop) {
+      if (out.length) break
+      continue
+    }
+    out.push(t)
+  }
+  return out.length ? out.join(' ').replace(/\*\*|__|`/g, '') : null
+}
+
 const DECISION_LINE = /^\s*[-*]?\s*(D\d+\s*[:.].*)$/
 
 function decisionLines(text: unknown): string[] {
@@ -248,6 +280,10 @@ export type Raw = {
   readme: string | null
   readmePath: string
   log: string
+  /** package.json description (README 첫 문단이 없을 때 목적) */
+  pkgDescription?: string | null
+  /** topic → spec 파일 내용 */
+  specs?: Record<string, string | null>
 }
 
 export function buildModel(raw: Raw): Model {
@@ -286,6 +322,7 @@ export function buildModel(raw: Raw): Model {
       group: needsPlan ? 'now' : (GROUP_OF[status] ?? 'next'),
       problem: 'problem' in t ? str(t.problem) : null,
       summary,
+      detail: specDetail(raw.specs?.[name] ?? null),
       planSummary,
       headline: planSummary ?? summary ?? live?.title ?? '',
       status,
@@ -300,6 +337,7 @@ export function buildModel(raw: Raw): Model {
       unimplemented,
       blocking,
       needsPlan,
+      chores: arr(t.chores).length,
       lastTime: Math.max(0, ...mine.map(c => c.time), ...plans.map(p => p.time ?? 0)) || null,
     }
     if (!exists) orphans.push(name)
@@ -340,12 +378,16 @@ export function buildModel(raw: Raw): Model {
   const requests: Request[] = arr(trace.requests).map(r => ({ sha: String(r.sha ?? ''), subject: stripPrefix(String(r.subject ?? '')), status: String(r.status ?? 'open'), by: Array.isArray(r.by) ? r.by.length : 0 }))
   const stepsLive = [...now, ...next].filter(n => !topics[n]!.needsPlan).map(n => topics[n]!.progress)
 
+  let purpose = parsePurpose(raw.readme, raw.readmePath)
+  if (!purpose.text && raw.pkgDescription) purpose = { ...purpose, text: raw.pkgDescription, from: 'package.json' }
+
   return {
+    plugins: Object.entries((s.plugins ?? {}) as Record<string, Json>).map(([id, p]) => ({ id, version: String(p?.version ?? '?'), kind: String(p?.kind ?? '?') })),
     project: (typeof s.project === 'string' ? s.project : raw.cwd).split('/').filter(Boolean).at(-1) ?? raw.cwd,
     branch: str(s.env?.branch),
     head: str(trace.head),
     gnamVersion: str(s.gnam?.version),
-    purpose: parsePurpose(raw.readme, raw.readmePath),
+    purpose,
     counts: {
       topics: live.length,
       now: now.filter(n => !topics[n]!.needsPlan).length,
@@ -412,7 +454,7 @@ export class Loader {
   async signature(): Promise<string> {
     const head = await this.exec(['git', 'rev-parse', 'HEAD'], this.cwd).catch(() => null)
     const parts = [head?.code === 0 ? head.stdout.trim() : 'no-head', String(await this.files.mtime(`${this.cwd}/gnam.json`))]
-    for (const f of [`${this.cwd}/README.md`, `${this.cwd}/readme.md`, this.handoffPath]) if (f) parts.push(String(await this.files.mtime(f)))
+    for (const f of [`${this.cwd}/README.md`, `${this.cwd}/readme.md`, `${this.cwd}/package.json`, this.handoffPath]) if (f) parts.push(String(await this.files.mtime(f)))
     const specs = (await this.files.list(`${this.cwd}/specs`)) ?? []
     for (const f of specs.filter(f => f.endsWith('.md')).sort()) parts.push(`${f}@${await this.files.mtime(`${this.cwd}/specs/${f}`)}`)
     return parts.join('|')
@@ -452,7 +494,16 @@ export class Loader {
       readmePath = 'readme.md'
       readme = await this.files.read(`${this.cwd}/readme.md`)
     }
-    const model = buildModel({ cwd: this.cwd, status, readme, readmePath, log: log.code === 0 ? log.stdout : '' })
+    let pkgDescription: string | null = null
+    if (!parsePurpose(readme, readmePath).text) {
+      try {
+        pkgDescription = str(JSON.parse((await this.files.read(`${this.cwd}/package.json`)) ?? '{}').description)
+      } catch {}
+    }
+    const specs: Record<string, string | null> = {}
+    for (const [name, t] of Object.entries((status.trace.topics ?? {}) as Record<string, Json>))
+      if (name && t?.exists !== false) specs[name] = await this.files.read(`${this.cwd}/${String(t.path ?? `specs/${name}.md`)}`)
+    const model = buildModel({ cwd: this.cwd, status, readme, readmePath, log: log.code === 0 ? log.stdout : '', pkgDescription, specs })
     this.handoffPath = model.handoffPath
     // 인계 메모 경로를 이제 알았으면 그 수정 시각까지 넣은 서명으로 기억 (다음 비교가 같은 모양)
     this.last = model.handoffPath ? await this.signature() : sig
