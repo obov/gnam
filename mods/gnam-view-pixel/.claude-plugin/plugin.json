@@ -1,0 +1,22 @@
+{
+  "name": "gnam-view-pixel",
+  "version": "0.1.0",
+  "description": "gnam 저장소가 어떤 문제를 어떤 기능으로 해결했고 지금 무엇을 하는지 pixel (kitty graphics) 로 그린 pane 에 보여 준다",
+  "author": {
+    "name": "obov"
+  },
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "theme": {
+      "type": "string",
+      "title": "색",
+      "description": "auto = 터미널 색을 받으면 그것, 아니면 어두운 기본값. dark · light = 기본값 고정",
+      "default": "auto",
+      "options": [
+        "auto",
+        "dark",
+        "light"
+      ]
+    }
+  }
+}

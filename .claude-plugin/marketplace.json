@@ -6,6 +6,11 @@
       "name": "gnam-view",
       "source": "./mods/gnam-view",
       "description": "gnam spec 진행 · 결정 · 요청 · 커밋 · plugin 상태를 Claude Code pane 으로 표시"
+    },
+    {
+      "name": "gnam-view-pixel",
+      "source": "./mods/gnam-view-pixel",
+      "description": "gnam 저장소가 어떤 문제를 어떤 기능으로 해결했고 지금 무엇을 하는지 pixel (kitty graphics) 그림 pane 으로 표시"
     }
   ]
 }
