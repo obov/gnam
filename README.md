@@ -56,6 +56,7 @@ npx gnam run <plugin> <command>        # plugin 명령
 | `s3` | 첨부를 S3 호환 저장소에 sha256 key 로 보관 · `put` · `get` · `url` · `check` | - |
 | `harness` | harness-execute 스킬 (에이전트 세션 실행 · adapter · `claude-args.sh`) | - |
 | `multi-agent` | multi-agent · agent-routing 스킬 · `status` | run, merge, harness |
+| `layout` | `.gnam/layout.json` 폴더 구조 선언 · 커밋마다 새 위반 경고 (`enforce: block` 이면 거부) · `layout:` 커밋 · `where` · `check` · `show` · `capture` | - |
 | `multirun` | 같은 plan 을 N 개 clone 에서 변형 실행 · 원본 tag 보존 · report 비교 · `start` · `sync` · `status` · `collect` · `open` · `close` · `abort` | harness |
 
 표기: `@gnam/<id>` (내장) · `./경로` (로컬) · npm 패키지명 (외부).
@@ -69,7 +70,7 @@ export default definePlugin({
   id: "docs",
   version: "0.1.0",
   kinds: [{ label: "docs: …", subject: /^docs: \S/, validate: (ctx) => [] }],
-  verify: (cwd, files, config) => [],        // gnam verify 의 파일 검사
+  verify: (cwd, files, config, plugins) => [],  // gnam verify 의 파일 검사. 위반 level: "warn" 이면 실패시키지 않음
   commands: { hello: { describe: "예시", run: () => 0 } },
   skills: ["skills/docs"],                   // plugin 루트 기준. SKILL.md 디렉터리
   skillDeps: [                               // GitHub 스킬 의존. add 때 commit 으로 잠가 .gnam/skills/<name>/ 에 받는다
@@ -77,6 +78,7 @@ export default definePlugin({
   ],
   agentsMd: "agents.md",                     // AGENTS.md gnam 블록에 들어갈 조각
   scaffold: { "docs/README.md": "files/README.md" },
+  layout: { rules: { pages: { name: "docs", children: [{ name: "{kebab-case}.md" }] } } },  // layout.json 에서 ruleId "docs.pages"
   status: { sections: { pages: {             // gnam status 의 plugins.docs.sections.pages
     describe: "문서 목록",
     collect: (ctx) => [{ path: "docs/a.md", state: "draft" }],

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.0
+
+- 내장 plugin `layout` (specs/layout.md): `.gnam/layout.json` 에 폴더 구조를 선언 (eslint-plugin-project-structure folder-structure 호환 부분 집합: structure · rules · ruleId · enforceExistence · 재귀 · regexParameters · ignorePatterns · structureRoot). commit-msg 는 부모 대비 새 위반만 경고, gnam.json `layout.enforce: "block"` 이면 거부. `layout:` 커밋 (layout.json 만 · 본문 Goal). `gnam run layout where · check · show · capture`, status `plugins.layout.sections.rules` (탭) · `violations`
+- 위반 등급: plugin 위반 `level: "warn"` 은 출력만 하고 commit-msg · verify 를 실패시키지 않는다 (`GNAM/<rule> (warn)`)
+- plugin 계약: `GnamPlugin.layout` (layout 규칙 · 파라미터 제공), `CommitContext.active` (활성 plugin 객체), `verify` 4번째 인자 plugins
+
 ## 0.5.0
 
 - plan 커밋 본문 `Summary:` 필수 (사람용 한 줄, 120자 이하, 규칙 `commit/plan-summary`). commit-msg · `verify --range` · `--push` 는 항상, 전체 `verify` 는 첫 Summary plan 이후만 검사 (도입 전 plan 면제)
