@@ -5,6 +5,7 @@
  */
 import { existsSync, readdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
+import { planSummaryOf } from "./commit.ts"
 import { fieldsOf, fieldText, itemsOf, requestRefOf } from "./fields.ts"
 import { git, gitOrThrow, lines } from "./git.ts"
 import { boundaryOf, historyArgs } from "./history.ts"
@@ -38,6 +39,8 @@ export interface Impl {
 export interface Plan {
   sha: string
   subject: string
+  /** 사람용 한 줄 (본문 Summary:). 없으면 null (specs/human-summary.md) */
+  summary: string | null
   requests: string[]
   supersedes: string | null
   supersededBy: string | null
@@ -59,6 +62,8 @@ export interface Marker {
 export interface Topic {
   path: string
   exists: boolean
+  /** spec 첫 줄 '# <topic> — <설명>' 의 설명. 없으면 null (specs/human-summary.md) */
+  summary: string | null
   unimplemented: Marker[]
   open: Marker[]
   plans: Plan[]
@@ -99,6 +104,16 @@ const IMPL = /^spec\.([A-Za-z0-9_-]+)\.impl: /
 const SPEC_CHORE = /^spec\.([A-Za-z0-9_-]+)\.chore: /
 const CHORE = /^(?:chore|refactor): /
 const REQUEST = /^request: /
+/** spec 첫 '# ' 줄에서 topic 이름 뒤 구분자 (— · : · -) 다음 설명. 이름뿐 · 줄 없음이면 null */
+export function specSummaryOf(name: string, text: string): string | null {
+  const heading = text.split("\n").find((line) => /^#\s/.test(line))
+  if (heading === undefined) return null
+  const title = heading.replace(/^#\s+/, "").trim()
+  const rest = title.startsWith(name) ? title.slice(name.length) : title
+  const match = /^\s*[—:–-]\s*(.+)$/.exec(rest)
+  return match === null ? null : (match[1] ?? "").trim() || null
+}
+
 const MARKER = (name: string) => new RegExp(`^\\s*(?:[-*]\\s+)?${name}:\\s*(.*)$`)
 
 /** 오래된 것부터 */
@@ -220,6 +235,7 @@ export function collectTrace(cwd: string, since?: string): Trace {
     plans.set(c.sha, {
       sha: c.sha,
       subject: c.subject,
+      summary: planSummaryOf(c.body),
       requests: requestsOf(c),
       supersedes: supersedes === "" ? null : resolve(supersedes, planCommits),
       supersededBy: null,
@@ -318,7 +334,7 @@ export function collectTrace(cwd: string, since?: string): Trace {
     const topicPlans = [...plans.values()].filter((p) => p.topics.includes(name) && planKept(p)).map(({ topics: _, ...p }) => p)
     const topicChores = (chores.get(name) ?? []).filter((c) => inRange(c.sha))
     if (range !== null && topicPlans.length === 0 && topicChores.length === 0) continue
-    topics[name] = { path, exists, unimplemented: markers(text, "미구현"), open, plans: topicPlans, chores: topicChores }
+    topics[name] = { path, exists, summary: specSummaryOf(name, text), unimplemented: markers(text, "미구현"), open, plans: topicPlans, chores: topicChores }
   }
   const decisionsBlocking = [...plans.values()]
     .filter((p) => p.supersededBy === null && p.blocking.length > 0 && inRange(p.sha))

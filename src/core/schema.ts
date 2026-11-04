@@ -32,6 +32,7 @@ const IMPL = obj({
 const PLAN = obj({
   sha: str(),
   subject: str(),
+  summary: strOrNull("사람용 한 줄 (본문 Summary:)"),
   requests: arr(str()),
   supersedes: strOrNull(),
   supersededBy: strOrNull(),
@@ -67,6 +68,7 @@ const TRACE = obj(
         additionalProperties: obj({
           path: str(),
           exists: bool,
+          summary: strOrNull("spec 첫 줄 '# <topic> — <설명>' 의 설명"),
           unimplemented: arr(marker),
           open: arr(marker),
           plans: arr(PLAN),

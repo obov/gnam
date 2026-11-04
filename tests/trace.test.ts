@@ -1,6 +1,8 @@
+import { writeFileSync } from "node:fs"
+import { join } from "node:path"
 import { test } from "node:test"
 import { expect } from "./expect.ts"
-import { collectTrace, stepNumbers, stepsOf, TraceError } from "../src/core/trace.ts"
+import { collectTrace, specSummaryOf, stepNumbers, stepsOf, TraceError } from "../src/core/trace.ts"
 import { tempRepo } from "./helpers.ts"
 import { fixture } from "./trace-fixture.ts"
 
@@ -125,6 +127,30 @@ test("trace --since: 범위 안 항목만, 범위 안 impl 의 plan 포함, stat
       error = e
     }
     expect(error).toBeInstanceOf(TraceError)
+  } finally {
+    repo.cleanup()
+  }
+})
+
+test("trace: topic summary = spec 첫 줄 설명, plan summary = 본문 Summary: (specs/human-summary.md)", () => {
+  expect(specSummaryOf("a", "# a — 사람용 설명\n\n본문")).toBe("사람용 설명")
+  expect(specSummaryOf("a", "# a: 콜론 설명")).toBe("콜론 설명")
+  expect(specSummaryOf("my-topic", "# my-topic - 하이픈 설명")).toBe("하이픈 설명")
+  expect(specSummaryOf("a", "# a\n\n본문")).toBe(null)
+  expect(specSummaryOf("a", "본문만")).toBe(null)
+  const repo = tempRepo(null)
+  try {
+    repo.commit("gnam.json", "chore: base")
+    repo.git("commit", "-q", "--no-verify", "--allow-empty", "-m", 'chore: format')
+    const plan = (summary: string) => `spec.a.plan: p\n\n${summary}Goal:\ng\n\nPlan:\n1. x\n\nBlocking: 없음`
+    repo.commit("specs/a.md", plan("Summary: 목록이 한 번에 보인다\n\n"))
+    repo.git("commit", "-q", "--no-verify", "--allow-empty", "-m", plan(""))
+    repo.commit("specs/b.md", "spec.b.chore: b\n\nGoal:\ng\n\nScope:\ns")
+    writeFileSync(join(repo.root, "specs/a.md"), "# a — 사람용 설명\n\n본문\n")
+    const trace = collectTrace(repo.root)
+    expect(trace.topics["a"]?.summary).toBe("사람용 설명")
+    expect(trace.topics["a"]?.plans.map((p) => p.summary)).toEqual(["목록이 한 번에 보인다", null])
+    expect(trace.topics["b"]?.summary).toBe(null)
   } finally {
     repo.cleanup()
   }
