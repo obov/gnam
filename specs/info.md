@@ -109,12 +109,15 @@ sha · subject · summary (본문 Summary: 사람용 한 줄, 없으면 null) ·
 supersedes · supersededBy · dropped (Dropped: 줄)
 blocking    Blocking 항목 (없음이면 [])
 decisionsExpected · risks · open   본문 필드의 항목 (D · R 번호 유지)
-steps       n · title · done (완료: 줄) · impls (그 단계를 Plan: 으로 가리킨 impl sha 목록)
-status      superseded | done (모든 단계에 impl) | partial | not-started
+steps       n · title · done (완료: 줄) · impls (그 단계를 Plan: 으로 가리킨 impl sha 목록) · parts (하위 단계 id · title · impls, 없으면 [])
+status      superseded | done (모든 단계에 impl, parts 가 있으면 parts 마다) | partial | not-started
 impls       sha · subject · step · deviation · decisions · remaining · deferred (본문 필드 원문, 없으면 null)
 ```
 
 - 단계 줄 (plan Plan: 절) = `1. 제목` 또는 `S1 제목` · `S1. 제목` (마일스톤 규약의 S 번호, skills/gnam/references/commits/milestone-close.md). n 은 숫자 부분
+- 하위 단계 줄 = `S4a. 제목` · `S4a 제목` (들여쓰기 없음). 부모 단계 4 의 parts (id `4a` · title · impls) 로 묶는다. 부모 줄 (`S4 …`) 이 없으면 단계 4 를 만들고 title = parts 제목을 ' · ' 로 이음
+- parts 가 있는 단계는 parts 마다 impl 이 있어야 impl 있는 단계로 센다 (status · n/m). 부모 참조 (`S4`) 는 모든 parts 를 가리킨다
+- 미구현: 하위 단계 줄 · parts
 - impl Plan: 의 단계 참조 = `3` · `1-3` · `S3` · `S1-S3` · `S1-3` · 하위 단계 `S3a` (단계 3 을 가리킨다). 쉼표 · 공백으로 여러 개
 - summary 두 키의 형식 · 검사: specs/human-summary.md
 - chores = 그 topic 의 spec.<topic>.chore 커밋 sha · subject · requests. topic 없는 chore · refactor 는 trace.topics."" 아래
