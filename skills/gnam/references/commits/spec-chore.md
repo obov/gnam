@@ -35,4 +35,20 @@ specs/README.md 인덱스 1행
 Gnam: spec.README.chore
 ```
 
+대체 기록 — plan 이 대체됐는데 대체한 plan 에 `Supersedes` 가 없으면 (지난 커밋은 고치지 않는다)
+대체된 plan 의 topic 에 spec chore 빈 커밋 (spec 파일이 없어진 topic 도 가능).
+
+```text
+docs(mirror): plan fe84872 이 export plan 5a5eb53 으로 대체됨을 기록
+
+Goal:
+mirror plan 이 export 로 이름을 바꿔 다시 쓴 plan 에 대체됐음을 status 가 읽게 한다.
+
+Scope:
+없음 (빈 커밋)
+
+Superseded-By: fe84872 5a5eb53
+Gnam: spec.mirror.chore
+```
+
 format 1 제목: `spec.<topic>.chore: …` (trailer 없음).

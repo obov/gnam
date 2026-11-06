@@ -102,13 +102,25 @@ test("impl 은 Blocking 이 남은 plan 을 따를 수 없다. Blocking 없는 �
   eq(rules("spec.workspace.impl: x\n\nPlan: abc1234 1"), [])
 })
 
-test("Supersedes 는 먼저 커밋된 같은 topic plan, 수집 plan 에는 금지", () => {
+test("Supersedes 는 먼저 커밋된 plan (다른 topic 가능), 수집 plan 에는 금지", () => {
   const plan = (extra: string) => `spec.workspace.plan: 확정\n\nSummary: s\n\nGoal:\nx\n\nPlan:\n1. y\n\nBlocking: 없음\n\n${extra}`
   eq(rules(plan("Supersedes: eee5555")), [])
   eq(rules(plan("Supersedes: fff9999")), ["commit/supersedes-ref"])
-  eq(rules(plan("Supersedes: ccc3333")), ["commit/supersedes-ref"])
+  eq(rules(plan("Supersedes: ccc3333")), [])
   eq(rules(plan("Supersedes: bbb2222")), ["commit/supersedes-ref"])
   eq(rules(`${gather("1. a\n   From: abc1234 1")}\n\nSupersedes: eee5555`), ["commit/supersedes-ref"])
+})
+
+test("Superseded-By 는 spec chore 의 '<이 topic plan> <대체한 plan>'", () => {
+  const chore = (extra: string) => `spec.billing.chore: 대체 기록\n\nGoal:\nx\n\nScope:\ny\n\n${extra}`
+  eq(rules(chore("Superseded-By: ccc3333 abc1234")), [])
+  eq(rules(chore("Superseded-By: ccc3333")), ["commit/superseded-by-ref"])
+  eq(rules(chore("Superseded-By: ccc3333 abc1234 eee5555")), ["commit/superseded-by-ref"])
+  eq(rules(chore("Superseded-By: abc1234 ccc3333")), ["commit/superseded-by-ref"])
+  eq(rules(chore("Superseded-By: ccc3333 bbb2222")), ["commit/superseded-by-ref"])
+  eq(rules(chore("Superseded-By: ccc3333 fff9999")), ["commit/superseded-by-ref"])
+  eq(rules(chore("Superseded-By: ccc3333 ccc3333")), ["commit/superseded-by-ref"])
+  eq(rules(`spec.workspace.plan: 확정\n\nSummary: s\n\nGoal:\nx\n\nPlan:\n1. y\n\nBlocking: 없음\n\nSuperseded-By: eee5555 abc1234`), ["commit/superseded-by-ref"])
 })
 
 test("spec chore 본문 Goal · Scope", () => {

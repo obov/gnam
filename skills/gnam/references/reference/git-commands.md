@@ -38,7 +38,7 @@ Git 은 이 관계를 모른다 — 추적 품질은 커밋 메시지 규칙을 
 | 커밋마다 종류 · 연결 값 | `git log --format='%h %(trailers:key=Gnam,valueonly,separator=) %(trailers:key=Plan,valueonly,separator=) %s'` |
 | 종류별 커밋 수 | `git shortlog -s --group=trailer:Gnam HEAD` |
 | 이 계획을 실행한 커밋은 | `git log --all --oneline --grep='<plan-hash>'` |
-| 이 계획을 대체한 plan 은 | `git log --all --oneline --grep='Supersedes: <plan-hash>'` |
+| 이 계획을 대체한 plan 은 | `git log --all --oneline --grep='Supersedes: <plan-hash>' --grep='Superseded-By: <plan-hash>'` |
 | 구현 · 합의가 남은 요구사항 | `git grep -n -E '미구현:\|미결:' -- specs/` |
 | 이 결정의 이유 + diff | `git show <hash>` |
 | 이 개념은 언제 생겼나 | `git log -S'<string>' -p -- specs/<topic>.md` |
