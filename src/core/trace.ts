@@ -341,6 +341,17 @@ export function collectTrace(cwd: string, since?: string): Trace {
     const target = plans.get(plan.supersedes)
     if (target !== undefined) target.supersededBy = plan.sha
   }
+  // spec chore 의 'Superseded-By: <대체된 plan> <대체한 plan>' (대체를 나중에 기록). Supersedes 가 우선
+  for (const c of commits) {
+    if (!SPEC_CHORE.test(c.subject)) continue
+    for (const line of c.body.split("\n")) {
+      const match = /^Superseded-By:[ \t]*([0-9a-f]{7,40})[ \t]+([0-9a-f]{7,40})[ \t]*$/.exec(line)
+      if (match === null) continue
+      const target = plans.get(resolve(match[1] ?? "", planCommits))
+      const by = resolve(match[2] ?? "", planCommits)
+      if (target !== undefined && target.supersededBy === null && plans.has(by) && by !== target.sha) target.supersededBy = by
+    }
+  }
   const items: Item[] = []
   const chores = new Map<string, Topic["chores"]>()
   const touched = new Set<string>()

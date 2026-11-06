@@ -171,6 +171,26 @@ test("trace: plan status 4종 · 단계별 impl · supersededBy · 수집 plan",
   }
 })
 
+test("trace: 다른 topic Supersedes · spec chore 의 Superseded-By 로 superseded", () => {
+  const repo = tempRepo(null)
+  try {
+    commit(repo, "chore: gnam 도입", { "gnam.json": JSON.stringify({ format: 2, plugins: [] }) })
+    const plan = (topic: string, extra = "") =>
+      commit(repo, `docs(${topic}): 계획\n\nGoal:\ng\n\nPlan:\n1. a\n   완료: a 테스트\n\nSummary: s\nBlocking: 없음\n${extra}Gnam: spec.${topic}.plan`)
+    const old1 = plan("old")
+    const new1 = plan("next", `Supersedes: ${old1.slice(0, 7)}\n`)
+    const old2 = plan("gone")
+    const new2 = plan("kept")
+    commit(repo, `docs(gone): 대체 기록\n\nGoal:\ng\n\nScope:\n없음\n\nSuperseded-By: ${old2.slice(0, 7)} ${new2.slice(0, 7)}\nGnam: spec.gone.chore`)
+    const trace = collectTrace(repo.root)
+    expect(trace.topics["old"]?.plans.map((p) => [p.status, p.supersededBy])).toEqual([["superseded", new1]])
+    expect(trace.topics["gone"]?.plans.map((p) => [p.status, p.supersededBy])).toEqual([["superseded", new2]])
+    expect(trace.topics["kept"]?.plans.map((p) => [p.status, p.supersedes])).toEqual([["not-started", null]])
+  } finally {
+    repo.cleanup()
+  }
+})
+
 test("trace: request status 3종 · agent · items 출처", () => {
   const repo = tempRepo(null)
   try {

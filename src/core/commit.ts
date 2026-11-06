@@ -142,7 +142,7 @@ function coAuthor(message: string): Violation[] {
 }
 
 const SPEC_KIND = /^spec\.([A-Za-z0-9_-]+)\.(plan|impl|chore|merge)$/
-const ONE_LINE_FIELDS = /^(?:Gnam|Summary|Blocking|Topics|Supersedes|Plan: [0-9a-f]{7,40}\b)/
+const ONE_LINE_FIELDS = /^(?:Gnam|Summary|Blocking|Topics|Supersedes|Superseded-By|Plan: [0-9a-f]{7,40}\b)/
 type Level = "patch" | "minor" | "major"
 const LEVEL_RANK: Record<Level, number> = { patch: 0, minor: 1, major: 2 }
 
@@ -170,7 +170,7 @@ function format2Problems(ctx: CommitContext, subject: string, body: string): Vio
     if (ONE_LINE_FIELDS.test(line)) {
       add(
         "trailer-field",
-        "한 줄 필드 (Gnam · Summary · Blocking · Plan · Topics · Supersedes) 는 메시지 끝 trailer 단락에 둔다. git 이 trailer 로 읽어야 조회된다.",
+        "한 줄 필드 (Gnam · Summary · Blocking · Plan · Topics · Supersedes · Superseded-By) 는 메시지 끝 trailer 단락에 둔다. git 이 trailer 로 읽어야 조회된다.",
         line,
         "그 줄을 메시지 마지막 단락 (Key: value 줄만) 으로 옮긴다.",
       )
@@ -373,13 +373,13 @@ function validateCore(ctx: CommitContext, plugins: GnamPlugin[]): Violation[] | 
             ? "커밋 없음"
             : !isAncestor(hash)
               ? "조상 아님"
-              : PLAN_SUBJECT.exec(refSubject)?.[1] !== topic
-                ? `같은 topic plan 아님 (${refSubject})`
+              : !PLAN_SUBJECT.test(refSubject)
+                ? `plan 아님 (${refSubject})`
                 : null
       if (problem !== null) {
         add(
           "supersedes-ref",
-          "Supersedes: 는 이 plan 이 대체하는 먼저 커밋된 같은 topic plan 이다. 수집 plan 은 From: 으로 다시 모은다.",
+          "Supersedes: 는 이 plan 이 대체하는 먼저 커밋된 plan 이다 (topic 이름 변경이면 다른 topic). 수집 plan 은 From: 으로 다시 모은다.",
           `Supersedes: ${hash || "(빈 값)"} → ${problem}`,
           `git log --oneline --grep '^spec\\.${topic}\\.plan:' 에서 hash 를 고른다. 수집 plan 이면 Supersedes 대신 From: <이전 수집 hash> <단계>.`,
         )
@@ -498,6 +498,39 @@ function validateCore(ctx: CommitContext, plugins: GnamPlugin[]): Violation[] | 
       if (!fields(name)) {
         add("chore-body", "spec chore 본문은 Goal · Scope 를 적는다.", `본문에 ${name}: 없음`, `본문에 ${name}: 필드를 추가한다.`)
       }
+    }
+  }
+
+  for (const line of body.split("\n").filter((l) => /^Superseded-By:/.test(l))) {
+    const value = line.replace(/^Superseded-By:/, "").trim()
+    const [old = "", next = "", ...extra] = value.split(/\s+/).filter(Boolean)
+    const planCheck = (hash: string) => {
+      if (!HASH.test(hash)) return `hash 아님 (${hash || "빈 값"})`
+      const refSubject = subjectOf(hash)
+      if (refSubject === null) return `${hash} 커밋 없음`
+      if (!isAncestor(hash)) return `${hash} 조상 아님`
+      if (!PLAN_SUBJECT.test(refSubject)) return `${hash} plan 아님 (${refSubject})`
+      return null
+    }
+    const problem =
+      kind !== "chore"
+        ? "spec chore 에서만 씀"
+        : extra.length > 0
+          ? "hash 2개만"
+          : (planCheck(old) ??
+            planCheck(next) ??
+            (old.startsWith(next) || next.startsWith(old)
+              ? "같은 plan"
+              : PLAN_SUBJECT.exec(subjectOf(old) ?? "")?.[1] !== topic
+                ? `대체된 plan 의 topic 이 ${topic} 아님`
+                : null))
+    if (problem !== null) {
+      add(
+        "superseded-by-ref",
+        "Superseded-By: 는 이 topic 의 먼저 커밋된 plan 이 다른 plan 으로 대체됐음을 나중에 적는 spec chore trailer 다. 값은 '<대체된 plan> <대체한 plan>'.",
+        `${line.trim()} → ${problem}`,
+        `'Superseded-By: <spec.${topic}.plan hash> <대체한 plan hash>' 한 줄을 spec chore (Gnam: spec.${topic}.chore) trailer 에 둔다.`,
+      )
     }
   }
   return violations

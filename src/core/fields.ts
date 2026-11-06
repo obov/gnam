@@ -2,7 +2,7 @@
  * 커밋 본문 필드 해석. 필드 = 줄 머리 '<이름>:' 부터 다음 필드 머리 전까지 (commits/ 본문 필드 형식).
  * commit 검사 · request plugin · status trace 가 같이 쓴다.
  */
-const FIELD = /^([A-Z][A-Za-z ]*):[ \t]*(.*)$/
+const FIELD = /^([A-Z][A-Za-z -]*):[ \t]*(.*)$/
 
 /** 필드 이름 → 값 줄 (머리 줄 나머지 + 다음 줄들, 끝 빈 줄 제외). 같은 이름이 여러 번이면 마지막 */
 export function fieldsOf(body: string): Map<string, string[]> {

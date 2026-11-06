@@ -90,7 +90,8 @@ spec 파일을 새로 만들거나 첫 부분을 고칠 때 사람용 두 줄을
 (확정 내용은 그 커밋에서 spec 에 반영, 본문 `Blocking: 없음`).
 
 ```text
-Supersedes   (trailer) 이전 plan hash. 같은 topic 의 plan
+Supersedes   (trailer) 이전 plan hash. topic 이름을 바꿔 다시 쓰면 이전 topic 의 plan
+             빠뜨렸으면 이전 topic 의 spec chore 에 Superseded-By: <이전 plan> <새 plan> (commits/spec-chore.md)
 Dropped      (선택, 본문) 이전 plan 에서 버린 단계. <hash> <단계> <이유> 한 줄씩
              끝난 단계는 적지 않는다 (impl 의 Plan: 기록이 있음)
 impl         새 impl 은 새 plan 을 가리킨다. 이미 들어간 impl 은 이전 plan 을 가리킨 채로 둔다
