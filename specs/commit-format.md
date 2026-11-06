@@ -91,6 +91,7 @@ Blocking     plan. 'Blocking: 없음' 또는 항목마다 'Blocking: B<n> <내�
 Plan         impl. '<plan hash> <단계>'
 Topics       수집 plan. 'a, b'
 Supersedes   plan. 대체하는 plan hash
+Superseded-By spec chore. '<대체된 plan hash> <대체한 plan hash>'. 대체 사실을 나중에 기록
 Breaking     plan. 쓰는 쪽이 할 일 한 줄. release 수준 근거이고 그 자체로 릴리스를 만들지 않는다
 ```
 
@@ -98,6 +99,14 @@ Breaking     plan. 쓰는 쪽이 할 일 한 줄. release 수준 근거이고 �
 - 수집 plan 의 `Spec:` · `From:` 은 단계 아래 들여쓴 줄 (본문, format 1 과 같음). 값이 단계마다 붙는다
 - run 의 `Agent:` · `Why:` 줄은 trailer 단락에 함께 둔다 (줄 단위로 읽음)
 - 그 밖의 본문 필드 (Goal · Plan 단계 · Scope · Decisions expected · Risks · Open · Intent · Implementation · Decisions · Invariant · Deferred …) 는 본문
+
+## 계획 대체
+
+- `Supersedes` 는 먼저 커밋된 plan 을 가리킨다. topic 이 달라도 된다 (topic 이름 변경). 수집 plan 에는 쓰지 않는다
+- 대체한 plan 에 `Supersedes` 를 빠뜨렸으면 대체된 plan 의 topic 에 spec chore 를 쓰고 `Superseded-By: <대체된 plan> <대체한 plan>` trailer 를 단다. 지난 커밋은 고치지 않는다
+- `Superseded-By` 검사 (`commit/superseded-by-ref`): spec chore 에서만 · 두 hash 모두 먼저 커밋된 plan · 대체된 plan 의 topic = chore topic · 두 hash 가 다름
+- trace: 둘 중 어느 표기로든 대체된 plan 은 `supersededBy` = 대체한 plan, status `superseded`. 둘이 겹치면 `Supersedes` 가 우선
+- spec chore 는 spec 파일이 없어진 topic 에도 쓸 수 있다 (빈 커밋)
 
 ## impl 의 type
 
