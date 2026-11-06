@@ -59,6 +59,16 @@ herdr agent prompt <name> "리뷰 결과 반영 지시 /tmp/<run>-<name>-<n>.md 
 
 ## wait
 
+부모 지정 (SKILL.md '시작 인자', 이 세션에 `AWAKE_SESSION_ID`) 이 있으면 기다리지 않는다. 턴을 끝내면 자식이 턴을 마칠 때마다 `<awake kind="report">` (본문 = 자식의 마지막 응답) 로 새 턴이 시작된다. 먼저 끝난 자식부터 처리한다.
+
+```sh
+awake wake on-report "<할 일>" --mode all --timeout 1h   # 선택: 전부 보고했을 때 한 번 · 시간 상한 (timeout = kind="timeout")
+```
+
+보고가 오지 않는 경우 = 승인 대기 · 폴더 신뢰 대화상자 · 프로세스 종료. timeout 으로 깨어나면 `herdr agent list` 로 blocked 확인 후 아래와 같이 처리.
+
+부모 지정이 없을 때:
+
 ```sh
 herdr agent wait <name> --timeout 1800000     # Bash run_in_background 로. 전경 블로킹 금지
 herdr agent list                              # working / idle / blocked / done

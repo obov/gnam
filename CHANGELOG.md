@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- harness claude-args.sh (specs/multirun.md 'harness plugin'): `--settings` 가 여러 개면 yq 로 병합해 cache 파일 하나로 넘긴다. 호출 세션에 `AWAKE_SESSION_ID` 가 있으면 병합에 `env.AWAKE_PARENT_ID` (awake 부모 지정). herdr-claude wait: 부모 지정이 있으면 `herdr agent wait` 대신 보고로 깨어남 · `awake wake on-report --timeout` 으로 상한
 - 계획 대체 (specs/commit-format.md): `Supersedes` 가 다른 topic 의 plan 도 가리킨다 (topic 이름 변경). 대체한 plan 에 `Supersedes` 를 빠뜨렸으면 대체된 plan 의 topic 에 spec chore 를 쓰고 `Superseded-By: <대체된 plan> <대체한 plan>` trailer 를 단다. trace 가 두 표기 모두 `supersededBy` · status `superseded` 로 읽는다. 검사 `commit/superseded-by-ref`
 - trace 하위 단계 (specs/info.md): plan Plan: 절의 하위 단계 줄 `S4a. 제목` · `S4a 제목` 을 단계 4 의 `parts` ({ id · title · impls }) 로 묶는다 (부모 줄 없으면 단계 4 생성, title = parts 제목 ' · '). impl `S4a` 참조는 단계 4 와 parts 4a, `S4` 참조는 단계 4 와 모든 parts 에 연결. parts 가 있는 단계는 parts 마다 impl 이 있어야 status done · 요약 n/m 에 센다 (하위 단계 줄을 쓴 기존 plan 은 done → partial 로 바뀔 수 있다). `--schema` step 에 `parts`
 - trace 단계 (specs/info.md): plan Plan: 절의 단계 줄 `S1 제목` · `S1. 제목` 과 impl `Plan: <hash>` 의 단계 참조 `S3` · `S1-S3` · `S1-3` · `S3a` (단계 3) 를 숫자 단계와 같게 읽는다. S 번호로 기록한 저장소의 plan 이 0/0 대신 실제 진행 n/m · status 를 낸다

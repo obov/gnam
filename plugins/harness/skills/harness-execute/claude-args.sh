@@ -17,6 +17,7 @@
 # 쓰던 `claude \ --tools … --settings …` 명령을 그대로 붙여 넣어도 된다 (맨 앞 claude 는 무시).
 # 값 확장은 하지 않는다 (eval 없음). 경로는 절대 경로 또는 ~/ 로 시작.
 # --session-id · --model · --effort 는 세션마다 호출자가 정하므로 파일에 있어도 버린다.
+# --settings 여러 개 · 호출 세션 AWAKE_SESSION_ID 있음 → yq 로 병합한 파일 하나 (env.AWAKE_PARENT_ID 포함). 아래 emit 참고
 set -euo pipefail
 
 here="$(cd "$(dirname "$0")" && pwd)"
@@ -70,10 +71,47 @@ strip_session_flags() { # stdin → stdout
   done
 }
 
-emit() {
+raw_args() {
   local kind path
   read -r kind path < <(pick)
   if [ "$kind" = default ]; then default_args; else file_args "$path" | strip_session_flags; fi
+}
+
+# --settings 가 여러 개 (Claude Code 는 마지막 하나만 적용) 이거나 호출 세션이 awake 에 등록돼 있으면
+# yq '. *+ $i' 로 하나로 합친 파일 (cache) 경로 하나로 바꾼다. 부모 지정 = env.AWAKE_PARENT_ID
+emit() {
+  local a want=0 n=0 i
+  local rest=() settings=()
+  while IFS= read -r a; do
+    if [ "$want" = 1 ]; then settings+=("$a"); want=0; continue; fi
+    case "$a" in
+      --settings) want=1 ;;
+      --settings=*) settings+=("${a#--settings=}") ;;
+      *) rest+=("$a") ;;
+    esac
+  done < <(raw_args)
+  [ -z "${AWAKE_SESSION_ID:-}" ] || settings+=("{\"env\":{\"AWAKE_PARENT_ID\":\"$AWAKE_SESSION_ID\"}}")
+  n=${#settings[@]}
+  if [ "$n" -le 1 ] && [ -z "${AWAKE_SESSION_ID:-}" ]; then raw_args; return; fi
+  command -v yq > /dev/null 2>&1 || { printf 'claude-args.sh: --settings 병합에 yq 필요\n' >&2; exit 1; }
+  local tmp files=() merged cache out
+  tmp="$(mktemp -d)"
+  for i in "${!settings[@]}"; do
+    a="${settings[$i]}"
+    case "$a" in
+      "{"*) printf '%s\n' "$a" > "$tmp/$i.json"; files+=("$tmp/$i.json") ;;
+      *) [ -f "$a" ] || { rm -rf "$tmp"; printf 'claude-args.sh: settings 파일 없음: %s\n' "$a" >&2; exit 1; }
+         files+=("$a") ;;
+    esac
+  done
+  merged="$(yq -o json ea '. as $i ireduce ({}; . *+ $i)' "${files[@]}")" || { rm -rf "$tmp"; exit 1; }
+  rm -rf "$tmp"
+  cache="${XDG_CACHE_HOME:-$HOME/.cache}/gnam"
+  mkdir -p "$cache"
+  out="$cache/claude-settings-$(printf '%s' "$merged" | shasum -a 256 | cut -c1-16).json"
+  [ -f "$out" ] || printf '%s\n' "$merged" > "$out"
+  [ "${#rest[@]}" = 0 ] || printf '%s\n' "${rest[@]}"
+  printf '%s\n' --settings "$out"
 }
 
 case "${1:-}" in

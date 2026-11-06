@@ -70,6 +70,8 @@ bash .agents/skills/harness-execute/claude-args.sh --file <경로>   # 세션별
 - 파일을 저장소에 커밋하면 팀이 공유하고, `.gitignore` 에 넣으면 개인 설정. 실행 중인 세션은 바뀌지 않는다. 새로 띄우는 세션부터 적용
 - 세션별 파일: 세션마다 다른 인자가 필요하면 호출자가 `--file <경로>` 를 adapter start 에 넘긴다. 형식 · 제거 규칙 같음. 없는 경로 = exit 1
 - 파일이 있으면 기본값은 쓰이지 않는다. `--dangerously-skip-permissions` 를 빼면 세션이 권한 확인에서 blocked
+- settings 조각 여러 개: 평소처럼 `--settings <파일>` 을 여러 번 적는다. claude-args.sh 가 yq `. *+ $i` 로 합쳐 `${XDG_CACHE_HOME:-~/.cache}/gnam/claude-settings-<hash>.json` 하나로 넘긴다 (Claude Code 는 마지막 `--settings` 만 적용). 인라인 JSON 도 된다. yq 필요
+- 부모 지정 (awake): 호출 세션에 `AWAKE_SESSION_ID` 가 있으면 병합에 `env.AWAKE_PARENT_ID` 를 넣는다. 조각에 awake 플러그인이 있으면 자식이 부모로 등록되고, 턴을 끝낼 때마다 마지막 응답이 이 세션에 보고로 도착한다 (지시 불필요)
 
 ## adapter 선택
 

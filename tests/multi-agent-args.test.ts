@@ -18,9 +18,11 @@ function setup() {
   mkdirSync(repo)
   mkdirSync(home)
   spawnSync("git", ["init", "-q"], { cwd: repo })
-  const env = { ...process.env, HOME: home, XDG_CONFIG_HOME: join(home, ".config"), HERDR_ENV: "1" }
-  const run = (...args: string[]) => {
-    const child = spawnSync("bash", [argsScript, ...args], { cwd: repo, env, encoding: "utf8" })
+  const env: NodeJS.ProcessEnv = { ...process.env, HOME: home, XDG_CONFIG_HOME: join(home, ".config"), XDG_CACHE_HOME: join(home, ".cache"), HERDR_ENV: "1" }
+  delete env.AWAKE_SESSION_ID
+  const run = (...args: string[]) => runWith({}, ...args)
+  const runWith = (extra: NodeJS.ProcessEnv, ...args: string[]) => {
+    const child = spawnSync("bash", [argsScript, ...args], { cwd: repo, env: { ...env, ...extra }, encoding: "utf8" })
     return { status: child.status, out: child.stdout.trim(), err: child.stderr }
   }
   const project = join(repo, ".gnam/claude-args")
@@ -29,7 +31,7 @@ function setup() {
     mkdirSync(join(file, ".."), { recursive: true })
     writeFileSync(file, text)
   }
-  return { dir, repo, home, env, run, project, global, put }
+  return { dir, repo, home, env, run, runWith, project, global, put }
 }
 
 test("claude 시작 인자: 파일이 없으면 기본값", () => {
@@ -131,6 +133,43 @@ test("clone.sh start 가 설정 인자 뒤에 session · model · effort 를 붙
       "--effort",
       "high",
     ])
+  } finally {
+    rmSync(t.dir, { recursive: true, force: true })
+  }
+})
+
+test("claude 시작 인자: --settings 여러 개 병합 · AWAKE_SESSION_ID → env.AWAKE_PARENT_ID", () => {
+  const t = setup()
+  try {
+    const a = join(t.dir, "a.json")
+    const b = join(t.dir, "b.json")
+    writeFileSync(a, JSON.stringify({ hooks: { Stop: [{ hooks: [{ type: "command", command: "a" }] }] }, env: { X: "1" } }))
+    writeFileSync(b, JSON.stringify({ hooks: { Stop: [{ hooks: [{ type: "command", command: "b" }] }] }, enabledPlugins: { "awake@awake": true } }))
+    t.put(t.global, `--tools Bash \\\n--settings ${a} \\\n--settings ${b}\n`)
+    const out = t.run().out.split("\n")
+    expect(out.slice(0, 3)).toEqual(["--tools", "Bash", "--settings"])
+    expect(out).toHaveLength(4)
+    const merged = JSON.parse(readFileSync(out[3]!, "utf8"))
+    expect(merged.hooks.Stop.map((h: any) => h.hooks[0].command)).toEqual(["a", "b"])
+    expect(merged.env).toEqual({ X: "1" })
+    expect(merged.enabledPlugins).toEqual({ "awake@awake": true })
+
+    const withParent = t.runWith({ AWAKE_SESSION_ID: "ss_p1" }).out.split("\n")
+    expect(JSON.parse(readFileSync(withParent[3]!, "utf8")).env).toEqual({ X: "1", AWAKE_PARENT_ID: "ss_p1" })
+    expect(JSON.parse(t.runWith({ AWAKE_SESSION_ID: "ss_p1" }, "--json").out)[3]).toBe(withParent[3])
+
+    // 단일 settings · awake 없음 → 그대로
+    t.put(t.global, `--settings ${a}\n`)
+    expect(t.run().out.split("\n")).toEqual(["--settings", a])
+    // settings 없음 + awake → 부모 지정만 담은 병합 파일
+    t.put(t.global, "--tools Bash\n")
+    const only = t.runWith({ AWAKE_SESSION_ID: "ss_p2" }).out.split("\n")
+    expect(JSON.parse(readFileSync(only[3]!, "utf8"))).toEqual({ env: { AWAKE_PARENT_ID: "ss_p2" } })
+    // 없는 파일 · yq 없음 → exit 1
+    t.put(t.global, `--settings ${a} --settings ${join(t.dir, "none.json")}\n`)
+    expect(t.run().status).toBe(1)
+    t.put(t.global, `--settings ${a} --settings ${b}\n`)
+    expect(t.runWith({ PATH: "/usr/bin:/bin" }).status).toBe(/yq/.test(spawnSync("bash", ["-c", "PATH=/usr/bin:/bin command -v yq"], { encoding: "utf8" }).stdout) ? 0 : 1)
   } finally {
     rmSync(t.dir, { recursive: true, force: true })
   }
