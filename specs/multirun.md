@@ -204,6 +204,9 @@ harness-execute 스킬 (adapter · system-prompt · claude-args.sh) 을 내장 p
 - 스킬 경로 · 이름 그대로 (`.agents/skills/harness-execute`). 기존 문서 참조 변경 없음
 - 세션별 claude 시작 인자: `claude-args.sh --file <경로>` 가 프로젝트 · 전역 파일 대신 그 파일을 쓴다 (형식 · --session-id · --model · --effort 제거 규칙 같음, 없는 경로 = exit 1). multirun 배정에서 변형마다 지정할 수 있다. model · effort 는 start 의 --model · --effort
 - 이전 항목 (CHANGELOG): multi-agent 를 쓰는 저장소는 `npx gnam plugin add harness`
+- settings 병합: 인자에 `--settings` 가 여러 개면 (파일 경로 또는 인라인 JSON) yq `. *+ $i` 로 하나로 합쳐 파일 하나로 넘긴다 (Claude Code 는 마지막 `--settings` 만 적용). 병합 파일 = `${XDG_CACHE_HOME:-~/.cache}/gnam/claude-settings-<내용 hash>.json`. yq 가 없으면 exit 1
+- 부모 지정: 호출 세션에 `AWAKE_SESSION_ID` 가 있으면 병합에 `env.AWAKE_PARENT_ID` 를 넣는다. 자식 세션의 awake 플러그인이 부모로 등록하고, 자식이 턴을 끝낼 때마다 부모에게 자동 보고한다 (awake Stop hook). 모든 adapter · clone.sh 공통
+- 대기 (herdr-claude): 부모 지정이 있으면 `herdr agent wait` 대신 턴을 끝내고 보고 (`<awake kind="report">`) 로 깨어난다. 시간 상한은 `awake wake on-report --mode all --timeout <시간>`. 시간 초과 · 보고 없음 = `herdr agent list` 로 blocked 확인 (승인 · 폴더 신뢰 대화상자는 보고가 오지 않는다)
 
 ## 변형 · 요약 세션 규칙
 
