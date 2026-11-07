@@ -1,6 +1,6 @@
 {
   "name": "gnam-view",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "gnam spec 진행 · 결정 · 요청 · 커밋 · plugin 상태를 아이콘 카드 pane 으로 표시",
   "types": "./types/index.d.ts",
   "userConfig": {
