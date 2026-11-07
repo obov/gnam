@@ -161,3 +161,33 @@ test('설정: 탭 숨기기 · 순서 · 프로젝트 탭 · 새 탭 저장 (gna
   expect(saved.view.tabs).toEqual([{ id: 'items-risk', title: '항목 · risk', source: 'trace.items', view: 'list', where: { kind: 'risk' }, fields: { title: 'text', meta: 'sha' } }])
   await ui.unmount()
 })
+
+test('/clear 후 열린 pane 다시 읽기', async ($, on) => {
+  let loads = 0
+  let onLoad: () => void = () => {}
+  const nextLoad = () => new Promise<void>(r => { onLoad = r })
+  on('classic.SessionStart', () => ({}))
+  on('command.register', () => ({ value: { command: 'gnam-view' } }))
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  on('session.start', (_: unknown, e: any) => ({ cwd: e.cwd }))
+  on('session.cwd', () => ({ value: '/repo' }))
+  on('clock.now', () => ({ value: 1000 }))
+  on('fs.exists', () => ({ value: false }))
+  on('process.run', () => ({ value: { exitCode: 1, stdout: '', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }))
+  on('state.set', { plugin: 'gnam-view', key: 'view' } as any, async (_: unknown, e: any, next: any) => {
+    const r = await next(e)
+    const v = e.value?.value ?? e.value
+    if (v?.loadedAt > 0 && v?.isLoading === false) (loads += 1, onLoad())
+    return r
+  })
+  await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+  await $.classic.SessionStart({ source: 'clear' } as any)
+  expect(loads).toBe(0)
+  const opened = nextLoad()
+  await $.command.run({ command: 'gnam-view', args: '' } as any)
+  await opened
+  const again = nextLoad()
+  await $.classic.SessionStart({ source: 'clear' } as any)
+  await again
+  expect(loads).toBe(2)
+})

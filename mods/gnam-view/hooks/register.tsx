@@ -675,6 +675,12 @@ export const register: Register = (on, options) => {
     return next(e)
   })
 
+  // /clear 는 session.start 없이 새 세션으로 넘어가며 $.state 가 비므로, 열린 pane 을 다시 읽는다
+  on('classic.SessionStart', async ($, e, next) => {
+    if (isOpen && e.source === 'clear') void refresh($)
+    return next(e)
+  })
+
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const els = $.ui.resolve(e)
     const { Box, Text, Button } = els
